@@ -48,6 +48,8 @@ public final class AuditAction {
     public static final String BOOKING_CANCELLED = "BOOKING_CANCELLED";
 
     public static final String PAYMENT_CONFIRMED = "PAYMENT_CONFIRMED";
+    public static final String PAYMENT_SUBMITTED = "PAYMENT_SUBMITTED";
+    public static final String PAYMENT_CANCELLED = "PAYMENT_CANCELLED";
     public static final String PAYMENT_FAILED = "PAYMENT_FAILED";
     public static final String PAYMENT_AMOUNT_MISMATCH = "PAYMENT_AMOUNT_MISMATCH";
     public static final String REFUND_COMPLETED = "REFUND_COMPLETED";

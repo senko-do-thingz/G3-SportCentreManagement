@@ -36,6 +36,7 @@ public class MemberPaymentResponse {
 
     private LocalDateTime time;
     private LocalDateTime paymentTime;
+    private LocalDateTime submittedForVerificationAt;
     private LocalDateTime createdAt;
 
     private Long memberId;

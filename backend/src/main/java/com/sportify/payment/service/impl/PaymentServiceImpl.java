@@ -9,6 +9,7 @@ import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.common.SecurityUtils;
 import com.sportify.core.exception.BusinessRuleException;
+import com.sportify.core.exception.ConflictException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
@@ -20,6 +21,7 @@ import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.repository.PaymentRepository;
+import com.sportify.payment.service.PaymentCancellationGuard;
 import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,7 +44,113 @@ public class PaymentServiceImpl implements PaymentService {
     private final CodeFormatter codeFormatter;
     private final Clock clock;
     private final CashCaptureService cashCaptureService;
+
+    @Override
+    @Transactional
+    public PaymentResponse submitForVerification(Long id, UserAccount actor) {
+        Payment payment = ownedPendingPayment(id, actor);
+        if (payment.getSubmittedForVerificationAt() == null) {
+            payment.setSubmittedForVerificationAt(LocalDateTime.now(clock));
+            paymentRepository.saveAndFlush(payment);
+            auditPayment(com.sportify.core.audit.AuditAction.PAYMENT_SUBMITTED, payment, actor);
+        }
+        return mapToPaymentResponse(payment);
+    }
+
+    @Override
+    @Transactional
+    public PaymentResponse cancelPayment(Long id, UserAccount actor) {
+        Payment payment = ownedPendingPayment(id, actor);
+        requireCancellable(payment, "This payment has been submitted or settlement has begun and can no longer be cancelled");
+        var registration = sportPackageRegistrationRepository.findByPaymentId(id);
+        var card = memberCardRepository.findByPaymentId(id);
+        if (registration.isPresent() == card.isPresent()) {
+            throw new ConflictException("Payment must have exactly one linked pending item");
+        }
+        if (registration.isPresent()) {
+            var item = registration.get();
+            if (item.getStatus() != PackageRegistrationStatus.PENDING_PAYMENT) {
+                throw new ConflictException("Package registration is no longer pending");
+            }
+            item.setStatus(PackageRegistrationStatus.CANCELLED);
+            item.setCancelledAt(LocalDateTime.now(clock));
+            item.setCancelReason("Payment cancelled by member");
+            sportPackageRegistrationRepository.save(item);
+        } else {
+            var item = card.get();
+            if (item.getStatus() != CardStatus.PENDING_PAYMENT) {
+                throw new ConflictException("Membership card is no longer pending");
+            }
+            item.setStatus(CardStatus.CANCELLED);
+            memberCardRepository.save(item);
+        }
+        payment.setPaymentStatus(PaymentStatus.CANCELLED);
+        closeOpenCheckouts(payment);
+        payment.setNotes(PaymentNotes.append(payment.getNotes(), "Payment cancelled by member user id " + actor.getId()));
+        paymentRepository.saveAndFlush(payment);
+        auditPayment(com.sportify.core.audit.AuditAction.PAYMENT_CANCELLED, payment, actor);
+        PaymentResponse response = mapToPaymentResponse(payment);
+        response.setNotes(null);
+        return response;
+    }
+
+    /**
+     * Payment-first locking: the payment row is locked (pessimistic write) before its status, handoff time or linked
+     * card/package is read, the same order the Receptionist, wallet and QR settlement paths use. A cancellation and a
+     * concurrent confirmation therefore run one after the other, and the second sees the first one's result.
+     */
+    /**
+     * One cancellation rule for every path, checked with the payment row locked: no Receptionist handoff, no
+     * settlement marker on the payment, and no channel (demo QR, later VietQR) with a checkout or settlement under way.
+     */
+    private void requireCancellable(Payment payment, String settledMessage) {
+        if (payment.getSubmittedForVerificationAt() != null || payment.getPaymentTime() != null
+                || payment.getReferenceCode() != null || payment.getSettlementType() != null
+                || payment.getSettlementProvider() != null || payment.getSimulatedTransactionId() != null) {
+            throw new ConflictException(settledMessage);
+        }
+        for (PaymentCancellationGuard guard : cancellationGuards) {
+            String reason = guard.blockedReason(payment);
+            if (reason != null) throw new ConflictException(reason);
+        }
+    }
+
+    private void closeOpenCheckouts(Payment payment) {
+        for (PaymentCancellationGuard guard : cancellationGuards) guard.onCancelled(payment);
+    }
+
+    private java.util.List<PaymentCancellationGuard> cancellationGuards = java.util.List.of();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setCancellationGuards(java.util.List<PaymentCancellationGuard> guards) {
+        this.cancellationGuards = java.util.List.copyOf(guards);
+    }
+
+    private Payment ownedPendingPayment(Long id, UserAccount actor) {
+        Payment payment = lockPayment(id);
+        if (actor == null || payment.getMember() == null || !payment.getMember().getId().equals(actor.getId())) {
+            throw new ResourceNotFoundException("Payment not found for id: " + id);
+        }
+        if (payment.getPaymentStatus() != PaymentStatus.PENDING) {
+            throw new ConflictException("Payment is " + payment.getPaymentStatus() + " and can no longer be changed");
+        }
+        return payment;
+    }
     private com.sportify.catalog.service.OperationalMemberPolicy transferMemberPolicy;
+    private com.sportify.core.audit.AuditService auditService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setAuditService(com.sportify.core.audit.AuditService auditService) {
+        this.auditService = auditService;
+    }
+
+    private void auditPayment(String action, Payment payment, UserAccount actor) {
+        if (auditService != null) auditService.record(com.sportify.core.audit.AuditEvent.builder()
+                .actor(actor).action(action).entityType("PAYMENT").entityId(payment.getId())
+                .entityCode(payment.getPaymentCode()).summary("Payment " + payment.getPaymentCode() + " "
+                        + (action.equals(com.sportify.core.audit.AuditAction.PAYMENT_CANCELLED) ? "cancelled" : "submitted for verification"))
+                .build());
+    }
 
     @org.springframework.beans.factory.annotation.Autowired
     void setTransferMemberPolicy(com.sportify.catalog.service.OperationalMemberPolicy policy) {
@@ -205,6 +313,20 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
+    public Payment markPaymentCancelled(Long paymentId, String reason) {
+        Payment payment = lockPayment(paymentId);
+        if (payment.getPaymentStatus() != PaymentStatus.PENDING) {
+            throw new ConflictException("This payment can no longer be cancelled");
+        }
+        requireCancellable(payment, "This payment can no longer be cancelled");
+        payment.setPaymentStatus(PaymentStatus.CANCELLED);
+        closeOpenCheckouts(payment);
+        payment.setNotes(PaymentNotes.append(payment.getNotes(), reason));
+        return paymentRepository.save(payment);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
     public Payment lockPayment(Long paymentId) {
         if (paymentId == null) {
             throw new BusinessRuleException("Payment ID cannot be null");
@@ -256,6 +378,9 @@ public class PaymentServiceImpl implements PaymentService {
 
         if (payment.getPaymentStatus() != PaymentStatus.PENDING) {
             throw new BusinessRuleException("Only pending payments can have their payment method updated");
+        }
+        if (payment.getSubmittedForVerificationAt() != null) {
+            throw new ConflictException("Payment has been submitted for verification and cannot be changed");
         }
 
         memberCardRepository.findByPaymentId(payment.getId()).ifPresent(card -> {
@@ -338,6 +463,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .invoiceNumber(invoiceNumber)
                 .notes(payment.getNotes())
                 .paymentTime(payment.getPaymentTime())
+                .submittedForVerificationAt(payment.getSubmittedForVerificationAt())
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
                 .build();

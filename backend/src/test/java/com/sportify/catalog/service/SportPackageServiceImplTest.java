@@ -784,7 +784,8 @@ public class SportPackageServiceImplTest {
         PackageRegistrationResponse res = sportPackageService.cancelRegistration(88L, memberUser);
 
         assertEquals(PackageRegistrationStatus.CANCELLED, res.getStatus());
-        verify(paymentService).markPaymentFailed(eq(88L), org.mockito.ArgumentMatchers.contains("member user id 100"));
+        // A Member cancelling before the Receptionist handoff cancels the payment instead of failing it.
+        verify(paymentService).markPaymentCancelled(eq(88L), org.mockito.ArgumentMatchers.contains("member user id 100"));
     }
 
     @Test
@@ -1210,7 +1211,7 @@ public class SportPackageServiceImplTest {
         order.verify(registrationRepository).findPaymentIdById(88L);
         order.verify(paymentService).lockPayment(88L);
         order.verify(registrationRepository).findById(88L);
-        order.verify(paymentService).markPaymentFailed(eq(88L), any());
+        order.verify(paymentService).markPaymentCancelled(eq(88L), any());
     }
 
     // ---------- BE-19: payment at the desk ----------

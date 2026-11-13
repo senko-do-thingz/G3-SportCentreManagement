@@ -37,6 +37,9 @@ class AuthenticationControllerTest {
 
     @MockitoBean
     private AuthenticationService authenticationService;
+
+    @MockitoBean
+    private com.sportify.identity.service.PasswordRecoveryService passwordRecoveryService;
     
     @MockitoBean
     private JwtService jwtService;
