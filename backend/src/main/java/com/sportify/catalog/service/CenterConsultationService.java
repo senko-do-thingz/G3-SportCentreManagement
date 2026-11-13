@@ -152,6 +152,7 @@ public class CenterConsultationService {
             || intent.equals("UNKNOWN") && contains(raw,"today","h\u00F4m nay")))intent="STAFF";
         Consultation draft=switch(intent) {
             case "STAFF" -> staffOverview(vi,mode,role,memberId);
+            case "CLASS_MANAGEMENT" -> classManagement(vi,mode,role);
             case "PRIVATE","UNKNOWN" -> unknown(vi,mode);
             case "COACH" -> coach(vi,mode);
             case "FAQ" -> faq==null?unknown(vi,mode):faqAnswer(vi,mode,faq);
@@ -299,6 +300,21 @@ public class CenterConsultationService {
         return response(vi,mode,"ANSWERED",t(vi,"Here is your Sportify workspace overview:\n","T\u1ED5ng quan c\u00F4ng vi\u1EC7c Sportify c\u1EE7a b\u1EA1n:\n")+lines,sources);
     }
 
+    /**
+     * A question about performing a management action is not a request for a list of published sessions.
+     * No action is performed by this assistant, regardless of role or AI availability.
+     */
+    private static Consultation classManagement(boolean vi,String mode,String role) {
+        if("MANAGER".equals(role))return response(vi,mode,"ANSWERED",t(vi,
+            "Yes. As Manager, open My workspace > Classes > Create class. Enter the name, sport, age group, level, qualified coach and maximum members. Save the class, then create its sessions in Schedule and coaches. I can explain the steps but cannot create a class for you.",
+            "C\u00F3. V\u1EDBi vai tr\u00F2 Manager, v\u00E0o My workspace > Classes > Create class. Nh\u1EADp t\u00EAn l\u1EDBp, m\u00F4n, nh\u00F3m tu\u1ED5i, tr\u00ECnh \u0111\u1ED9, Coach \u0111\u1EE7 \u0111i\u1EC1u ki\u1EC7n v\u00E0 s\u1ED1 h\u1ECDc vi\u00EAn t\u1ED1i \u0111a. L\u01B0u l\u1EDBp r\u1ED3i t\u1EA1o session t\u1EA1i Schedule and coaches. Spori kh\u00F4ng t\u1EF1 t\u1EA1o l\u1EDBp."),
+            List.of(new ConsultationSource("PRODUCT_GUIDANCE",0,t(vi,"Manager class creation","T\u1EA1o l\u1EDBp cho Manager"),
+                t(vi,"Only a Manager can create or change classes; sessions are scheduled separately.","Ch\u1EC9 Manager \u0111\u01B0\u1EE3c t\u1EA1o ho\u1EB7c s\u1EEDa l\u1EDBp; session \u0111\u01B0\u1EE3c x\u1EBFp l\u1ECBch ri\u00EAng."),"")));
+        return response(vi,mode,"ANSWERED",t(vi,
+            "Class creation is a Manager action. Your current role cannot create classes. Ask the Manager to set up the class; I can help you find published sessions instead.",
+            "Vi\u1EC7c t\u1EA1o l\u1EDBp thu\u1ED9c quy\u1EC1n Manager. Vai tr\u00F2 hi\u1EC7n t\u1EA1i c\u1EE7a b\u1EA1n kh\u00F4ng \u0111\u01B0\u1EE3c t\u1EA1o l\u1EDBp. H\u00E3y li\u00EAn h\u1EC7 Manager \u0111\u1EC3 t\u1EA1o l\u1EDBp; Spori c\u00F3 th\u1EC3 t\u00ECm bu\u1ED5i h\u1ECDc \u0111\u00E3 c\u00F4ng b\u1ED1."),List.of());
+    }
+
     /** Up to six published sessions with booked and total places, without any Member detail. */
     private List<ConsultationSource> sessionsSummary(boolean vi,String where,Object... args) {
         try {
@@ -437,6 +453,10 @@ public class CenterConsultationService {
 
     /** Rule-based intent after the guard. */
     static String rules(String raw,String plain) {
+        // Action/permission questions must not be misclassified as schedule lookups just because they say "class".
+        if(contains(raw,"create class","create a class","create new class","add a class","add class",
+            "set up a class","make a class","manage classes","t\u1EA1o l\u1EDBp","th\u00EAm l\u1EDBp","qu\u1EA3n l\u00FD l\u1EDBp")
+            || contains(plain,"tao lop","them lop","quan ly lop"))return "CLASS_MANAGEMENT";
         if(faq(raw,plain)!=null)return "FAQ";
         if(contains(raw,"homework","coach feedback","my feedback","my training","my progress","my results","my result",
             "b\u00E0i t\u1EADp v\u1EC1 nh\u00E0","nh\u1EADn x\u00E9t","ph\u1EA3n h\u1ED3i c\u1EE7a","k\u1EBFt qu\u1EA3 t\u1EADp","ti\u1EBFn \u0111\u1ED9")

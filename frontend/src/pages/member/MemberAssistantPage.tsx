@@ -206,7 +206,7 @@ function AnswerBubble({ question, result, at }: { question: string; result: Cons
       </div>
       <div className="spori-meta-row">
         <time className="spori-time">{formatTime(at)}</time>
-        {result.mode === 'AI_GENERATED' && <SporiAiBadge />}
+        {result.mode === 'AI_GENERATED' ? <SporiAiBadge /> : <span className="spori-mode-badge" title="This answer uses verified Sportify guidance, not a live Gemini-generated reply">Guided answer</span>}
         <SporiCopyButton text={result.answer} vi={vi} />
       </div>
     </div>

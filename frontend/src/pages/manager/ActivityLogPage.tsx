@@ -142,9 +142,23 @@ export function ActivityLogPage() {
       <p className="manager-activity__footnote">Activity records are read-only. Times use the center timezone (Asia/Ho_Chi_Minh). Only the safe fields returned by the activity service are shown.</p>
     </Card>
     {picking && <ActorPickerModal onClose={() => setPicking(false)} onSelect={(selectedActor) => { setActor(selectedActor); setPicking(false); setPage(0) }} />}
-    {selected && <Modal open title="Activity details" description="Read-only record from activity history." onClose={() => setSelected(null)} footer={<Button variant="secondary" onClick={() => setSelected(null)}>Close</Button>}>
-      <DetailList items={[{ label: 'Time', value: formatManagerDateTime(selected.createdAt) }, { label: 'Performed by', value: selected.actorName || 'System / unavailable actor' }, { label: 'Role', value: selected.actorRole ? humanizeCode(selected.actorRole) : '-' }, { label: 'Action code', value: selected.action }, { label: 'Target type', value: selected.entityType ? humanizeCode(selected.entityType) : '-' }, { label: 'Target ID', value: selected.entityId }]} />
-      <p className="manager-detail-text">{selected.shortDetail}</p>
+    {selected && <Modal open title="Activity details" description="Read-only audit event details from verified safe fields." onClose={() => setSelected(null)} footer={<Button variant="secondary" onClick={() => setSelected(null)}>Close</Button>}>
+      <div className="manager-activity__detail">
+        <h3>Recorded event</h3>
+        <p className="manager-detail-text">{selected.shortDetail || humanizeCode(selected.action)}. This action was recorded in the Sportify audit trail.</p>
+        <DetailList items={[
+          { label: 'Audit event ID', value: selected.id },
+          { label: 'Recorded at', value: formatManagerDateTime(selected.createdAt) },
+          { label: 'Performed by', value: selected.actorName || 'System / unavailable actor' },
+          { label: 'Actor account ID', value: selected.actorId ?? 'System / unavailable' },
+          { label: 'Actor role', value: selected.actorRole ? humanizeCode(selected.actorRole) : 'Not recorded' },
+          { label: 'Action', value: humanizeCode(selected.action) },
+          { label: 'Audit action code', value: selected.action },
+          { label: 'Target record type', value: selected.entityType ? humanizeCode(selected.entityType) : 'Not recorded' },
+          { label: 'Target record ID', value: selected.entityId ?? 'Not recorded' },
+        ]} />
+        <p className="manager-activity__footnote">Sensitive audit payloads and unverified before/after values are intentionally excluded. These are all the verified details available for this event.</p>
+      </div>
     </Modal>}
   </div>
 }

@@ -201,7 +201,7 @@ function FloatingMessage({ message, member, onNavigate }: { message: SporiMessag
       </div>
       <div className="spori-meta-row">
         <time className="spori-time">{formatTime(message.at)}</time>
-        {result.mode === 'AI_GENERATED' && <SporiAiBadge />}
+        {result.mode === 'AI_GENERATED' ? <SporiAiBadge /> : <span className="spori-mode-badge" title="This answer uses verified Sportify guidance, not a live Gemini-generated reply">Guided answer</span>}
         <SporiCopyButton text={result.answer} vi={vi} />
       </div>
     </div>

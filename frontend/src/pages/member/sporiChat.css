@@ -330,21 +330,7 @@
   padding: 14px 16px;
 }
 
-.spori-typing>span:not(.member-concept__sr-only) {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--color-text-muted);
-  animation: spori-bounce 1s ease-in-out infinite;
-}
-
-.spori-typing>span:nth-child(2) {
-  animation-delay: 150ms;
-}
-
-.spori-typing>span:nth-child(3) {
-  animation-delay: 300ms;
-}
+.spori-typing .spinner { flex: none; }
 
 .spori-chips {
   display: flex;
@@ -1378,4 +1364,16 @@
 .spori-suggest__icon,
 .spori-hero__grid button span {
   color: var(--color-primary);
+}
+/* A transparent label for safe rules-mode replies, never claiming Gemini wrote them. */
+.spori-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  color: var(--color-text-muted);
+  font-size: 0.62rem;
+  font-weight: 700;
 }
