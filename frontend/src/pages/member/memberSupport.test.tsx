@@ -19,7 +19,7 @@ describe('Member support requests (Flow 6)', () => {
     let created = false
     const { calls, fetchMock } = installFakeFetch(call => {
       if (call.path === '/users/me') return json(200, MEMBER)
-      if (call.path.includes('/consultation')) return json(200, {
+      if (call.path.includes('/assistant/chat')) return json(200, {
         mode: 'AI_ASSISTED', status: 'ANSWERED', answer: 'Your active packages and card from your own records.', historyStored: false,
         sources: [{ kind: 'MY_PACKAGE', id: 3, title: 'Football 8', detail: 'Football: 7 of 8 sessions available.', path: '/member/membership' }],
       })

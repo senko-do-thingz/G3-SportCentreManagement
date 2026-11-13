@@ -4,8 +4,9 @@ import { type Consultation } from '../../api/trainingGuidanceApi'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { safeMemberReturnTo } from './assistantNavigation'
-import { SporiAiBadge, SporiAvatar, SporiComposer, SporiIcon, SporiCopyButton, SporiSources, SporiText, SporiTyping } from './sporiChat'
+import { SporiAiBadge, SporiAvatar, SporiComposer, SporiCopyButton, SporiHandoff, SporiIcon, SporiSources, SporiText, SporiTyping } from './sporiChat'
 import { formatTime, useSporiChat, useSporiScroll } from './useSporiChat'
+import './sporiChat.css'
 
 export function MemberAssistantLink({ onNavigate, className, label = 'Open center assistant' }: {
   onNavigate?: () => void
@@ -192,9 +193,12 @@ function AnswerBubble({ question, result, at }: { question: string; result: Cons
       <div className={'spori-bubble' + (noAnswer ? ' is-warning' : '')}>
         <span className={'spori-tag' + (noAnswer ? ' spori-tag--warning' : '')}>{noAnswer ? text.unavailable : text.answered}</span>
         <SporiText text={result.answer} />
-        {noAnswer && <div className="spori-handoff">
-          {result.mode !== 'AI_GENERATED' && <><p>{text.noAnswer}</p><p>{text.noAnswerSteps}</p></>}
+        {noAnswer && result.handoff !== 'COACH' && <div className="spori-handoff">
+          {result.mode !== 'AI_GENERATED' && !result.handoff && <><p>{text.noAnswer}</p><p>{text.noAnswerSteps}</p></>}
           <Link className="spori-handoff__button" to="/member/support" state={{ question, excerpt: assistantExcerpt(question, result) }}>{text.contactReceptionist}</Link>
+        </div>}
+        {(result.handoff === 'COACH' || !noAnswer && result.handoff === 'RECEPTIONIST') && <div className="spori-handoff">
+          <SporiHandoff role={result.handoff} member vi={vi} question={question} answer={result.answer} />
         </div>}
         <SporiSources sources={result.sources} kindLabel={kind => text.kinds[kind] ?? text.otherKind} vi={vi} />
         <p className="spori-meta">{text.found}: {text.modes[result.mode] ?? result.mode}.</p>

@@ -92,10 +92,10 @@ export function SporiSources({ sources, kindLabel, onNavigate, vi = false }: {
     <ul className="spori-sources">
       {sources.map(source => (
         <li key={`${source.kind}-${source.id}`}>
-          <Link to={source.path} onClick={onNavigate}>
+          {source.path ? <Link to={source.path} onClick={onNavigate}>
             <span className="spori-sources__title">{source.title}</span>
             <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </Link>
+          </Link> : <span className="spori-sources__plain">{source.title}</span>}
           {kindLabel && <span className="spori-sources__kind">{kindLabel(source.kind)}</span>}
           {source.detail && <small>{source.detail}</small>}
         </li>
@@ -112,6 +112,26 @@ export function SporiSources({ sources, kindLabel, onNavigate, vi = false }: {
       {list}
     </details>
   )
+}
+
+/**
+ * Points to the person who owns the topic. Members get a button to the right place in the app; staff see which team
+ * handles it. Spori itself never performs or confirms these actions.
+ */
+export function SporiHandoff({ role, member, vi, question, answer, onNavigate }: {
+  role: 'RECEPTIONIST' | 'COACH'; member: boolean; vi: boolean; question: string; answer: string; onNavigate?: () => void
+}) {
+  const reception = role === 'RECEPTIONIST'
+  if (!member) return <p className="spori-handoff__note">{reception
+    ? (vi ? 'Bộ phận phụ trách: Lễ tân' : 'Handled by: Reception team')
+    : (vi ? 'Bộ phận phụ trách: Coach' : 'Handled by: Coaching team')}</p>
+  return reception
+    ? <Link to="/member/support" state={{ question, excerpt: `Question: ${question}\nSpori AI: ${answer}`.slice(0, 1000) }} onClick={onNavigate} className="spori-handoff__button">
+        {vi ? 'Liên hệ Lễ tân' : 'Contact Receptionist'}
+      </Link>
+    : <Link to="/member/training/questions" onClick={onNavigate} className="spori-handoff__button">
+        {vi ? 'Hỏi Coach của bạn' : 'Ask your coach'}
+      </Link>
 }
 
 /** Copies an answer to the clipboard, with a short "Copied" confirmation. */

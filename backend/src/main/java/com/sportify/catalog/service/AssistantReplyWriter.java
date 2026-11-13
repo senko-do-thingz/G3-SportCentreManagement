@@ -24,16 +24,28 @@ public interface AssistantReplyWriter {
 
     /**
      * @param language "vi" or "en", detected from the question
-     * @param question the Member's question with e-mail addresses and phone numbers removed
+     * @param question the question with e-mail addresses and phone numbers removed
      * @param history  earlier turns, oldest first, already filtered by the guard
      * @param intent   what the rules or the classifier decided the question is about
      * @param draft    the fixed rule-based answer for the same data
-     * @param facts    the center or Member records found for the question
+     * @param facts    the center records the caller may see for the question (never another person's private data)
      * @param today    today's date at the center (ISO)
+     * @param role     the signed-in user's role: MEMBER, MANAGER, RECEPTIONIST or COACH
+     * @param handoff  the human role the server decided owns the topic (RECEPTIONIST or COACH), or null
      */
     record ReplyRequest(String language, String question, List<Turn> history, String intent, String draft,
-                        List<Fact> facts, String today) {}
+                        List<Fact> facts, String today, String role, String handoff) {
+        public ReplyRequest(String language, String question, List<Turn> history, String intent, String draft,
+                            List<Fact> facts, String today) {
+            this(language, question, history, intent, draft, facts, today, "MEMBER", null);
+        }
+    }
 
-    /** answered=false when the data did not contain the answer, so the screen offers a human handoff. */
-    record Reply(String text, boolean answered) {}
+    /**
+     * answered=false when the data did not contain the answer. category is SPORTIFY, GREETING, OFF_TOPIC,
+     * HANDOFF_RECEPTIONIST, HANDOFF_COACH or NOT_IN_DATA, as judged by the writer.
+     */
+    record Reply(String text, boolean answered, String category) {
+        public Reply(String text, boolean answered) { this(text, answered, answered ? "SPORTIFY" : "NOT_IN_DATA"); }
+    }
 }

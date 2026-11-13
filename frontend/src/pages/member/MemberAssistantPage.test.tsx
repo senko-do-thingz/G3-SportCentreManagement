@@ -14,12 +14,12 @@ it('asks without a consent checkbox and shows grounded sources', async () => {
   renderApp('/member/assistant')
   const ask = await screen.findByRole('button', { name: 'Ask' })
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
-  expect(calls.filter(call => call.path.includes('/consultation'))).toHaveLength(0)
+  expect(calls.filter(call => call.path.includes('/assistant/chat'))).toHaveLength(0)
   await userEvent.type(screen.getByRole('textbox', { name: /Your question/ }), 'What are package prices?')
   await userEvent.click(ask)
   expect(await screen.findByText('Active catalog package prices.')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Practice package' })).toHaveAttribute('href', '/member/packages/3')
-  expect(calls.find(call => call.path.includes('/consultation'))?.body).toEqual({ question: 'What are package prices?', optIn: true })
+  expect(calls.find(call => call.path.includes('/assistant/chat'))?.body).toEqual({ question: 'What are package prices?'})
 })
 it('shows a short privacy note', async () => {
   tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
@@ -38,12 +38,12 @@ it('fills example questions and labels curated FAQ sources without calling the A
   expect(screen.getByRole('textbox', { name: /Your question/ })).toHaveValue('Which classes are available in the next two weeks?')
   await userEvent.click(screen.getByRole('button', { name: 'How should I warm up before practice?' }))
   expect(screen.getByRole('textbox', { name: /Your question/ })).toHaveValue('How should I warm up before practice?')
-  expect(calls.filter(call => call.path.includes('/consultation'))).toHaveLength(0)
+  expect(calls.filter(call => call.path.includes('/assistant/chat'))).toHaveLength(0)
   await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
   expect(await screen.findByText(/^General exercise FAQ/)).toBeInTheDocument()
   expect(screen.getByText('Curated center FAQ (fixed text)')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Center FAQ: Warming up' })).toHaveAttribute('href', '/member/training/questions')
-  expect(calls.filter(call => call.path.includes('/consultation'))).toHaveLength(1)
+  expect(calls.filter(call => call.path.includes('/assistant/chat'))).toHaveLength(1)
 })
 it('shows a human handoff for NO_ANSWER and submits with Enter from the question field', async () => {
   tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
@@ -57,11 +57,11 @@ it('shows a human handoff for NO_ANSWER and submits with Enter from the question
   expect(screen.getByText('This assistant does not answer personal, medical or private questions. Ask your human coach or reception.')).toBeInTheDocument()
   expect(screen.getByText('Human coach')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Ask your coach' })).toHaveAttribute('href', '/member/training/questions')
-  expect(calls.find(call => call.path.includes('/consultation'))?.body).toEqual({ question: 'My knee hurts after practice', optIn: true })
+  expect(calls.find(call => call.path.includes('/assistant/chat'))?.body).toEqual({ question: 'My knee hurts after practice'})
 })
 it('does not keep a previous answer after leaving the assistant route', async () => {
   tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
-  installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : call.path.includes('/consultation') ? json(200, {
+  installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : call.path.includes('/assistant/chat') ? json(200, {
     mode: 'KNOWLEDGE_BASED', status: 'ANSWERED', answer: 'Booking guidance answer.', historyStored: false, sources: [],
   }) : json(200, []))
   renderApp('/member/assistant')
@@ -79,7 +79,7 @@ it('makes no consultation request when the feature flag is off', async () => {
   const { calls } = installFakeFetch(() => json(200, MEMBER))
   renderApp('/member/assistant')
   expect(await screen.findByText('Automated consultation is disabled')).toBeInTheDocument()
-  expect(calls.filter(call => call.path.includes('/consultation'))).toHaveLength(0)
+  expect(calls.filter(call => call.path.includes('/assistant/chat'))).toHaveLength(0)
 })
 it('labels a Vietnamese answer in Vietnamese', async () => {
   tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
@@ -99,7 +99,7 @@ it('labels a Vietnamese answer in Vietnamese', async () => {
 it('keeps a conversation, sends earlier turns as history and shows a Gemini reply with bullets', async () => {
   tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
   let turn = 0
-  const { calls } = installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : !call.path.includes('/consultation') ? json(200, []) : json(200, ++turn === 1
+  const { calls } = installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : !call.path.includes('/assistant/chat') ? json(200, []) : json(200, ++turn === 1
     ? { mode: 'AI_GENERATED', status: 'ANSWERED', answer: 'We have two packages:\n- **Basic** 500000 VND\n- Pro 900000 VND', historyStored: false, sources: [], language: 'en' }
     : { mode: 'AI_GENERATED', status: 'ANSWERED', answer: 'Pro includes 12 sessions.', historyStored: false, sources: [], language: 'en' }))
   renderApp('/member/assistant')
@@ -111,8 +111,8 @@ it('keeps a conversation, sends earlier turns as history and shows a Gemini repl
   await userEvent.type(box, 'And the second one?{Enter}')
   expect(await screen.findByText('Pro includes 12 sessions.')).toBeInTheDocument()
   expect(screen.getByText('What packages are there?')).toBeInTheDocument()
-  const consults = calls.filter(call => call.path.includes('/consultation'))
-  expect(consults[1].body).toEqual({ question: 'And the second one?', optIn: true, history: [
+  const consults = calls.filter(call => call.path.includes('/assistant/chat'))
+  expect(consults[1].body).toEqual({ question: 'And the second one?', history: [
     { role: 'user', text: 'What packages are there?' },
     { role: 'assistant', text: 'We have two packages:\n- **Basic** 500000 VND\n- Pro 900000 VND' },
   ] })

@@ -77,6 +77,24 @@ public class CenterConsultationService {
      */
     @Transactional(propagation=Propagation.NOT_SUPPORTED)
     public Consultation answer(Long memberId,String question,boolean optIn,List<AssistantReplyWriter.Turn> history) {
+        return respond(memberId,MEMBER,question,optIn,history);
+    }
+
+    static final String MEMBER="MEMBER";
+    static final java.util.Set<String> STAFF_ROLES=java.util.Set.of("MANAGER","RECEPTIONIST","COACH");
+
+    /**
+     * Shared Spori chat for every signed-in role. Members get their own records; staff get only aggregate figures and,
+     * for a Coach, their own sessions. No other person's private data is read for staff or sent to the AI provider.
+     */
+    @Transactional(propagation=Propagation.NOT_SUPPORTED)
+    public Consultation chat(long userId,String role,String question,List<AssistantReplyWriter.Turn> history) {
+        if(!MEMBER.equals(role) && !STAFF_ROLES.contains(role))throw new BusinessRuleException("Spori is not available for this account");
+        return respond(userId,role,question,true,history);
+    }
+
+    private Consultation respond(Long memberId,String role,String question,boolean optIn,List<AssistantReplyWriter.Turn> history) {
+        boolean staff=STAFF_ROLES.contains(role);
         boolean early=question!=null && vietnamese(question);
         if(!enabled)return response(early,RULES_MODE,"UNAVAILABLE",t(early,"Automated center consultation is disabled.",
             "T\u01B0 v\u1EA5n t\u1EF1 \u0111\u1ED9ng c\u1EE7a trung t\u00E2m \u0111ang t\u1EAFt."),List.of());
@@ -89,7 +107,10 @@ public class CenterConsultationService {
         String plain=plain(raw);
         boolean vi=vietnamese(raw,plain);
         String guard=guard(raw,plain);
-        if(guard!=null)return guard.equals("COACH")?coach(vi,RULES_MODE):unknown(vi,RULES_MODE);
+        String handoff=handoff(raw,plain);
+        // Guarded questions never reach the AI provider; a transaction request still learns who can help.
+        if(guard!=null)return guard.equals("COACH")?forRole(coach(vi,RULES_MODE),staff).withHandoff("COACH")
+            :"RECEPTIONIST".equals(handoff)?receptionHandoff(vi,staff):unknown(vi,RULES_MODE);
         String courtesy=courtesy(plain);
         if(courtesy!=null) {
             boolean courtesyVi=vi || plain.startsWith("xin chao") || plain.startsWith("chao") || plain.startsWith("cam on");
@@ -100,7 +121,7 @@ public class CenterConsultationService {
                 :response(courtesyVi,RULES_MODE,"ANSWERED",t(courtesyVi,
                     "Hello! I'm Spori. I can help with center schedules, package prices, booking guidance, and your own Sportify training records. What would you like to know?",
                     "Xin ch\u00E0o! T\u00F4i l\u00E0 Spori. T\u00F4i c\u00F3 th\u1EC3 gi\u00FAp v\u1EC1 l\u1ECBch c\u1EE7a trung t\u00E2m, gi\u00E1 g\u00F3i t\u1EADp, h\u01B0\u1EDBng d\u1EABn \u0111\u1EB7t ch\u1ED7 v\u00E0 h\u1ED3 s\u01A1 t\u1EADp luy\u1EC7n Sportify c\u1EE7a b\u1EA1n. B\u1EA1n mu\u1ED1n bi\u1EBFt g\u00EC?"),List.of());
-            return compose(memberId,question,courtesyVi,courtesy,courtesyAnswer,history);
+            return compose(memberId,role,question,courtesyVi,courtesy,courtesyAnswer,history,null);
         }
 
         String mode=RULES_MODE;
@@ -108,7 +129,9 @@ public class CenterConsultationService {
         String day=day(raw,plain);
         Faq faq=faq(raw,plain);
         String aiSport=null;
-        if(classifier!=null && memberId!=null) {
+        // When Gemini writes the reply it already reads the question, so a second classification call would only add
+        // latency and use up the provider's per-minute quota; the keyword rules pick the data in that case.
+        if(classifier!=null && replyWriter==null && memberId!=null) {
             try {
                 var sports=jdbc.queryForList("SELECT name FROM sport WHERE is_active=1 ORDER BY id",String.class);
                 // Fail closed: only allowlisted service keywords may leave the server, and none means no provider call.
@@ -123,7 +146,12 @@ public class CenterConsultationService {
                 log.warn("Assistant AI classification failed, using keyword rules: {}",failure.getClass().getSimpleName());
             }
         }
+        // Staff never get Member-only answers; their own context replaces "my packages / bookings / training".
+        if(staff && (intent.startsWith("MY_") || contains(raw,"overview","summary","dashboard","my day","my work","my class",
+                "my session","my schedule","waiting for me","assigned to me","t\u1ED5ng quan","c\u00F4ng vi\u1EC7c","l\u1EDBp c\u1EE7a t\u00F4i","bu\u1ED5i c\u1EE7a t\u00F4i","l\u1ECBch c\u1EE7a t\u00F4i")
+            || intent.equals("UNKNOWN") && contains(raw,"today","h\u00F4m nay")))intent="STAFF";
         Consultation draft=switch(intent) {
+            case "STAFF" -> staffOverview(vi,mode,role,memberId);
             case "PRIVATE","UNKNOWN" -> unknown(vi,mode);
             case "COACH" -> coach(vi,mode);
             case "FAQ" -> faq==null?unknown(vi,mode):faqAnswer(vi,mode,faq);
@@ -142,7 +170,7 @@ public class CenterConsultationService {
             case "PACKAGES" -> packages(vi,mode,sport(raw,plain,aiSport));
             default -> sessions(vi,mode,sport(raw,plain,aiSport),day);
         };
-        return compose(memberId,question,vi,intent,draft,history);
+        return compose(memberId,role,question,vi,intent,forRole(draft,staff),history,handoff);
     }
 
     /** AI replies one Member may trigger per window; further questions in the window get the fixed rule answer. */
@@ -164,26 +192,133 @@ public class CenterConsultationService {
      * human-handoff text. Earlier user turns that the guard would refuse are left out of the history. Any failure,
      * a missing Member or an exhausted per-Member budget keeps the rule answer unchanged.
      */
-    private Consultation compose(Long memberId,String question,boolean vi,String intent,Consultation draft,
-                                 List<AssistantReplyWriter.Turn> history) {
-        if(replyWriter==null || memberId==null || intent.equals("COACH") || intent.equals("PRIVATE")) return draft;
-        if(!draft.status().equals("ANSWERED") && !draft.status().equals("NO_ANSWER")) return draft;
-        if(!allowed(aiReplies,AI_REPLIES_PER_WINDOW,memberId)) return draft;
+    private Consultation compose(Long userId,String role,String question,boolean vi,String intent,Consultation draft,
+                                 List<AssistantReplyWriter.Turn> history,String handoff) {
+        Consultation fallback=draft.withHandoff(handoff);
+        if(replyWriter==null || userId==null || intent.equals("COACH") || intent.equals("PRIVATE")) return fallback;
+        if(!draft.status().equals("ANSWERED") && !draft.status().equals("NO_ANSWER")) return fallback;
+        if(!allowed(aiReplies,AI_REPLIES_PER_WINDOW,userId)) return fallback;
         try {
             var turns=safeHistory(history);
             var facts=new ArrayList<AssistantReplyWriter.Fact>();
             for(var source:draft.sources())facts.add(new AssistantReplyWriter.Fact(source.title(),source.detail()));
-            // Off-topic or follow-up questions: give the writer the public catalog so it can still answer from data.
-            if(intent.equals("UNKNOWN"))facts.addAll(publicContext(vi));
+            // Open or follow-up questions: give the writer the public catalog so it can still answer from data.
+            if(intent.equals("UNKNOWN") || intent.equals("STAFF") && draft.sources().isEmpty())facts.addAll(publicContext(vi));
+            if(STAFF_ROLES.contains(role) && !intent.equals("STAFF"))
+                for(var source:staffOverview(vi,RULES_MODE,role,userId).sources())facts.add(new AssistantReplyWriter.Fact(source.title(),source.detail()));
             var reply=replyWriter.write(new AssistantReplyWriter.ReplyRequest(vi?"vi":"en",redact(question.strip()),turns,intent,
-                draft.answer(),facts,LocalDate.now(clock).toString()));
-            if(reply==null || reply.text()==null || reply.text().isBlank()) return draft;
-            return new Consultation(AI_REPLY_MODE,reply.answered()?"ANSWERED":"NO_ANSWER",reply.text().strip(),false,draft.sources(),draft.language());
+                draft.answer(),facts,LocalDate.now(clock).toString(),role,handoff));
+            if(reply==null || reply.text()==null || reply.text().isBlank()) return fallback;
+            String category=reply.category()==null?"SPORTIFY":reply.category();
+            // The server's own handoff decision wins; otherwise the writer may name the responsible role.
+            String routed=handoff!=null?handoff
+                :category.equals("HANDOFF_RECEPTIONIST")?"RECEPTIONIST":category.equals("HANDOFF_COACH")?"COACH":null;
+            boolean offTopic=category.equals("OFF_TOPIC") || category.equals("GREETING");
+            return new Consultation(AI_REPLY_MODE,reply.answered() || offTopic?"ANSWERED":"NO_ANSWER",reply.text().strip(),false,
+                offTopic?List.of():draft.sources(),draft.language(),routed);
         } catch(RuntimeException failure) {
             // Never log the question or the provider output; the exception class is enough to diagnose outages.
-            log.warn("Assistant AI reply failed, using the rule answer: {}",failure.getClass().getSimpleName());
-            return draft;
+            // The writer's own messages carry only the HTTP status, never request or provider content.
+            log.warn("Assistant AI reply failed, using the rule answer: {} {}",failure.getClass().getSimpleName(),
+                failure instanceof IllegalStateException?failure.getMessage():"");
+            return fallback;
         }
+    }
+
+    /**
+     * The human role that owns a topic: payments, VietQR, refunds, charges and account issues go to reception;
+     * attendance, performance, exercises and coaching go to the coach. Reception wins when both appear, because
+     * money and account problems block the Member first.
+     */
+    static String handoff(String raw,String plain) {
+        if(contains(raw,"payment","vietqr","qr code","qr payment","bank transfer","transfer","refund","charged","charge ",
+            "double charge","invoice","receipt","transaction","my account","account locked","locked out","cannot log in",
+            "can't log in","cannot sign in","can't sign in","login problem",
+            "thanh to\u00E1n","chuy\u1EC3n kho\u1EA3n","ho\u00E0n ti\u1EC1n","giao d\u1ECBch","h\u00F3a \u0111\u01A1n","ho\u00E1 \u0111\u01A1n","tr\u1EEB ti\u1EC1n","t\u00E0i kho\u1EA3n","\u0111\u0103ng nh\u1EADp","m\u00E3 qr","qu\u00E9t qr")
+            || matchesWord(plain,RECEPTION_TOPIC_PLAIN))return "RECEPTIONIST";
+        if(contains(raw,"attendance","absent","marked absent","check-in","checked in","performance","technique","coaching",
+            "exercise","drill","\u0111i\u1EC3m danh","v\u1EAFng","chuy\u00EAn c\u1EA7n","th\u00E0nh t\u00EDch","k\u1EF9 thu\u1EADt","b\u00E0i t\u1EADp","hu\u1EA5n luy\u1EC7n")
+            || matchesWord(plain,COACH_TOPIC_PLAIN))return "COACH";
+        return null;
+    }
+    private static final Pattern RECEPTION_TOPIC_PLAIN=Pattern.compile("\\b(thanh toan|chuyen khoan|hoan tien|giao dich|hoa don|tru tien|tai khoan|dang nhap)\\b");
+    private static final Pattern COACH_TOPIC_PLAIN=Pattern.compile("\\b(diem danh|chuyen can|thanh tich|ky thuat|bai tap|huan luyen)\\b");
+
+    /** Reception owns payment, refund and account problems; Spori never performs or confirms them. */
+    private static Consultation receptionHandoff(boolean vi,boolean staff) {
+        String answer=t(vi,"Payments, VietQR transfers, refunds, charges and account problems are handled by the Receptionist. Spori cannot confirm payments or approve refunds."
+                +(staff?" Please pass the case to the reception team.":" Open Contact reception and describe the issue; the reply appears in My support requests."),
+            "Thanh to\u00E1n, chuy\u1EC3n kho\u1EA3n VietQR, ho\u00E0n ti\u1EC1n, kho\u1EA3n b\u1ECB tr\u1EEB v\u00E0 v\u1EA5n \u0111\u1EC1 t\u00E0i kho\u1EA3n do L\u1EC5 t\u00E2n x\u1EED l\u00FD. Spori kh\u00F4ng th\u1EC3 x\u00E1c nh\u1EADn thanh to\u00E1n hay duy\u1EC7t ho\u00E0n ti\u1EC1n."
+                +(staff?" Vui l\u00F2ng chuy\u1EC3n tr\u01B0\u1EDDng h\u1EE3p n\u00E0y cho b\u1ED9 ph\u1EADn l\u1EC5 t\u00E2n.":" H\u00E3y m\u1EDF m\u1EE5c Li\u00EAn h\u1EC7 l\u1EC5 t\u00E2n v\u00E0 m\u00F4 t\u1EA3 v\u1EA5n \u0111\u1EC1; ph\u1EA3n h\u1ED3i s\u1EBD hi\u1EC3n th\u1ECB trong Y\u00EAu c\u1EA7u h\u1ED7 tr\u1EE3 c\u1EE7a t\u00F4i."));
+        return response(vi,RULES_MODE,"NO_ANSWER",answer,List.of()).withHandoff("RECEPTIONIST");
+    }
+
+    /** Member app links mean nothing in staff workspaces, so staff sources keep their text but no link. */
+    private static Consultation forRole(Consultation draft,boolean staff) {
+        if(!staff)return draft;
+        var sources=draft.sources().stream().map(s->new ConsultationSource(s.kind(),s.id(),s.title(),s.detail(),"")).toList();
+        return new Consultation(draft.mode(),draft.status(),draft.answer(),false,sources,draft.language(),draft.handoff());
+    }
+
+    /**
+     * Role context for staff. Only aggregate figures and, for a Coach, the Coach's own sessions are read: no Member
+     * names, contacts, payments or attendance rows. A failing figure is left out instead of failing the chat.
+     */
+    private Consultation staffOverview(boolean vi,String mode,String role,Long userId) {
+        LocalDate today=LocalDate.now(clock);
+        var sources=new ArrayList<ConsultationSource>();
+        java.util.function.BiConsumer<String,Integer> figure=(label,value)->{ if(value!=null && value>=0)
+            sources.add(new ConsultationSource("STAFF_OVERVIEW",sources.size(),label,String.valueOf(value),"")); };
+        switch(role) {
+            case "COACH" -> {
+                if(userId!=null) {
+                    sources.addAll(sessionsSummary(vi,"s.coach_id=? AND s.session_date BETWEEN ? AND ?",userId,Date.valueOf(today),Date.valueOf(today.plusDays(7))));
+                    figure.accept(t(vi,"Open learner questions assigned to you","C\u00E2u h\u1ECFi c\u1EE7a h\u1ECDc vi\u00EAn \u0111ang ch\u1EDD b\u1EA1n"),
+                        count("SELECT COUNT(*) FROM support_request WHERE assigned_staff_id=? AND status IN ('OPEN','IN_PROGRESS')",userId));
+                }
+            }
+            case "RECEPTIONIST" -> {
+                sources.addAll(sessionsSummary(vi,"s.session_date=?",Date.valueOf(today)));
+                figure.accept(t(vi,"Open support requests","Y\u00EAu c\u1EA7u h\u1ED7 tr\u1EE3 \u0111ang m\u1EDF"),
+                    count("SELECT COUNT(*) FROM support_request WHERE status IN ('OPEN','IN_PROGRESS')"));
+            }
+            default -> {
+                figure.accept(t(vi,"Active members","H\u1ED9i vi\u00EAn \u0111ang ho\u1EA1t \u0111\u1ED9ng"),
+                    count("SELECT COUNT(*) FROM user_account u JOIN role r ON r.id=u.role_id WHERE r.code='MEMBER' AND u.status='ACTIVE'"));
+                figure.accept(t(vi,"Active coaches","Hu\u1EA5n luy\u1EC7n vi\u00EAn \u0111ang ho\u1EA1t \u0111\u1ED9ng"),
+                    count("SELECT COUNT(*) FROM user_account u JOIN role r ON r.id=u.role_id WHERE r.code='COACH' AND u.status='ACTIVE'"));
+                figure.accept(t(vi,"Published sessions in the next 7 days","Bu\u1ED5i h\u1ECDc \u0111\u00E3 c\u00F4ng b\u1ED1 trong 7 ng\u00E0y t\u1EDBi"),
+                    count("SELECT COUNT(*) FROM class_session WHERE status='PUBLISHED' AND session_date BETWEEN ? AND ?",Date.valueOf(today),Date.valueOf(today.plusDays(7))));
+                figure.accept(t(vi,"Open support requests","Y\u00EAu c\u1EA7u h\u1ED7 tr\u1EE3 \u0111ang m\u1EDF"),
+                    count("SELECT COUNT(*) FROM support_request WHERE status IN ('OPEN','IN_PROGRESS')"));
+            }
+        }
+        if(sources.isEmpty())return response(vi,mode,"NO_ANSWER",t(vi,"I could not find workspace figures for that question.",
+            "T\u00F4i ch\u01B0a t\u00ECm th\u1EA5y s\u1ED1 li\u1EC7u ph\u00F9 h\u1EE3p cho c\u00E2u h\u1ECFi n\u00E0y."),List.of());
+        String lines=sources.stream().map(s->"- "+s.title()+": "+s.detail()).collect(Collectors.joining("\n"));
+        return response(vi,mode,"ANSWERED",t(vi,"Here is your Sportify workspace overview:\n","T\u1ED5ng quan c\u00F4ng vi\u1EC7c Sportify c\u1EE7a b\u1EA1n:\n")+lines,sources);
+    }
+
+    /** Up to six published sessions with booked and total places, without any Member detail. */
+    private List<ConsultationSource> sessionsSummary(boolean vi,String where,Object... args) {
+        try {
+            var rows=jdbc.query("SELECT TOP 6 s.id,c.name,sp.name sport_name,s.session_date,s.start_time,s.end_time,s.booked_count,s.capacity "
+                +"FROM class_session s JOIN sport sp ON sp.id=s.sport_id LEFT JOIN sport_class c ON c.id=s.class_id "
+                +"WHERE s.status='PUBLISHED' AND "+where+" ORDER BY s.session_date,s.start_time,s.id",
+                (rs,row)->new ConsultationSource("STAFF_SESSION",rs.getLong("id"),
+                    rs.getString("name")==null?rs.getString("sport_name"):rs.getString("name"),
+                    rs.getString("sport_name")+": "+date(vi,rs.getDate("session_date"))+" "+time(vi,rs.getTime("start_time"))+"-"+time(vi,rs.getTime("end_time"))
+                        +t(vi,", booked ",", \u0111\u00E3 \u0111\u1EB7t ")+rs.getInt("booked_count")+"/"+rs.getInt("capacity"),""),args);
+            return rows==null?List.of():rows;
+        } catch(RuntimeException failure) {
+            log.warn("Spori staff sessions unavailable: {}",failure.getClass().getSimpleName());
+            return List.of();
+        }
+    }
+
+    private Integer count(String sql,Object... args) {
+        try { return jdbc.queryForObject(sql,Integer.class,args); }
+        catch(RuntimeException failure) { log.warn("Spori staff figure unavailable: {}",failure.getClass().getSimpleName()); return null; }
     }
 
     /** The last few turns, trimmed, redacted, and without user turns the keyword guard refuses. */

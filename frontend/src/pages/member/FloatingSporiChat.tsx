@@ -1,20 +1,62 @@
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { AuthContext } from '../../auth/authContext'
 import { SporiRobotMark } from './SporiRobotMark'
-import { SporiAiBadge, SporiAvatar, SporiComposer, SporiIcon, SporiCopyButton, SporiSources, SporiText, SporiTyping } from './sporiChat'
+import { SporiAiBadge, SporiAvatar, SporiComposer, SporiCopyButton, SporiHandoff, SporiIcon, SporiSources, SporiText, SporiTyping, type SporiIconName } from './sporiChat'
 import { formatTime, useSporiChat, useSporiScroll, type SporiMessage } from './useSporiChat'
+import './sporiChat.css'
 
-const PROMPTS = [
-  { icon: 'calendar', text: 'Which classes are available soon?' },
-  { icon: 'flame', text: 'How should I warm up before practice?' },
-  { icon: 'ticket', text: 'How many sessions do I have left?' },
-] as const
+type SporiRole = 'MEMBER' | 'MANAGER' | 'RECEPTIONIST' | 'COACH'
 
-export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
+/** Greeting and suggested questions per role; every role talks to the same Spori API. */
+const ROLE_COPY: Record<SporiRole, { intro: string; prompts: { icon: SporiIconName; text: string }[] }> = {
+  MEMBER: {
+    intro: "I'm Spori. Ask me about classes, packages, or your own records, in English or Vietnamese.",
+    prompts: [
+      { icon: 'calendar', text: 'Which classes are available soon?' },
+      { icon: 'flame', text: 'How should I warm up before practice?' },
+      { icon: 'ticket', text: 'How many sessions do I have left?' },
+    ],
+  },
+  MANAGER: {
+    intro: "I'm Spori. Ask me about center figures, sessions, packages or services, in English or Vietnamese.",
+    prompts: [
+      { icon: 'note', text: 'Give me an overview of the center today' },
+      { icon: 'calendar', text: 'Which sessions are published this week?' },
+      { icon: 'card', text: 'What are the current package prices?' },
+    ],
+  },
+  RECEPTIONIST: {
+    intro: "I'm Spori. Ask me about today's sessions, packages, booking rules or services, in English or Vietnamese.",
+    prompts: [
+      { icon: 'calendar', text: "What is today's session overview?" },
+      { icon: 'card', text: 'What are the current package prices?' },
+      { icon: 'ticket', text: 'How does booking and cancellation work?' },
+    ],
+  },
+  COACH: {
+    intro: "I'm Spori. Ask me about your upcoming sessions, classes or center services, in English or Vietnamese.",
+    prompts: [
+      { icon: 'calendar', text: 'Show my sessions for the next 7 days' },
+      { icon: 'note', text: 'How many learner questions are waiting for me?' },
+      { icon: 'flame', text: 'Which sports does the center offer?' },
+    ],
+  },
+}
+
+/**
+ * The compact floating Spori chat used by every role. Sending a message always stays in this panel; only the
+ * expand icon (Members) or a source or handoff link the user clicks navigates away.
+ */
+export function FloatingSporiChat({ isDesktop = true }: { isDesktop?: boolean }) {
   const location = useLocation()
+  const auth = useContext(AuthContext)
+  const role: SporiRole = auth?.role ?? 'MEMBER'
+  const member = role === 'MEMBER'
+  const copy = ROLE_COPY[role]
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
-  const chat = useSporiChat('Spori could not load a grounded answer. Please try again or open the full assistant.')
+  const chat = useSporiChat('Spori could not load an answer. Please try again.')
   const launcher = useRef<HTMLButtonElement>(null)
   const dialog = useRef<HTMLElement>(null)
   const messageLog = useRef<HTMLDivElement>(null)
@@ -91,32 +133,32 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
             <h2 id="member-assistant-title">Spori AI</h2>
             <p>Sportify assistant · replies in seconds</p>
           </div>
-          <Link className="spori-icon-button" to={assistantHref} onClick={close} aria-label="Open full assistant" title="Open full assistant">
+          {member && <Link className="spori-icon-button" to={assistantHref} onClick={close} aria-label="Open full assistant" title="Open full assistant">
             <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </Link>
+          </Link>}
         </header>
 
         <div ref={messageLog} className="spori-log" role="log" aria-live="polite" aria-relevant="additions">
           <div className={'spori-welcome' + (chat.messages.length ? ' is-compact' : '')}>
             <p className="spori-welcome__title">Hi there!</p>
-            <p className="spori-welcome__copy">I'm Spori. Ask me about classes, packages, or your own records, in English or Vietnamese.</p>
+            <p className="spori-welcome__copy">{copy.intro}</p>
           </div>
           {chat.messages.length === 0 && enabled && (
             <div className="spori-suggest" aria-label="Suggested questions">
               <p className="spori-suggest__label">Popular questions</p>
-              {PROMPTS.map((prompt) => <button type="button" key={prompt.text} onClick={() => { setDraft(prompt.text); input.current?.focus() }}>
+              {copy.prompts.map((prompt) => <button type="button" key={prompt.text} onClick={() => { setDraft(prompt.text); input.current?.focus() }}>
                 <span className="spori-suggest__icon" aria-hidden="true"><SporiIcon name={prompt.icon} /></span>
                 <span className="spori-suggest__text">{prompt.text}</span>
                 <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>)}
             </div>
           )}
-          {chat.messages.map((message) => <FloatingMessage key={message.id} message={message} onNavigate={close} />)}
+          {chat.messages.map((message) => <FloatingMessage key={message.id} message={message} member={member} onNavigate={close} />)}
           {chat.pending && <SporiTyping label="Spori is typing…" />}
         </div>
 
         {!enabled
-          ? <p className="notice notice--warning spori-panel__notice" role="status">Automated consultation is currently disabled. The full assistant explains other support options.</p>
+          ? <p className="notice notice--warning spori-panel__notice" role="status">Automated consultation is currently disabled.</p>
           : <SporiComposer id="spori-question" label="Ask Spori a question" buttonLabel="Send" placeholder="Type a message…" value={draft}
               pending={chat.pending} onChange={setDraft} onSubmit={send} inputRef={input} />}
         <p className="spori-panel__foot">Answers use Sportify data · Spori can make mistakes</p>
@@ -125,7 +167,7 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
   </>
 }
 
-function FloatingMessage({ message, onNavigate }: { message: SporiMessage; onNavigate: () => void }) {
+function FloatingMessage({ message, member, onNavigate }: { message: SporiMessage; member: boolean; onNavigate: () => void }) {
   if (message.role === 'user') return (
     <div className="spori-row spori-row--user">
       <div className="spori-bubble"><SporiText text={message.text} /></div>
@@ -140,8 +182,10 @@ function FloatingMessage({ message, onNavigate }: { message: SporiMessage; onNav
   )
   const { result, question } = message
   const vi = result.language === 'vi'
-  // A rule-based "no answer" is replaced by a clear handoff; an AI reply already explains itself.
-  const ruleNoAnswer = result.status === 'NO_ANSWER' && result.mode !== 'AI_GENERATED'
+  // Who should help: the server's decision, or reception for a Member's unanswered question.
+  const handoff = result.handoff ?? (member && result.status === 'NO_ANSWER' ? 'RECEPTIONIST' : null)
+  // A plain rule "no answer" without a named owner is replaced by a clear handoff text.
+  const ruleNoAnswer = result.status === 'NO_ANSWER' && result.mode !== 'AI_GENERATED' && !result.handoff
   return (
     <div className="spori-row spori-row--bot">
       <SporiAvatar />
@@ -149,12 +193,9 @@ function FloatingMessage({ message, onNavigate }: { message: SporiMessage; onNav
         {ruleNoAnswer
           ? <p>{vi ? 'Tôi không tìm thấy câu trả lời chắc chắn cho câu hỏi của bạn. Bạn có thể liên hệ Lễ tân Sportify để được hỗ trợ thêm.' : "I couldn't find a reliable answer to your question. You can contact Sportify Reception for further assistance."}</p>
           : <SporiText text={result.answer} />}
-        {result.status === 'NO_ANSWER' && <div className="spori-handoff">
-          {/* An AI reply already explains the handoff in its own words; only the rule answer needs the steps. */}
-          {ruleNoAnswer && <p>{vi ? 'Mở mục Liên hệ Lễ tân, chọn chủ đề, nhập câu hỏi và gửi; phản hồi sẽ hiển thị trong Yêu cầu hỗ trợ của tôi.' : 'Open Contact Reception, choose a topic, enter the question and submit; replies appear in My support requests.'}</p>}
-          <Link to="/member/support" state={{ question, excerpt: `Question: ${question}\nSpori AI: ${result.answer}` }} onClick={onNavigate} className="spori-handoff__button">
-            {vi ? 'Liên hệ Lễ tân' : 'Contact Receptionist'}
-          </Link>
+        {handoff && <div className="spori-handoff">
+          {ruleNoAnswer && member && <p>{vi ? 'Mở mục Liên hệ Lễ tân, chọn chủ đề, nhập câu hỏi và gửi; phản hồi sẽ hiển thị trong Yêu cầu hỗ trợ của tôi.' : 'Open Contact Reception, choose a topic, enter the question and submit; replies appear in My support requests.'}</p>}
+          <SporiHandoff role={handoff} member={member} vi={vi} question={question} answer={result.answer} onNavigate={onNavigate} />
         </div>}
         <SporiSources sources={result.sources} onNavigate={onNavigate} vi={vi} />
       </div>

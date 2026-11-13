@@ -212,7 +212,7 @@ describe('Class learning Round 02', () => {
     await userEvent.type(screen.getByRole('textbox', { name: /Your question/ }), 'Unknown center question')
     await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
     expect(await screen.findByText('No grounded answer for this question.')).toBeInTheDocument()
-    expect(calls.some(call => call.path === '/member/training/consultation')).toBe(true)
+    expect(calls.some(call => call.path === '/assistant/chat')).toBe(true)
     expect(calls.some(call => /openai|gemini|chat\/completions/.test(call.path))).toBe(false)
   })
   it('renders contextual SVG icons for Member Questions queue metrics and omits decorative square markers', async () => {

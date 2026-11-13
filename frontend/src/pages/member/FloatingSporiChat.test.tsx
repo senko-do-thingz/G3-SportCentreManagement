@@ -1,12 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
-import { trainingGuidanceApi, type Consultation } from '../../api/trainingGuidanceApi'
+import { type Consultation } from '../../api/trainingGuidanceApi'
+import { sporiApi } from '../../api/sporiApi'
 import { FloatingSporiChat } from './FloatingSporiChat'
 
-vi.mock('../../api/trainingGuidanceApi', () => ({
-  trainingGuidanceApi: {
-    consult: vi.fn(),
+vi.mock('../../api/sporiApi', () => ({
+  sporiApi: {
+    chat: vi.fn(),
   },
 }))
 
@@ -20,7 +21,7 @@ describe('FloatingSporiChat', () => {
       sources: [],
       language: 'en',
     }
-    vi.mocked(trainingGuidanceApi.consult).mockResolvedValueOnce(noAnswerResult)
+    vi.mocked(sporiApi.chat).mockResolvedValueOnce(noAnswerResult)
 
     render(
       <MemoryRouter>

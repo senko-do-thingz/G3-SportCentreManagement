@@ -24,6 +24,8 @@ export interface Consultation {
   sources: { kind: string; id: number; title: string; detail: string; path: string }[]
   /** 'vi' when the question was Vietnamese and the answer text is Vietnamese. */
   language?: 'vi' | 'en'
+  /** The human role that owns the topic: Receptionist (payments, refunds, account) or Coach (attendance, training). */
+  handoff?: 'RECEPTIONIST' | 'COACH' | null
 }
 /** One earlier message of the open chat, sent back so follow-up questions make sense. Never stored. */
 export interface ChatTurn { role: 'user' | 'assistant'; text: string }

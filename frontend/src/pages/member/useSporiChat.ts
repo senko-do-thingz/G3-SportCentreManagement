@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { trainingGuidanceApi, type ChatTurn, type Consultation } from '../../api/trainingGuidanceApi'
+import { type ChatTurn, type Consultation } from '../../api/trainingGuidanceApi'
+import { sporiApi } from '../../api/sporiApi'
 
 /** Shared Spori conversation state: messages, the pending flag, and the history sent back with each question. */
 
@@ -25,7 +26,7 @@ export function useSporiChat(fallbackError: string) {
     setMessages(current => [...current, { id: nextId.current++, role: 'user', text, at: new Date() }])
     setPending(true)
     try {
-      const result = await trainingGuidanceApi.consult(text, history)
+      const result = await sporiApi.chat(text, history)
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', question: text, result, at: new Date() }])
     } catch (error) {
       const message = error instanceof Error && error.message ? error.message : fallbackError
