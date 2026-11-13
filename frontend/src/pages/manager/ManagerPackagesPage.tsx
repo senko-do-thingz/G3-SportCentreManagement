@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { managerPackagesApi } from '../../api/managerPackagesApi'
 import { packagesApi } from '../../api/packagesApi'
-import { Button, Card, Input, Select, StatusBadge, Table, useToast, type TableColumn } from '../../components/ui'
+import { Button, Card, Input, Select, StatusBadge, Table, useToast, type TableColumn, StatIcon } from '../../components/ui'
 import { formatMoney } from '../../utils/format'
 import type { ManagerPackage } from '../../types/manager'
 import { ConfirmationModal, ManagerError, PreviewNotice } from './ManagerShared'
@@ -128,28 +128,28 @@ export function ManagerPackagesPage() {
 
     <div className="concept-stats">
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">P</span>
+        <StatIcon name="package" />
         <div>
           <strong>{totalPackages}</strong>
           <small>Matching packages</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">S</span>
+        <StatIcon name="sports" />
         <div>
           <strong>{sportsCount}</strong>
           <small>Available sports</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">A</span>
+        <StatIcon name="check" />
         <div>
           <strong>{activeCount}</strong>
           <small>Active in view</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">F</span>
+        <StatIcon name="filter" />
         <div>
           <strong>{currentFormatLabel}</strong>
           <small>Format filter</small>

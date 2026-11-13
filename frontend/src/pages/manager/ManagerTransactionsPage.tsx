@@ -5,7 +5,7 @@ import { ApiError, getErrorMessage } from '../../api/errors'
 import { managerFinanceApi, type FinanceTransaction, type ReviewRefundRequest } from '../../api/managerFinanceApi'
 import type { Refund } from '../../api/receptionPaymentsApi'
 import { tokenStorage } from '../../api/tokenStorage'
-import { Button, Card, Input, Modal, Select, StatusBadge, Table, TextArea, type TableColumn } from '../../components/ui'
+import { Button, Card, Input, Modal, Select, StatusBadge, Table, TextArea, type TableColumn, StatIcon } from '../../components/ui'
 import { useResource, useDebounced } from './useManagerTools'
 import { ManagerError, PreviewNotice } from './ManagerShared'
 import { formatDateTime, formatMoney, humanizeCode } from '../../utils/format'
@@ -200,28 +200,28 @@ export function ManagerTransactionsPage() {
 
     <div className="concept-stats">
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">T</span>
+        <StatIcon name="receipt" />
         <div>
           <strong>{transactions.status === 'ready' ? `${transactions.data.totalElements} Total` : '--'}</strong>
           <small>Matching transactions</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">S</span>
+        <StatIcon name="rows" />
         <div>
           <strong>{transactions.status === 'ready' ? `${transactions.data.content.length} Shown` : '--'}</strong>
           <small>Rows on this page</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">R</span>
+        <StatIcon name="refund" />
         <div>
           <strong>{refunds.status === 'ready' ? `${refunds.data.length} Pending` : '--'}</strong>
           <small>Refund requests queue</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">M</span>
+        <StatIcon name="calendar" />
         <div>
           <strong>{month}</strong>
           <small>Reporting month</small>
@@ -237,7 +237,7 @@ export function ManagerTransactionsPage() {
         <Input label="Reporting month" type="month" value={month} onChange={(event) => updateFilter('month', event.target.value)} />
         <Select label="Payment status" placeholder="All statuses" value={status} options={TRANSACTION_STATUSES} onChange={(event) => updateFilter('status', event.target.value)} />
         <Select label="Payment method" placeholder="All methods" value={method} options={PAYMENT_METHODS} onChange={(event) => updateFilter('method', event.target.value)} />
-        <Button variant="ghost" onClick={clearFilters}>Clear search, status and method</Button>
+        <Button variant="ghost" onClick={clearFilters} aria-label="Clear filters: search, status and method" title="Clears search, status and method. The reporting month stays.">Clear filters</Button>
       </div>
       {transactions.status === 'error' ? <ManagerError error={transactions.error} onRetry={reloadTransactions} /> : <Table
         caption="Payment transactions"

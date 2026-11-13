@@ -2,7 +2,7 @@ import { useCallback, useRef, useState, type FormEvent } from 'react'
 import { receptionSupportApi as api, supportCategories, supportStatuses, supportTransitions, type SupportIntake, type SupportStatus, type SupportTicket } from '../../api/receptionSupportApi'
 import { receptionApi } from '../../api/receptionApi'
 import { tokenStorage } from '../../api/tokenStorage'
-import { Badge, Button, Input, PageHeader, Select, TextArea } from '../../components/ui'
+import { Badge, Button, EmptyState, Input, PageHeader, Select, TextArea } from '../../components/ui'
 import { formatCalendarDate, formatDateTime } from '../../utils/dateDisplay'
 import { ReceptionScreen } from './ReceptionConcept'
 import { TrainingData } from '../member/TrainingData'
@@ -35,7 +35,7 @@ export function SupportRequestsPage() {
   }
 
   return <ReceptionScreen className="training-page rcp-support">
-    <PageHeader title="Support requests" actions={!creating && <Button onClick={() => setCreating(true)}>+ New request</Button>} />
+    <PageHeader eyebrow="Receptionist workspace" title="Support requests" actions={!creating && <Button onClick={() => setCreating(true)}>+ New request</Button>} />
     {creating && <CreateTicket onCancel={() => setCreating(false)} onSaved={ticket => { setCreating(false); select(ticket.id); refresh(value => value + 1) }} />}
     <form className="rcp-support__toolbar" onSubmit={event => { event.preventDefault(); setQuery(search) }}>
       <Input label="Find request code, member or subject" maxLength={100} value={search} onChange={event => setSearch(event.target.value)} />
@@ -43,7 +43,7 @@ export function SupportRequestsPage() {
       <Button type="submit" variant="secondary">Search requests</Button>
     </form>
     <TrainingData key={revision} load={load}>{tickets => tickets.length === 0
-      ? <p role="status">No support requests match these filters.</p>
+      ? <div role="status"><EmptyState title="No support requests match these filters." description="Change the search or status filter, or record a new request." /></div>
       : <ul className="rcp-support__list" aria-label="Member support requests">{tickets.map(ticket => <li key={ticket.id}>
         <button type="button" className="rcp-support__row" aria-label={`View ${ticket.code}`} onClick={() => select(ticket.id)}>
           <span className="rcp-support__row-main"><strong>{ticket.code}</strong> {ticket.subject}</span>

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { managerClassesApi, type ClassLevel, type ManagerClass } from '../../api/managerClassesApi'
 import { packagesApi } from '../../api/packagesApi'
-import { Button, Card, Input, Select, StatusBadge, Table, useToast, type TableColumn } from '../../components/ui'
+import { Button, Card, Input, Select, StatusBadge, Table, useToast, type TableColumn, StatIcon } from '../../components/ui'
 import { ConfirmationModal, ManagerError, PreviewNotice } from './ManagerShared'
 import { useDebounced, useResource } from './useManagerTools'
 
@@ -60,28 +60,28 @@ export function ManagerClassesPage() {
 
     <div className="concept-stats">
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">C</span>
+        <StatIcon name="book" />
         <div>
           <strong>{totalClasses}</strong>
           <small>Matching classes</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">A</span>
+        <StatIcon name="check" />
         <div>
           <strong>{activeOnPage}</strong>
           <small>Active on this page</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">S</span>
+        <StatIcon name="sports" />
         <div>
           <strong>{sportsCount}</strong>
           <small>Available sports</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">K</span>
+        <StatIcon name="coach" />
         <div>
           <strong>{coachesCount}</strong>
           <small>Qualified coaches</small>

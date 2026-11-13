@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type FocusEventHandler } from 'react'
 import { formatDisplayCalendarDate, parseDisplayCalendarDate } from '../../utils/dateDisplay'
 import { CALENDAR_DATE_VALIDATE_EVENT } from './calendarDateValidation'
+import { HomeIcon } from '../../pages/public/HomeIcons'
 
 export interface CalendarDateFieldProps {
   value: string
@@ -212,7 +213,7 @@ export function CalendarDateField({
                 }
               }}
             >
-              <span className="calendar-date-field__icon" aria-hidden="true">&#128197;</span>
+              <HomeIcon name="calendar" className="calendar-date-field__icon" />
             </button>
             <input
               ref={pickerRef}

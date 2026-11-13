@@ -110,6 +110,30 @@
   --shadow-md: 0 8px 24px rgba(16, 46, 80, 0.08);
   --shadow-lg: 0 20px 48px rgba(16, 46, 80, 0.18);
 
+  /*
+   * Role workspace language taken from Home (styles/home.css, the design reference). These mirror the Home
+   * values so Manager, Member, Receptionist and Coach pages match it; home.css keeps its own --h-* copies,
+   * so editing these never changes Home. Applied by styles/workspaceUi.css.
+   */
+  --ui-font-body: 'Segoe UI', Arial, sans-serif;
+  --ui-font-display: var(--font-display);
+  --ui-ink: #0e1a33;
+  --ui-muted: #5a6782;
+  --ui-border: #e4e8f0;
+  --ui-band: #f5f7fb;
+  --ui-shadow: 0 18px 40px rgba(14, 26, 51, 0.08);
+  --ui-header-bg: var(--color-navy);
+  --ui-radius: 0;
+  --ui-title-size: 40px;
+  --ui-title-weight: 800;
+  --ui-control-height: 44px;
+  --ui-button-weight: 700;
+  --ui-header-height: 80px;
+  --ui-kicker-size: 14px;
+  --ui-section-title-size: 20px;
+  --ui-dropdown-shadow: 0 22px 48px rgba(11, 23, 54, 0.22);
+  --ui-unread-dot: #22c55e;
+
   /* Layout */
   --header-height: 64px;
   --sidebar-width: 232px;
@@ -164,6 +188,13 @@
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24);
     --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.28);
     --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.5);
+    /* Dark values of the Home workspace language (mirror :root[data-theme='dark'] .home-page). */
+    --ui-ink: #e8ecf6;
+    --ui-muted: #96a0b8;
+    --ui-border: #232d47;
+    --ui-band: #0e1526;
+    --ui-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
+    --ui-header-bg: var(--color-hero);
   }
 }
 

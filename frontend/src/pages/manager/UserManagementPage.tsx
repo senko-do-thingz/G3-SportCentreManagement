@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { managerUsersApi } from '../../api/managerUsersApi'
 import { useAuth } from '../../auth/useAuth'
 import { ROLE_LABELS } from '../../auth/roles'
-import { Button, Card, Input, Modal, Select, StatusBadge, Table, useToast, type TableColumn } from '../../components/ui'
+import { Button, Card, Input, Modal, Select, StatusBadge, Table, useToast, type TableColumn, StatIcon } from '../../components/ui'
 import type { ManagerUser } from '../../types/manager'
 import { formatManagerDateTime } from './managerFormat'
 import { AddStaffAccountModal } from './AddStaffAccountModal'
@@ -66,28 +66,28 @@ export function UserManagementPage() {
 
     <div className="concept-stats">
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">U</span>
+        <StatIcon name="users" />
         <div>
           <strong>{ready ? String(totalCount).padStart(2, '0') : '--'}</strong>
           <small>Matching accounts</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">A</span>
+        <StatIcon name="check" />
         <div>
           <strong>{ready ? String(activeCount).padStart(2, '0') : '--'}</strong>
           <small>Active on this page</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">R</span>
+        <StatIcon name="badge" />
         <div>
           <strong>{currentRoleLabel}</strong>
           <small>Role filter</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">S</span>
+        <StatIcon name="filter" />
         <div>
           <strong>{currentStatusLabel}</strong>
           <small>Status filter</small>

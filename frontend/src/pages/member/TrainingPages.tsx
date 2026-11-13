@@ -48,7 +48,7 @@ function FeedbackList({ feedback }: { feedback: CoachFeedback[] }) {
 export function TrainingPlansPage() {
   return (
     <div className="training-page">
-      <PageHeader title="Training plans" description="View the personal plans and exercise instructions assigned by your coach." />
+      <PageHeader eyebrow="Member workspace" title="Training plans" description="View the personal plans and exercise instructions assigned by your coach." />
       <TrainingData load={training.plans} refreshLabel="Refresh training plans">
         {plans => plans.length ? (
           <Card>
@@ -83,7 +83,7 @@ export function TrainingPlanDetailPage() {
             <Link to="/member/training/plans">Back to training plans</Link>
             <Button variant="secondary" onClick={refresh}>Refresh plan and feedback</Button>
           </div>
-          <PageHeader title={plan.title} description={`${plan.className} - Coach ${plan.coachName} - Read only`} />
+          <PageHeader eyebrow="Member workspace" title={plan.title} description={`${plan.className} - Coach ${plan.coachName} - Read only`} />
           {plan.description && <p className="training-copy">{plan.description}</p>}
           <Card title="Exercises">
             {steps.length ? (
@@ -108,7 +108,7 @@ export function TrainingPlanDetailPage() {
 export function CoachFeedbackPage() {
   return (
     <div className="training-page">
-      <PageHeader title="Coach feedback" description="Personal feedback, progress ratings and guidance from your coach." />
+      <PageHeader eyebrow="Member workspace" title="Coach feedback" description="Personal feedback, progress ratings and guidance from your coach." />
       <TrainingData load={training.feedback} refreshLabel="Refresh coach feedback">
         {feedback => <Card title="Progress rating"><FeedbackList feedback={feedback} /></Card>}
       </TrainingData>
@@ -119,7 +119,7 @@ export function CoachFeedbackPage() {
 export function AttendancePage() {
   return (
     <div className="training-page">
-      <PageHeader title="Attendance history" description="View your session dates, times and attendance status." />
+      <PageHeader eyebrow="Member workspace" title="Attendance history" description="View your session dates, times and attendance status." />
       <TrainingData load={training.attendance} refreshLabel="Refresh attendance history">
         {rows => rows.length ? (
           <Card>
@@ -143,7 +143,7 @@ export function AttendancePage() {
 export function TrainingResultsPage() {
   return (
     <div className="training-page">
-      <PageHeader title="Training results" description="View your session results, skill scores and coach feedback." />
+      <PageHeader eyebrow="Member workspace" title="Training results" description="View your session results, skill scores and coach feedback." />
       <TrainingData load={training.results} refreshLabel="Refresh training results">
         {rows => rows.length ? (
           <Card>
@@ -180,7 +180,7 @@ export function TrainingResultDetailPage() {
             <Link to="/member/training/results">Back to training results</Link>
             <Button variant="secondary" onClick={refresh}>Refresh session results</Button>
           </div>
-          <PageHeader title="Session result details" />
+          <PageHeader eyebrow="Member workspace" title="Session result details" />
           <SessionText session={result.session} />
           {result.notes && <p className="training-copy">{result.notes}</p>}
           <Card title="Skill scores">

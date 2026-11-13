@@ -21,7 +21,7 @@ import '../../styles/coachUi.css'
 export function CoachTrainingPlansPage() {
   return (
     <div className="training-page coach-ui coach-plans-page">
-      <PageHeader title="Assign plans and feedback" description="Assign a personal plan using a confirmed booking in a class you coach, or a plan for the whole class. Members can view plans and feedback as soon as you save them." />
+      <PageHeader eyebrow="Coach workspace" title="Assign plans and feedback" description="Assign a personal plan using a confirmed booking in a class you coach, or a plan for the whole class. Members can view plans and feedback as soon as you save them." />
       <TrainingData load={training.coachClasses}>{classes => <CoachPlansWorkspace classes={classes} />}</TrainingData>
     </div>
   )
@@ -135,7 +135,7 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
           <h3 id="coach-personal-plan-details">Plan details</h3>
           <Select label="Member booking" name="bookingId" required placeholder="Select a confirmed booking" value={bookingId} onChange={event => chooseBooking(event.target.value)}
             options={members.map(member => ({ value: String(member.bookingId), label: `${member.memberName} - Booking #${member.bookingId} - ${formatCalendarDate(member.sessionDate)}` }))} />
-          {bookingId && <Link className="btn btn--secondary" to={`/coach/training/progress?classId=${classId}&memberId=${selectedMemberId ?? ''}`}>View selected member progress</Link>}
+          {bookingId && <Link className="btn btn--secondary btn--md" to={`/coach/training/progress?classId=${classId}&memberId=${selectedMemberId ?? ''}`}>View selected member progress</Link>}
           <Input label="Plan title" name="title" required maxLength={150} value={title} onChange={event => setTitle(event.target.value)} placeholder="Enter plan title (e.g. Footwork & basic drills)" />
           <TrainingTextarea label="Plan description" name="description" maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} />
         </section>
@@ -419,7 +419,7 @@ function PublishFeedbackForm({ planId }: { planId: number }) {
 export function CoachTrainingResultsPage() {
   return (
     <div className="training-page coach-ui coach-results-page">
-      <PageHeader title="Record training results" description="Record results for members marked Present or Late in sessions you coach. Results are visible as soon as you save them." />
+      <PageHeader eyebrow="Coach workspace" title="Record training results" description="Record results for members marked Present or Late in sessions you coach. Results are visible as soon as you save them." />
       <TrainingData load={training.coachSessions}>{sessions => <CoachResultsWorkspace sessions={sessions} />}</TrainingData>
     </div>
   )

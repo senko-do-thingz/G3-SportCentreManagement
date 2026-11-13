@@ -1,5 +1,7 @@
 .attendance-help { color: var(--color-text-muted); font-size: var(--text-sm); }
 .attendance-layout { display: grid; gap: var(--space-6); min-width: 0; align-items: start; }
+/* Until a session is chosen the roster column is a short card, not a full-height empty panel. */
+.attendance-placeholder .state--plain { padding: var(--space-4) var(--space-4) var(--space-2); }
 .attendance-selector .attendance-session-list { max-height: 32rem; overflow-y: auto; padding: var(--space-1); scrollbar-gutter: stable; }
 .attendance-session-list, .attendance-roster { list-style: none; margin: var(--space-4) 0 0; padding: 0; display: grid; gap: var(--space-4); }
 .attendance-session-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); }

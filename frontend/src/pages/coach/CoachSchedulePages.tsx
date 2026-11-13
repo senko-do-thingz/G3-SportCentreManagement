@@ -103,14 +103,14 @@ export function CoachTeachingSchedulePage() {
   const dates = Array.from({ length: 7 }, (_, index) => browseAddDays(week, index))
 
   return <div className="page coach-schedule-page coach-ui">
-    <PageHeader eyebrow="Your workspace" title="Teaching Schedule" description="Review assigned sessions across the teaching week." />
+    <PageHeader eyebrow="Coach workspace" title="Teaching Schedule" description="Review assigned sessions across the teaching week." />
     <section className="coach-schedule-hero" aria-label="Coach schedule introduction">
       <div className="coach-schedule-hero__copy">
         <p className="coach-schedule-hero__eyebrow">Sportify coach experience</p>
         <h2>Your week.<br /><span>Clearly organized.</span></h2>
         <p>Simple workflows. Better coaching.</p>
       </div>
-      {selectedSession && <Link className="btn btn--accent coach-schedule-hero__action" to={rosterHref(selectedSession, week)}>View class roster</Link>}
+      {selectedSession && <Link className="btn btn--accent btn--md coach-schedule-hero__action" to={rosterHref(selectedSession, week)}>View class roster</Link>}
     </section>
     {resource.status === 'loading' ? <PageLoader label="Loading your teaching schedule" /> : resource.status === 'error' ? <ErrorState title="We could not load your teaching schedule" error={resource.error} onRetry={reload} /> : <>
       <section className="coach-schedule-metrics" aria-label="Schedule summary">
@@ -120,11 +120,14 @@ export function CoachTeachingSchedulePage() {
         <div className="coach-schedule-metric"><ScheduleMetricIcon name="week" /><div><p>{weekMetricLabel(week, weekEnd)}</p><span>Week in view</span></div></div>
       </section>
       <div className="coach-schedule-layout">
-        <Card className="coach-schedule-weekly" title="Weekly schedule" actions={<Button variant="secondary" size="sm" onClick={() => setParams((current) => changeWeekParams(current, browseMonday(browseToday())))}>This week</Button>}>
-          <div className="coach-schedule-week-nav" aria-label="Teaching week navigation">
-            <Button variant="secondary" size="sm" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, -7)))}>Previous week</Button>
+        <Card className="coach-schedule-weekly" title="Weekly schedule">
+          <div className="coach-schedule-week-nav" role="group" aria-label="Teaching week navigation">
+            <div className="coach-week-controls">
+              <Button variant="secondary" size="sm" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, -7)))}>Previous week</Button>
+              <Button variant="secondary" size="sm" onClick={() => setParams((current) => changeWeekParams(current, browseMonday(browseToday())))}>This week</Button>
+              <Button variant="secondary" size="sm" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, 7)))}>Next week</Button>
+            </div>
             <strong>{browseDate(week)} - {browseDate(weekEnd)}</strong>
-            <Button variant="secondary" size="sm" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, 7)))}>Next week</Button>
           </div>
           {sessions.length === 0 ? <div className="coach-schedule-empty"><EmptyState title="No assigned sessions this week" description="Your schedule will show sessions assigned to your coach account." /></div> : <>
             <div className="coach-schedule-week-scroll" role="region" aria-label={`Sessions from ${browseDate(week)} to ${browseDate(weekEnd)}`} tabIndex={0}>
@@ -165,7 +168,7 @@ export function CoachTeachingSchedulePage() {
               <div><dt>Facility</dt><dd>{selectedSession.facilityName || 'Not provided'}</dd></div>
               {selectedSession.trainingType && <div><dt>Training type</dt><dd>{selectedSession.trainingType === 'SELF_TRAINING' ? 'Self-training' : 'Coach-led'}</dd></div>}
             </dl>
-            <Link className="btn btn--primary coach-schedule-overview__action" to={rosterHref(selectedSession, week)}>View roster</Link>
+            <Link className="btn btn--primary btn--md coach-schedule-overview__action" to={rosterHref(selectedSession, week)}>View roster</Link>
           </> : <div className="coach-schedule-overview__empty"><p>No session to review</p><span>Choose another week to view assigned sessions and rosters.</span></div>}
         </Card>
       </div>
@@ -252,14 +255,14 @@ export function CoachRosterPage() {
   const rosterCount = selectedSession && roster.status === 'ready' ? roster.data.length : '--'
 
   return <div className="page coach-schedule-page coach-roster-page coach-ui">
-    <PageHeader eyebrow="Your workspace" title="Class Roster" description="Select an assigned session to review its confirmed bookings." actions={<Button variant="secondary" disabled={!selectedSession || roster.status !== 'ready'} onClick={() => window.print()}>Print roster</Button>} />
+    <PageHeader eyebrow="Coach workspace" title="Class Roster" description="Select an assigned session to review its confirmed bookings." actions={<Button variant="secondary" disabled={!selectedSession || roster.status !== 'ready'} onClick={() => window.print()}>Print roster</Button>} />
     <section className="coach-schedule-hero" aria-label="Class roster introduction">
       <div className="coach-schedule-hero__copy">
         <p className="coach-schedule-hero__eyebrow">Sportify coach experience</p>
         <h2>Know your class.<br /><span>Prepare to coach.</span></h2>
         <p>Review confirmed bookings and session details in one place.</p>
       </div>
-      <a className="btn btn--accent coach-schedule-hero__action" href="#coach-roster-picker">Choose session</a>
+      <a className="btn btn--accent btn--md coach-schedule-hero__action" href="#coach-roster-picker">Choose session</a>
     </section>
     <section className="coach-roster-metrics" aria-label="Roster summary">
       <div className="coach-schedule-metric"><RosterMetricIcon name="session" /><div><p>{selectedSession ? '1' : '--'}</p><span>Selected session</span></div></div>
@@ -270,12 +273,16 @@ export function CoachRosterPage() {
     <div className="coach-roster-layout">
       <Card className="coach-roster-picker" title="Choose a session" id="coach-roster-picker">
         <div className="coach-roster-picker__body">
-          <p className="coach-roster-field-label">Schedule week</p>
-          <div className="coach-roster-week-nav" aria-label="Roster week navigation">
-            <strong>{browseDate(week)} - {browseDate(weekEnd)}</strong>
-            <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, -7)))}>Previous</Button>
-            <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseMonday(browseToday())))}>This week</Button>
-            <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, 7)))}>Next</Button>
+          <div className="coach-roster-picker__week">
+            <p className="coach-roster-field-label">Schedule week</p>
+            <div className="coach-schedule-week-nav coach-roster-week-nav" role="group" aria-label="Roster week navigation">
+              <div className="coach-week-controls">
+                <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, -7)))}>Previous week</Button>
+                <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseMonday(browseToday())))}>This week</Button>
+                <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, 7)))}>Next week</Button>
+              </div>
+              <strong>{browseDate(week)} - {browseDate(weekEnd)}</strong>
+            </div>
           </div>
           {sessionsResource.status === 'error' ? <ErrorState title="We could not load your sessions" error={sessionsResource.error} onRetry={reloadSessions} /> : sessionsResource.status === 'loading' ? <PageLoader label="Loading your sessions" /> : sessions.length === 0 ? <EmptyState title="No assigned sessions this week" description="Change the week to find one of your sessions." /> : <Select label="Session" placeholder="Choose an assigned session" value={selectedSession ? sessionRouteReference(selectedSession) : ''} options={options} onChange={(event) => selectSession(event.target.value)} />}
           <p className="coach-roster-picker__note">Only sessions assigned to your coach account are available. The roster contains confirmed bookings only.</p>
@@ -290,6 +297,6 @@ export function CoachRosterPage() {
         </> : sessionsResource.status === 'error' ? <EmptyState title="Roster unavailable" description="Retry loading your sessions to choose a class roster." /> : sessionsResource.status === 'loading' ? <PageLoader label="Loading roster options" /> : selectedSessionId ? <ErrorState title="Session is not in this week's schedule" message="Choose a session from your schedule, or change the week and select it again." /> : sessions.length === 0 ? <EmptyState title="No session to review" description="Assigned sessions with confirmed bookings will appear here." /> : <EmptyState title="Choose a session to view its roster" description="Select one of your assigned sessions. Confirmed bookings will appear here." />}
       </Card>
     </div>
-    {sessionsResource.status === 'ready' && selectedSession && roster.status === 'ready' && roster.data.length > 0 && <div className="coach-print-hidden coach-roster-links"><Link className="btn btn--secondary" to={`/coach?week=${week}`}>Back to teaching schedule</Link>{selectedSession.classId && <Link className="btn btn--secondary" to={`/coach/training/progress?classId=${selectedSession.classId}`}>View class member progress</Link>}</div>}
+    {sessionsResource.status === 'ready' && selectedSession && roster.status === 'ready' && roster.data.length > 0 && <div className="coach-print-hidden coach-roster-links"><Link className="btn btn--secondary btn--md" to={`/coach?week=${week}`}>Back to teaching schedule</Link>{selectedSession.classId && <Link className="btn btn--secondary btn--md" to={`/coach/training/progress?classId=${selectedSession.classId}`}>View class member progress</Link>}</div>}
   </div>
 }
