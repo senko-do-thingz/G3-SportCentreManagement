@@ -49,6 +49,8 @@ public record ActivityLogQuery(Long actorId, String action, LocalDateTime from,
             AuditAction.BOOKING_CREATED,
             AuditAction.BOOKING_CANCELLED,
             AuditAction.PAYMENT_CONFIRMED,
+            AuditAction.PAYMENT_SUBMITTED,
+            AuditAction.PAYMENT_CANCELLED,
             AuditAction.PAYMENT_FAILED,
             AuditAction.PAYMENT_AMOUNT_MISMATCH,
             AuditAction.REFUND_COMPLETED);

@@ -451,6 +451,20 @@
       ],
       "drops": [],
       "sha256_lf": "bcb4730b3508786a35cc3fdaa7941be61f37403b9020b39868b9a661e44bbeb0"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V58__payment_cancellation_handoff.sql",
+      "version": 58,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "57ed53c7f1b126d223359ff33f82fde6dfb1473e1a230ef47fe242338d92bbf9"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/identity/V59__password_reset_otp.sql",
+      "version": 59,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "9fd73e35d84cee60dc6d4da5b1f9df06a33094ec5e7edd771befbffa9eaaf59b"
     }
   ],
   "create_occurrences": 82,

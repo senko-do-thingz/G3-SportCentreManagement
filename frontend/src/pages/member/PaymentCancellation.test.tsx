@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { CancelPayment, HANDOFF_TOOLTIP } from './PaymentCancellation'
+import { CancelPayment, HANDOFF_TOOLTIP, SubmitPayment } from './PaymentCancellation'
 import { paymentsApi, type Payment } from '../../api/paymentsApi'
 
 vi.mock('../../api/paymentsApi', () => ({ paymentsApi: { cancel: vi.fn(), submit: vi.fn() } }))
@@ -18,6 +18,19 @@ describe('Cancel Payment', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cancel Payment' }))
     expect(paymentsApi.cancel).toHaveBeenCalledWith(10)
     expect(changed).toHaveBeenCalled()
+  })
+  it('hands the order to Receptionist only after an explicit confirmation', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    vi.mocked(paymentsApi.submit).mockResolvedValue({ ...pending, submittedForVerificationAt: '2026-11-13T10:00:00' })
+    const changed = vi.fn()
+    render(<SubmitPayment payment={pending} onChanged={changed} />)
+    const button = screen.getByRole('button', { name: 'Submit to Receptionist for verification' })
+    await userEvent.click(button)
+    expect(paymentsApi.submit).not.toHaveBeenCalled()
+    await userEvent.click(button)
+    expect(paymentsApi.submit).toHaveBeenCalledWith(10)
+    expect(changed).toHaveBeenCalled()
+    confirm.mockRestore()
   })
   it('keeps a disabled, focusable explanation after handoff', () => {
     render(<CancelPayment payment={{ ...pending, submittedForVerificationAt: '2026-11-13T10:00:00' }} onChanged={vi.fn()} />)

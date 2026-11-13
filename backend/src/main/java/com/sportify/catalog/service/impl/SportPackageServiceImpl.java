@@ -428,13 +428,14 @@ public class SportPackageServiceImpl implements SportPackageService {
                 .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + registrationId));
 
         boolean isStaff = SecurityUtils.isStaff(actor);
-        if (!isStaff && registration.getPayment() != null
-                && registration.getPayment().getSubmittedForVerificationAt() != null) {
-            throw new com.sportify.core.exception.ConflictException("Payment was submitted for verification and can no longer be cancelled");
-        }
         // MemberProfile shares its primary key with UserAccount (@MapsId user_id), so member id equals user id by design.
         if (!isStaff && !registration.getMember().getId().equals(actor.getId())) {
             throw new ResourceNotFoundException("Package registration not found for id: " + registrationId);
+        }
+        // Ownership first, so another account learns nothing; a Member may cancel only before the Receptionist handoff.
+        if (!isStaff && registration.getPayment() != null
+                && registration.getPayment().getSubmittedForVerificationAt() != null) {
+            throw new com.sportify.core.exception.ConflictException("Payment was submitted for verification and can no longer be cancelled");
         }
 
         if (registration.getStatus() != PackageRegistrationStatus.PENDING_PAYMENT) {

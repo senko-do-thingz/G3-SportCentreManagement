@@ -95,9 +95,13 @@ public class PaymentServiceImpl implements PaymentService {
         return response;
     }
 
+    /**
+     * Payment-first locking: the payment row is locked (pessimistic write) before its status, handoff time or linked
+     * card/package is read, the same order the Receptionist, wallet and QR settlement paths use. A cancellation and a
+     * concurrent confirmation therefore run one after the other, and the second sees the first one's result.
+     */
     private Payment ownedPendingPayment(Long id, UserAccount actor) {
-        Payment payment = paymentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + id));
+        Payment payment = lockPayment(id);
         if (actor == null || payment.getMember() == null || !payment.getMember().getId().equals(actor.getId())) {
             throw new ResourceNotFoundException("Payment not found for id: " + id);
         }

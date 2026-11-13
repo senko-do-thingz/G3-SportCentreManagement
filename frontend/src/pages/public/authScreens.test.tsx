@@ -253,15 +253,37 @@ describe('F1-05 Log in', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Cannot reach the server')
   })
 
-  it('Forgot password explains how to reset without leaving the page', async () => {
-    const { calls } = installFakeFetch(authBackend())
+  it('Forgot password resets by email code without leaving the page', async () => {
+    const login = authBackend()
+    const { calls } = installFakeFetch(call => {
+      if (call.path === '/auth/forgot-password/request') return json(200, { message: 'If an account exists, check your inbox.' })
+      if (call.path === '/auth/forgot-password/verify') return json(200, { authorization: 'reset-authorization' })
+      if (call.path === '/auth/forgot-password/reset') return json(200, { message: 'Password reset. You can now log in.' })
+      return login(call)
+    })
     const user = userEvent.setup()
     renderApp('/login')
 
-    await user.click(await screen.findByRole('button', { name: 'Forgot password?' }))
+    await user.type(await screen.findByLabelText(/email address/i), 'member@sportify.demo')
+    await user.click(screen.getByRole('button', { name: 'Forgot password?' }))
+    expect(screen.getByLabelText(/email address/i)).toHaveValue('member@sportify.demo')
+    await user.click(screen.getByRole('button', { name: 'Send code' }))
 
-    expect(screen.getByRole('status')).toHaveTextContent('Ask the front desk to reset your password')
-    expect(calls).toHaveLength(0)
+    await user.type(await screen.findByLabelText(/verification code/i), '123456')
+    expect(screen.getByRole('button', { name: /Resend code in \d+s/ })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Verify code' }))
+
+    await user.type(await screen.findByLabelText(/^new password/i), 'NewPassword2')
+    await user.type(screen.getByLabelText(/confirm new password/i), 'NewPassword2')
+    await user.click(screen.getByRole('button', { name: 'Reset password' }))
+
+    expect(await screen.findByText(/Your password has been reset/)).toBeInTheDocument()
+    expect(calls.find(call => call.path === '/auth/forgot-password/request')?.body).toEqual({ email: 'member@sportify.demo' })
+    expect(calls.find(call => call.path === '/auth/forgot-password/verify')?.body).toEqual({ email: 'member@sportify.demo', otp: '123456' })
+    expect(calls.find(call => call.path === '/auth/forgot-password/reset')?.body)
+      .toEqual({ authorization: 'reset-authorization', newPassword: 'NewPassword2', confirmPassword: 'NewPassword2' })
+    await user.click(screen.getByRole('button', { name: 'Return to Login' }))
+    expect(await screen.findByRole('button', { name: 'Log in' })).toBeInTheDocument()
   })
 
   it('moves the focus to the first invalid field', async () => {

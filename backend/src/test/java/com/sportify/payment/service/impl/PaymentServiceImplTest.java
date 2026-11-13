@@ -140,6 +140,48 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    void cancellationAndHandoffLockThePaymentRowInsteadOfAPlainRead() {
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(call -> call.getArgument(0));
+
+        paymentService.submitForVerification(10L, ownerUser);
+
+        verify(paymentRepository).findByIdForUpdate(10L);
+        verify(paymentRepository, never()).findById(10L);
+    }
+
+    @Test
+    void handoffIsRecordedOnceAndThenBlocksCancellation() {
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(call -> call.getArgument(0));
+
+        var first = paymentService.submitForVerification(10L, ownerUser);
+        var second = paymentService.submitForVerification(10L, ownerUser);
+
+        assertThat(first.getSubmittedForVerificationAt()).isNotNull();
+        assertThat(second.getSubmittedForVerificationAt()).isEqualTo(first.getSubmittedForVerificationAt());
+        verify(paymentRepository, times(1)).saveAndFlush(pendingPayment);
+        assertThatThrownBy(() -> paymentService.cancelPayment(10L, ownerUser))
+                .isInstanceOf(com.sportify.core.exception.ConflictException.class);
+        assertThat(pendingPayment.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
+    }
+
+    @Test
+    void cancellationIsRefusedOnceSettlementHasStartedOrFinished() {
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
+        pendingPayment.setSettlementType("ACTUAL");
+        assertThatThrownBy(() -> paymentService.cancelPayment(10L, ownerUser))
+                .isInstanceOf(com.sportify.core.exception.ConflictException.class);
+
+        pendingPayment.setSettlementType(null);
+        pendingPayment.setPaymentStatus(PaymentStatus.SUCCESS);
+        assertThatThrownBy(() -> paymentService.cancelPayment(10L, ownerUser))
+                .isInstanceOf(com.sportify.core.exception.ConflictException.class);
+        verify(memberCardRepository, never()).save(any());
+        verify(paymentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     @DisplayName("Create pending payment with valid online method succeeds and initializes pending status")
     void createPendingPayment_ValidOnlineMethod_Succeeds() {
         when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1001L);

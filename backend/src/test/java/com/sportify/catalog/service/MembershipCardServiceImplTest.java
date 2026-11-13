@@ -884,7 +884,8 @@ public class MembershipCardServiceImplTest {
         MemberCardResponse res = membershipCardService.cancelCard(42L, memberUser);
 
         assertEquals(CardStatus.CANCELLED, res.getStatus());
-        verify(paymentService).markPaymentFailed(eq(99L), org.mockito.ArgumentMatchers.contains("member user id 100"));
+        // A Member cancelling before the Receptionist handoff cancels the payment instead of failing it.
+        verify(paymentService).markPaymentCancelled(eq(99L), org.mockito.ArgumentMatchers.contains("member user id 100"));
     }
 
     @Test
@@ -2370,7 +2371,7 @@ public class MembershipCardServiceImplTest {
         order.verify(memberCardRepository).findPaymentIdById(42L);
         order.verify(paymentService).lockPayment(99L);
         order.verify(memberCardRepository).findById(42L);
-        order.verify(paymentService).markPaymentFailed(eq(99L), any());
+        order.verify(paymentService).markPaymentCancelled(eq(99L), any());
     }
 
     @Test
