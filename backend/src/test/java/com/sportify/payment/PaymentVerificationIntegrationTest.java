@@ -588,7 +588,7 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
             int invoices = invoiceRepository.findByPaymentId(ids[0]).size();
             if (cancelWon) {
                 assertThat(card.getStatus()).isEqualTo(CardStatus.CANCELLED);
-                assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.FAILED);
+                assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.CANCELLED);
                 assertThat(invoices).isZero();
             } else {
                 assertThat(card.getStatus()).isEqualTo(CardStatus.ACTIVE);
