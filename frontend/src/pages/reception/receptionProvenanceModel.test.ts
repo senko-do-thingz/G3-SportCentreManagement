@@ -14,6 +14,19 @@ describe('receptionProvenanceModel - classifyProvenance', () => {
     expect(resUndef.canPrintReceipt).toBe(false)
   })
 
+  it('classifies a local VietQR demo (LOCAL_DEMO, SANDBOX) as valid simulated, not inconsistent', () => {
+    const payment = { status: 'SUCCESS', settlementType: 'SIMULATED', settlementProvider: 'LOCAL_DEMO', settlementEnvironment: 'SANDBOX', simulatedTransactionId: null }
+    const invoice = { ...payment, status: 'PAID' }
+    for (const res of [classifyProvenance(payment), reconcileProvenance(payment, invoice)]) {
+      expect(res.classification).toBe('VALID_SIMULATED')
+      expect(res.statusBadgeLabel).toBe('Paid - Simulated')
+      expect(res.provenanceLabel).toBe('SIMULATED (VIETQR LOCAL DEMO)')
+      expect(res.receiptWarningMessage).toContain('No real money was moved')
+      expect(res.canPrintReceipt).toBe(true)
+    }
+    expect(classifyProvenance({ ...payment, settlementEnvironment: 'PRODUCTION' }).classification).toBe('INCONSISTENT')
+  })
+
   it('classifies valid SIMULATED settlement with positive txId truthfully', () => {
     const res = classifyProvenance({
       status: 'PAID',

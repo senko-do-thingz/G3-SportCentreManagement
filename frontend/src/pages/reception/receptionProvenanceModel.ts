@@ -2,7 +2,8 @@
  * Pure provenance classification helper for Reception payments, invoices, and receipts.
  * Strictly guarantees truthful presentation of settlement provenance:
  * - VALID_SIMULATED: explicit simulated settlement label, warning banner, excluded from real cash.
- *   This includes Sportify simulator records with a transaction row and VietQR sandbox records.
+ *   This includes Sportify simulator records with a transaction row, VietQR gateway sandbox records and
+ *   local VietQR demo records (provider LOCAL_DEMO, environment SANDBOX).
  * - ACTUAL: truthful actual settlement presentation where supported by provider data.
  * - LEGACY_UNVERIFIED: explicit 'Legacy unverified' classification for records with NULL/missing provenance.
  * - INCONSISTENT: explicit unverified/inconsistent classification for contradictory metadata.
@@ -29,20 +30,25 @@ export interface ProvenanceSubject {
   simulatedTransactionId?: number | null
 }
 
+/** VietQR sandbox settlements: the gateway sandbox (GATEWAY) and the guarded local demo (LOCAL_DEMO). */
+const VIETQR_SANDBOX_PROVIDERS = ['GATEWAY', 'LOCAL_DEMO']
+
 function isVietQrSandbox(subject: ProvenanceSubject, provider: string, txId: number | null | undefined): boolean {
-  return provider === 'GATEWAY'
+  return VIETQR_SANDBOX_PROVIDERS.includes(provider)
     && (subject.settlementEnvironment ?? '').trim().toUpperCase() === 'SANDBOX'
     && txId == null
 }
 
 function simulatedProvenanceLabel(provider: string): string {
-  return provider === 'GATEWAY' ? 'SIMULATED (VIETQR SANDBOX)' : 'SIMULATED (SPORTIFY_SIMULATOR)'
+  if (provider === 'GATEWAY') return 'SIMULATED (VIETQR SANDBOX)'
+  if (provider === 'LOCAL_DEMO') return 'SIMULATED (VIETQR LOCAL DEMO)'
+  return 'SIMULATED (SPORTIFY_SIMULATOR)'
 }
 
 function simulatedWarning(provider: string): string {
-  return provider === 'GATEWAY'
-    ? 'VIETQR SANDBOX - The local test transaction did not move real money.'
-    : 'SIMULATED SETTLEMENT - Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.'
+  if (provider === 'GATEWAY') return 'VIETQR SANDBOX - The local test transaction did not move real money.'
+  if (provider === 'LOCAL_DEMO') return 'VIETQR LOCAL DEMO - Completed in local demo mode. No real money was moved.'
+  return 'SIMULATED SETTLEMENT - Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.'
 }
 
 export interface ProvenancePresentation {
@@ -509,7 +515,7 @@ export function reconcileProvenance(
           'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting settlement providers.',
         )
       }
-      if (invProv === 'GATEWAY') {
+      if (VIETQR_SANDBOX_PROVIDERS.includes(invProv)) {
         const invEnv = (invoiceSubject.settlementEnvironment ?? '').trim().toUpperCase()
         const payEnv = (paymentSubject.settlementEnvironment ?? '').trim().toUpperCase()
         if (invEnv !== 'SANDBOX' || payEnv !== 'SANDBOX' || invTx !== null || payTx !== null) {
@@ -554,7 +560,7 @@ export function reconcileProvenance(
         'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting settlement providers.',
       )
     }
-    if (invProvider === 'GATEWAY') {
+    if (VIETQR_SANDBOX_PROVIDERS.includes(invProvider)) {
       const invEnv = (invoiceSubject.settlementEnvironment ?? '').trim().toUpperCase()
       const payEnv = (paymentSubject.settlementEnvironment ?? '').trim().toUpperCase()
       if (invEnv !== 'SANDBOX' || payEnv !== 'SANDBOX'
