@@ -8,7 +8,7 @@ import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDate, formatDateTime, humanizeCode } from '../../utils/format'
 import { PaymentNav } from './PaymentNav'
-import { formatPaymentMoney as formatMoney, methodLabel, parseIdParam, PAYMENT_PATHS } from './paymentsModel'
+import { formatPaymentMoney as formatMoney, isSimulatedSettlement, methodLabel, parseIdParam, PAYMENT_PATHS, simulatedProvenanceLabel, simulatedSettlementSource } from './paymentsModel'
 import { useMemberResource } from './useMemberResource'
 
 const ITEM_TYPE_LABELS: Record<string, string> = {
@@ -84,6 +84,8 @@ function ReceiptContent({ invoice }: { invoice: Invoice }) {
   const hasDiscount = invoice.discountAmount !== null && invoice.discountAmount !== undefined && invoice.discountAmount !== ''
   const discount = Number(invoice.discountAmount ?? 0)
   const tax = Number(invoice.taxAmount ?? 0)
+  const simulated = isSimulatedSettlement(invoice)
+
   return (
     <div className="page receipt-page">
       {invoice.paymentId ? <PaymentNav paymentId={invoice.paymentId} /> : null}
@@ -93,6 +95,11 @@ function ReceiptContent({ invoice }: { invoice: Invoice }) {
           <p className="receipt__brand">SPORTIFY / PAYMENT RECEIPT</p>
           <p className="receipt__number">{invoice.invoiceNumber}</p>
         </div>
+        {simulated && (
+          <p className="notice notice--warning" role="status">
+            SIMULATED SETTLEMENT - {simulatedSettlementSource(invoice)}
+          </p>
+        )}
         <dl className="summary-list receipt__list">
           <div>
             <dt>Receipt / date</dt>
@@ -169,10 +176,16 @@ function ReceiptContent({ invoice }: { invoice: Invoice }) {
               <dd>{formatDateTime(invoice.paymentTime)}</dd>
             </div>
           )}
+          {simulated && (
+            <div>
+              <dt>Settlement provenance</dt>
+              <dd>{simulatedProvenanceLabel(invoice)}</dd>
+            </div>
+          )}
           <div>
             <dt>Status</dt>
             <dd>
-              <StatusBadge status={invoice.status} />
+              <StatusBadge status={invoice.status} label={simulated && invoice.status === 'PAID' ? 'Paid - Simulated' : undefined} />
             </dd>
           </div>
         </dl>

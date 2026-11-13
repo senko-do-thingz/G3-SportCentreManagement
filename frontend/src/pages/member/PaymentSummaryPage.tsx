@@ -19,6 +19,7 @@ import {
   isPending,
   DEFAULT_PAYMENT_METHOD,
   isMethodAvailable,
+  isSimulatedSettlement,
   isSingleVisitRegistration,
   methodLabel,
   parseIdParam,
@@ -27,6 +28,7 @@ import {
   paymentStatusToneCode,
   paymentSummaryNote,
   priceBreakdown,
+  simulatedProvenanceLabel,
   registrationForPayment,
   validityRange,
   type PaymentItemKind,
@@ -167,9 +169,21 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
             <div>
               <dt>Status</dt>
               <dd>
-                <StatusBadge status={paymentStatusToneCode(data.status)} label={paymentStatusLabel(data.status)} />
+                <StatusBadge status={paymentStatusToneCode(data.status)} label={paymentStatusLabel(data.status, data.settlementType)} />
               </dd>
             </div>
+            {isSimulatedSettlement(data) && (
+              <div>
+                <dt>Settlement provenance</dt>
+                <dd>{simulatedProvenanceLabel(data)}</dd>
+              </div>
+            )}
+            {isSimulatedSettlement(data) && data.referenceCode && (
+              <div>
+                <dt>Simulated transaction</dt>
+                <dd>{data.referenceCode}</dd>
+              </div>
+            )}
             {registration && <RegistrationRows registration={registration} singleVisit={singleVisit} />}
             {card && <CardRows card={card} />}
             <div>
@@ -368,7 +382,7 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
       ) : (
         <div className="payment-summary__actions">
           <p className="payment-methods__hint">
-            {payment.status === 'SUCCESS' ? 'Paid with' : 'Method'}: {methodLabel(payment.method)}
+            {payment.status === 'SUCCESS' ? (isSimulatedSettlement(payment) ? 'Paid (Simulated) with' : 'Paid with') : 'Method'}: {methodLabel(payment.method)}
           </p>
           {payment.invoiceId ? (
             <Link className={buttonClassName('primary', 'md', true)} to={PAYMENT_PATHS.receipt(payment.invoiceId)}>

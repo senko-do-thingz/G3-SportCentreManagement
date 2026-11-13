@@ -17,12 +17,15 @@ import {
   accountNumberToCopy,
   amountToCopy,
   formatPaymentMoney as formatMoney,
+  isSimulatedSettlement,
   methodLabel,
   parseIdParam,
   PAYMENT_PATHS,
   paymentStatusLabel,
   paymentStatusToneCode,
   POLL_INTERVAL_MS,
+  simulatedProvenanceLabel,
+  simulatedSettlementSource,
   transferContentToCopy,
 } from './paymentsModel'
 import { usePaymentPolling } from './usePaymentPolling'
@@ -142,6 +145,18 @@ function Instructions({ payment }: { payment: Payment }) {
             <dt>Method</dt>
             <dd>{methodLabel(payment.method)}</dd>
           </div>
+          {isSimulatedSettlement(payment) && (
+            <div>
+              <dt>Settlement provenance</dt>
+              <dd>{simulatedProvenanceLabel(payment)}</dd>
+            </div>
+          )}
+          {isSimulatedSettlement(payment) && payment.referenceCode && (
+            <div>
+              <dt>Simulated transaction</dt>
+              <dd>{payment.referenceCode}</dd>
+            </div>
+          )}
         </dl>
       </Card>
     )
@@ -291,9 +306,14 @@ function StatusPanel({ polling, payment }: { polling: ReturnType<typeof usePayme
   return (
     <Card title="Payment status" aria-label="Payment status">
       <div className="payment-status" aria-live="polite" data-status={payment.status}>
-        <StatusBadge status={paymentStatusToneCode(payment.status)} label={paymentStatusLabel(payment.status)} />
+        <StatusBadge status={paymentStatusToneCode(payment.status)} label={paymentStatusLabel(payment.status, payment.settlementType)} />
         <h3 className="payment-status__title">{content.title}</h3>
         <p className="payment-status__text">{content.text}</p>
+        {isSimulatedSettlement(payment) && (
+          <p className="notice notice--warning" role="status">
+            Settled in simulation only. {simulatedSettlementSource(payment)}
+          </p>
+        )}
       </div>
 
       {payment.status === 'PENDING' && (

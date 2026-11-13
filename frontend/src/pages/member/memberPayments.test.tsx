@@ -929,11 +929,15 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     expect(screen.queryByRole('button', { name: 'Print receipt' })).not.toBeInTheDocument()
   })
 
-  it('shows the ordinary Paid and Bank transfer labels in member payment pages', async () => {
+  it.each([
+    ['SPORTIFY_SIMULATOR', 52, 'SIMULATED (SPORTIFY_SIMULATOR)', 'Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.'],
+    ['LOCAL_DEMO', null, 'SIMULATED (VIETQR LOCAL DEMO)', 'Completed in VietQR local demo mode. No real money was moved.'],
+  ])('QR-05 shows Paid - Simulated and the %s provenance on summary, status, history and receipt', async (provider, txId, provenance, source) => {
     const simulatedPayment = payment({
       status: 'SUCCESS',
       settlementType: 'SIMULATED',
-      settlementProvider: 'SPORTIFY_SIMULATOR',
+      settlementProvider: provider,
+      settlementEnvironment: provider === 'LOCAL_DEMO' ? 'SANDBOX' : null,
       referenceCode: 'SIM-QR-52-00000052',
       invoiceId: 7,
       invoiceNumber: 'INV-0007',
@@ -941,8 +945,9 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     })
     const simulatedInvoice = invoice({
       settlementType: 'SIMULATED',
-      settlementProvider: 'SPORTIFY_SIMULATOR',
-      simulatedTransactionId: 52,
+      settlementProvider: provider,
+      settlementEnvironment: provider === 'LOCAL_DEMO' ? 'SANDBOX' : null,
+      simulatedTransactionId: txId,
       paymentReference: 'SIM-QR-52-00000052',
     })
     paymentsBackend({
@@ -952,21 +957,26 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     })
 
     const summary = renderApp('/member/payments/52')
-    expect(await screen.findByText('Paid')).toBeInTheDocument()
-    expect(screen.getByText('Paid with: Bank transfer')).toBeInTheDocument()
-    expect(screen.queryByText(/simulated/i)).not.toBeInTheDocument()
+    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
+    expect(screen.getByText(provenance)).toBeInTheDocument()
+    expect(screen.getByText('SIM-QR-52-00000052')).toBeInTheDocument()
+    expect(screen.getByText('Paid (Simulated) with: Bank transfer')).toBeInTheDocument()
     summary.unmount()
 
+    const status = renderApp('/member/payments/52/status')
+    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
+    expect(screen.getByText(`Settled in simulation only. ${source}`)).toBeInTheDocument()
+    status.unmount()
+
     const history = renderApp('/member/payments')
-    expect(await screen.findByText('Paid')).toBeInTheDocument()
-    const historyTable = await screen.findByRole('table', { name: 'Payment history' })
-    expect(historyTable.querySelector('tbody tr td:nth-child(4)')).toHaveTextContent('Bank transfer')
-    expect(screen.queryByText(/simulated/i)).not.toBeInTheDocument()
+    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
+    expect(screen.getByText('Bank transfer (Simulated)')).toBeInTheDocument()
     history.unmount()
 
     renderApp('/member/payments/receipts/7')
     const receipt = await screen.findByRole('region', { name: 'Receipt INV-0007' })
-    expect(within(receipt).getByText('Paid')).toBeInTheDocument()
-    expect(within(receipt).queryByText(/simulated/i)).not.toBeInTheDocument()
+    expect(within(receipt).getByText(`SIMULATED SETTLEMENT - ${source}`)).toBeInTheDocument()
+    expect(within(receipt).getByText(provenance)).toBeInTheDocument()
+    expect(within(receipt).getByText('Paid - Simulated')).toBeInTheDocument()
   })
 })

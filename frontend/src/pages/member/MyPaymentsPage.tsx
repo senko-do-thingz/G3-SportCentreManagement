@@ -10,6 +10,7 @@ import {
   formatPaymentMoney,
   historyPageFromParam,
   historySizeFromParam,
+  isSimulatedSettlement,
   methodLabel,
   PAYMENT_PATHS,
   paymentStatusLabel,
@@ -35,13 +36,13 @@ const COLUMNS: TableColumn<Payment>[] = [
   {
     key: 'method',
     header: 'Method',
-    render: (payment) => methodLabel(payment.method),
+    render: (payment) => isSimulatedSettlement(payment) ? `${methodLabel(payment.method)} (Simulated)` : methodLabel(payment.method),
   },
   {
     key: 'status',
     header: 'Status',
     render: (payment) => (
-      <StatusBadge status={paymentStatusToneCode(payment.status)} label={paymentStatusLabel(payment.status)} />
+      <StatusBadge status={paymentStatusToneCode(payment.status)} label={paymentStatusLabel(payment.status, payment.settlementType)} />
     ),
   },
   { key: 'action', header: 'Action', render: (payment) => <PaymentAction payment={payment} /> },
