@@ -6,10 +6,11 @@ import { AccountSwitchNotice } from '../components/AccountSwitchNotice'
 import { MemberAssistantLink } from '../pages/member/MemberAssistantPage'
 import { FloatingSporiChat } from '../pages/member/FloatingSporiChat'
 import { TrainingNavigation } from '../pages/member/TrainingNavigation'
-import { findActiveItem, itemHref, MEMBER_AREA } from './navigation'
+import { itemHref, MEMBER_AREA, pageTitle } from './navigation'
 import { PaymentWorkspaceHeader } from './PaymentWorkspaceHeader'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import './memberConceptB.css'
+import '../styles/workspaceUi.css'
 
 /** Member-only Concept B shell. Shared staff headers and their styles remain untouched. */
 export function MemberLayout() {
@@ -17,7 +18,6 @@ export function MemberLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(() => window.matchMedia?.('(min-width: 960px)').matches ?? window.innerWidth >= 960)
   const navigationRef = useRef<HTMLElement>(null)
-  const current = findActiveItem(MEMBER_AREA, location.pathname)
   const paymentSummaryRoute = useMatch('/member/payments/:paymentId')
   const paymentStatusRoute = useMatch('/member/payments/:paymentId/status')
   const paymentQrRoute = useMatch('/member/payments/:paymentId/qr-demo')
@@ -113,7 +113,7 @@ export function MemberLayout() {
     <nav className="workspace-header__context" aria-label="Breadcrumb">
       <div className="workspace-header__breadcrumb">
         <Link to="/">Sportify Center</Link>
-        <span aria-current="page">{current?.title ?? 'Member workspace'}</span>
+        <span aria-current="page">{pageTitle(MEMBER_AREA, location.pathname)}</span>
       </div>
     </nav>
   )

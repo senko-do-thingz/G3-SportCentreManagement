@@ -136,7 +136,7 @@ function CenterSchedule() {
           <CalendarDateField label="Week containing" value={from} onChange={(value, valid) => { if (valid !== false) change('date', value) }} />
         </div>
         <div className="center-schedule__toolbar-actions">
-          <Link className="btn btn--primary" to="/member/schedules?tab=find-classes">Find a class</Link>
+          <Link className="btn btn--primary btn--md" to="/member/schedules?tab=find-classes">Find a class</Link>
         </div>
       </div>
       <div className="center-schedule__filters" aria-label="Center schedule filters">

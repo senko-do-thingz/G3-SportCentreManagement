@@ -23,7 +23,7 @@ export function MemberSupportPage() {
   const load = useCallback((signal: AbortSignal) => memberSupportApi.list(signal), [])
   return <div className="training-page member-support-page">
     <Link to="/member/assistant">Back to the center assistant</Link>
-    <PageHeader title="Contact reception" description="Send a question that needs a staff member's help. Reception replies here; replies are not instant." />
+    <PageHeader eyebrow="Member workspace" title="Contact reception" description="Send a question that needs a staff member's help. Reception replies here; replies are not instant." />
     {submitted ? <Card title="Support request submitted">
       <p role="status">Your request {submitted.code} was sent to reception. Status: {submitted.status.replaceAll('_', ' ')}.</p>
       <p>Reception will reply in My support requests below. Sending a request does not book, cancel, pay or change any package.</p>

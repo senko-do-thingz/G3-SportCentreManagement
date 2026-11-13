@@ -175,9 +175,9 @@ export function ManagerRevenueReportsPage() {
     <OperationsSummary from={from} to={to} />
     {report.status === 'loading' ? <PageLoader label="Loading revenue report" /> : report.status === 'error' ? <ManagerError error={report.error} onRetry={reloadReport} /> : <>
       <section className="finance-kpis" aria-label="Revenue report totals">
-        <StatCard label="Revenue" value={formatMoney(report.data.totalRevenue)} />
-        <StatCard label="Transactions" value={report.data.totalTransactions.toLocaleString('en-US')} />
-        <StatCard label="Grouped by" value={GROUPS.find((option) => option.value === report.data.groupBy)?.label ?? report.data.groupBy} />
+        <StatCard icon="receipt" label="Revenue" value={formatMoney(report.data.totalRevenue)} />
+        <StatCard icon="rows" label="Transactions" value={report.data.totalTransactions.toLocaleString('en-US')} />
+        <StatCard icon="filter" label="Grouped by" value={GROUPS.find((option) => option.value === report.data.groupBy)?.label ?? report.data.groupBy} />
       </section>
 
       <Card title="Revenue breakdown" actions={<Button onClick={() => void exportCsv()} loading={exporting}>Export CSV</Button>}>

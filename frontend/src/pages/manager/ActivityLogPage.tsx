@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../../api/errors'
 import { ACTIVITY_ACTIONS, managerActivityLogsApi } from '../../api/managerActivityLogsApi'
-import { Button, CalendarDateField, Card, Input, Modal, Select, Table, type TableColumn } from '../../components/ui'
+import { Button, CalendarDateField, Card, Input, Modal, Select, Table, type TableColumn, StatIcon } from '../../components/ui'
 import { humanizeCode } from '../../utils/format'
 import type { ActivityLog, ManagerUser } from '../../types/manager'
 import { ActorPickerModal } from './ActorPickerModal'
@@ -83,28 +83,28 @@ export function ActivityLogPage() {
 
     <div className="concept-stats">
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">E</span>
+        <StatIcon name="list" />
         <div>
           <strong>{totalEvents}</strong>
           <small>Matching events</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">A</span>
+        <StatIcon name="users" />
         <div>
           <strong>{activeActors}</strong>
           <small>Actors on this page</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">S</span>
+        <StatIcon name="rows" />
         <div>
           <strong>{pageEvents}</strong>
           <small>Events on this page</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">F</span>
+        <StatIcon name="filter" />
         <div>
           <strong>{filterScopeLabel}</strong>
           <small>Filter scope</small>

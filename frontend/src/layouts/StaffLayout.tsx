@@ -1,12 +1,15 @@
+import '@fontsource/be-vietnam-pro/700.css'
+import '@fontsource/be-vietnam-pro/800.css'
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router-dom'
 import { AccountSwitchNotice } from '../components/AccountSwitchNotice'
 import { useAuth } from '../auth/useAuth'
-import { findActiveItem, itemHref, STAFF_AREAS } from './navigation'
+import { itemHref, pageTitle, STAFF_AREAS } from './navigation'
 import { PaymentWorkspaceHeader } from './PaymentWorkspaceHeader'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import { WorkflowSurface } from '../components/WorkflowSurface'
 import { FloatingSporiChat } from '../pages/member/FloatingSporiChat'
+import '../styles/workspaceUi.css'
 
 /** Coach, reception and manager workspaces share a Home-branded header and role-aware sidebar. */
 export function StaffLayout() {
@@ -21,14 +24,13 @@ export function StaffLayout() {
 
   // RequireRole guarantees a staff role here; fall back to the manager menu for type safety only.
   const area = role && role !== 'MEMBER' ? STAFF_AREAS[role] : STAFF_AREAS.MANAGER
-  const activeItem = findActiveItem(area, location.pathname)
   const menuId = 'staff-menu'
 
   const breadcrumb = (
     <nav className="workspace-header__context" aria-label="Breadcrumb">
       <ol className="workspace-header__breadcrumb">
         <li><Link to="/">Sportify Center</Link></li>
-        <li><span aria-current="page">{activeItem?.title ?? 'Workspace'}</span></li>
+        <li><span aria-current="page">{pageTitle(area, location.pathname)}</span></li>
       </ol>
     </nav>
   )

@@ -1,10 +1,5 @@
 /* Member Concept B: a focused, branded workspace shell. Shared staff shells stay unchanged. */
 .member-concept {
-  --member-rail: var(--color-footer);
-  --member-rail-soft: var(--color-feature-surface);
-  --member-rail-text: var(--color-on-feature-muted);
-  --member-rail-muted: var(--color-on-feature-muted);
-  --member-line: var(--color-feature-surface);
   min-height: 100vh;
   background: var(--color-bg);
   color: var(--color-text);
@@ -52,25 +47,26 @@
 
 .member-concept__workspace {
   display: grid;
-  grid-template-columns: 228px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   align-items: start;
   min-height: calc(100vh - var(--workspace-header-height, 80px));
 }
 
+/* Sidebar: the same light rail as the Manager, Receptionist and Coach workspaces (styles/workspace.css). */
 .member-concept__sidebar {
   position: sticky;
   z-index: 60;
   top: var(--workspace-header-height, 80px);
   display: flex;
   flex-direction: column;
-  width: 228px;
+  width: var(--sidebar-width);
   height: calc(100vh - var(--workspace-header-height, 80px));
   height: calc(100dvh - var(--workspace-header-height, 80px));
   overflow-y: auto;
-  padding: 22px 13px 16px;
-  background: linear-gradient(180deg, var(--color-hero) 0%, var(--color-footer) 100%);
-  color: var(--member-rail-text);
-  scrollbar-color: var(--color-border-strong) var(--color-hero);
+  padding: var(--space-5) var(--space-4);
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
   scrollbar-width: thin;
 }
 
@@ -79,17 +75,19 @@
 }
 
 .member-concept__sidebar-label {
-  padding: 0 10px 18px;
-  color: var(--color-on-feature-muted);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  padding: 0 var(--space-2);
+  color: var(--color-primary);
+  font-size: 0.6875rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-eyebrow);
+  line-height: 1.5;
   text-transform: uppercase;
 }
 
 .member-concept__nav {
   display: grid;
-  gap: 18px;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
 }
 
 .member-concept__nav-section {
@@ -97,19 +95,20 @@
 }
 
 .member-concept__nav-heading {
-  margin: 0 0 6px;
-  padding: 0 10px;
-  color: var(--member-rail-muted);
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  margin: 0 0 2px;
+  padding: var(--space-1) var(--space-3);
+  color: var(--color-text-subtle);
+  font-family: var(--ui-font-body);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
   line-height: 1.5;
   text-transform: uppercase;
 }
 
 .member-concept__nav-links {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -119,67 +118,79 @@
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 38px;
-  padding: 8px 10px 8px 12px;
-  border-left: 2px solid var(--color-hero);
-  color: var(--member-rail-text);
-  font-size: 0.82rem;
-  font-weight: 550;
+  padding: 10px var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   line-height: 1.25;
   text-decoration: none;
-  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+  transition: color 0.2s ease, background-color 0.2s ease;
 }
 
 .member-concept__nav-link:hover {
-  border-left-color: var(--color-hero-highlight);
-  background: var(--color-feature-surface);
-  color: var(--color-on-hero);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
   text-decoration: none;
 }
 
 .member-concept__nav-link--active,
 .member-concept__nav-link[aria-current='page'] {
-  border-left-color: var(--color-hero-highlight);
-  background: var(--color-feature-surface);
-  color: var(--color-on-hero);
-  font-weight: 700;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-weight: var(--weight-semibold);
+}
+
+.member-concept__nav-link--active::before,
+.member-concept__nav-link[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 3px;
+  background: var(--color-primary);
 }
 
 .member-concept__sidebar-utility {
   margin-top: auto;
-  padding: 18px 0 12px;
+  padding: var(--space-4) 0 var(--space-3);
 }
 
 .member-concept__sidebar-assistant {
   display: flex;
   align-items: center;
-  min-height: 42px;
-  padding: 9px 11px;
-  border: 1px solid var(--color-border-strong);
-  color: var(--color-on-feature-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
+  justify-content: center;
+  min-height: var(--ui-control-height);
+  padding: 0 var(--space-4);
+  box-shadow: inset 0 0 0 1.5px var(--ui-border);
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--ui-button-weight);
+  letter-spacing: 0.02em;
   text-decoration: none;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .member-concept__sidebar-assistant:hover {
-  border-color: var(--color-hero-highlight);
-  background: var(--color-feature-surface);
-  color: var(--color-on-hero);
+  background: var(--color-primary-soft);
+  box-shadow: inset 0 0 0 1.5px var(--color-primary);
+  text-decoration: none;
 }
 
 .member-concept__sidebar-footer {
   display: grid;
-  gap: 4px;
-  padding: 14px 9px 0;
-  border-top: 1px solid var(--member-line);
-  color: var(--color-on-hero);
-  font-size: 0.78rem;
+  gap: 2px;
+  padding: var(--space-4) var(--space-2) 0;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
 }
 
 .member-concept__sidebar-footer span {
-  color: var(--member-rail-muted);
-  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
 }
 
 .member-concept__main.member-main {
@@ -210,19 +221,9 @@
   margin: 0;
 }
 
+/* Font, size, case, spacing and colour of page titles come from styles/workspaceUi.css. */
 .member-concept__content .page-header__title {
   margin: 0;
-  color: var(--color-navy);
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 3.2vw, 3.1rem);
-  font-weight: 800;
-  letter-spacing: -0.055em;
-  line-height: 1.08;
-  text-transform: uppercase;
-}
-
-:root[data-theme='dark'] .member-concept__content .page-header__title {
-  color: var(--color-text);
 }
 
 .member-concept__content .page-header__description {
@@ -232,23 +233,8 @@
   font-size: 0.95rem;
 }
 
-.member-concept__content .eyebrow {
-  margin: 0 0 7px;
-  color: var(--color-primary);
-  font-size: 0.69rem;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-}
-
 .member-concept__content .page-header__text {
   min-width: 0;
-}
-
-.member-concept__content a:focus-visible,
-.member-concept .workspace-header button:focus-visible,
-.member-concept__nav-link:focus-visible {
-  outline: 3px solid var(--color-hero-highlight);
-  outline-offset: 3px;
 }
 
 .member-concept__scrim {
@@ -338,10 +324,6 @@
 .member-concept .member-ui--dashboard {
   display: grid;
   gap: 18px;
-}
-
-.member-concept .member-ui--dashboard .page-header__title {
-  font-size: clamp(2.25rem, 4.3vw, 3.5rem);
 }
 
 .member-concept__dashboard-heading {
@@ -525,13 +507,6 @@
   min-height: 34px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--color-border);
-}
-
-.member-concept .training-page .card__title {
-  font-family: var(--font-display);
-  font-size: 1rem;
-  font-weight: 750;
-  letter-spacing: -0.015em;
 }
 
 .member-concept .member-training-hub .training-actions {
@@ -1191,7 +1166,6 @@
   }
 
   .member-concept .member-ui--dashboard .page-header__title {
-    font-size: clamp(2rem, 3.2vw, 2.8rem);
     line-height: 1.08;
   }
 
@@ -1200,8 +1174,9 @@
     font-family: var(--font-display);
     font-size: inherit;
     font-weight: 800;
-    letter-spacing: -0.045em;
-    text-transform: none;
+    /* Uppercase like every other workspace page title (Home section headings). */
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
   }
 
   .member-concept__dashboard-heading--desktop,
@@ -1292,7 +1267,7 @@
 
   .member-concept .member-ui--dashboard .stat-card__value {
     overflow-wrap: anywhere;
-    font-family: var(--font-body);
+    font-family: var(--ui-font-body);
     font-size: clamp(1.05rem, 1.4vw, 1.3rem);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
@@ -1785,11 +1760,6 @@
     align-items: start;
   }
 
-  .assistant-workspace__heading .page-header__title {
-    font-size: 1.8rem;
-    letter-spacing: -0.03em;
-  }
-
   .assistant-workspace__heading .page-header__description {
     max-width: 82ch;
     font-size: 0.8rem;
@@ -1826,11 +1796,6 @@
   .member-concept .member-support-page > a:first-child {
     width: fit-content;
     font-size: 0.76rem;
-  }
-
-  .member-concept .member-support-page .page-header__title {
-    font-size: 1.9rem;
-    letter-spacing: -0.03em;
   }
 
   .member-concept .member-support-page .card {

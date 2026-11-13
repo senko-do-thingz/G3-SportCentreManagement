@@ -29,7 +29,7 @@ function AttendanceBrowser() {
   const [message, setMessage] = useState('')
   const [focusBooking, setFocusBooking] = useState<number | null>(null)
   return <div className="training-page">
-    <PageHeader title="Session attendance" description="Record participation for your assigned sessions. Corrections require a reason. Saved results require Present or Late attendance." />
+    <PageHeader eyebrow="Coach workspace" title="Session attendance" description="Record participation for your assigned sessions. Corrections require a reason. Saved results require Present or Late attendance." />
     {message && <p className="notice notice--success" role="status" aria-live="polite">{message}</p>}
     <TrainingData key={revision} load={training.coachSessions}>{sessions => {
       const ordered = [...sessions].sort((a, b) => Number(actionable(b)) - Number(actionable(a)))
@@ -62,7 +62,7 @@ function AttendanceBrowser() {
           onActionStart={() => setMessage('')}
           onRefresh={() => refresh(value => value + 1)}
           onSaved={(bookingId, correcting) => { setFocusBooking(bookingId); setMessage(correcting ? 'Attendance corrected and the reason saved. The roster is updated.' : 'Attendance saved and the list updated.'); select(key(active)); refresh(value => value + 1) }} />
-          : <EmptyState title="Choose a session to view its member roster" />}
+          : <Card title="Member roster" className="attendance-placeholder"><EmptyState variant="plain" title="Choose a session to view its member roster" description="Select a session on the left. Its confirmed members and attendance appear here." /></Card>}
       </div>
     }}</TrainingData>
   </div>

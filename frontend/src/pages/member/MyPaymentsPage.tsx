@@ -32,11 +32,11 @@ const COLUMNS: TableColumn<Payment>[] = [
     ),
   },
   { key: 'date', header: 'Date', render: (payment) => formatDate(payment.paymentTime ?? payment.createdAt) },
-  { key: 'amount', header: 'Amount', render: (payment) => formatPaymentMoney(payment.amount) },
+  { key: 'amount', header: 'Amount', render: (payment) => <span className="payment-row__value">{formatPaymentMoney(payment.amount)}</span> },
   {
     key: 'method',
     header: 'Method',
-    render: (payment) => isSimulatedSettlement(payment) ? `${methodLabel(payment.method)} (Simulated)` : methodLabel(payment.method),
+    render: (payment) => <span className="payment-row__value">{isSimulatedSettlement(payment) ? `${methodLabel(payment.method)} (Simulated)` : methodLabel(payment.method)}</span>,
   },
   {
     key: 'status',
