@@ -437,7 +437,7 @@
 }
 
 .checkbox__input:disabled,
-.checkbox__input:disabled + .checkbox__label {
+.checkbox__input:disabled+.checkbox__label {
   cursor: not-allowed;
   opacity: 0.7;
 }
@@ -533,25 +533,27 @@
   cursor: pointer;
 }
 
+
 :root {
-  --select-home-surface: #ffffff;
-  --select-home-border: #e4e8f0;
-  --select-home-ink: #0e1a33;
-  --select-home-muted: #5a6782;
-  --select-home-primary: #1f4fd8;
+  --select-home-surface: var(--color-surface);
+  --select-home-border: var(--ui-border);
+  --select-home-ink: var(--ui-ink);
+  --select-home-muted: var(--ui-muted);
+  --select-home-primary: var(--color-brand-logo);
   --select-home-primary-text: var(--color-primary);
   --select-home-active: var(--color-primary-soft);
 }
 
 :root[data-theme='dark'] {
-  --select-home-surface: #141c31;
-  --select-home-border: #232d47;
-  --select-home-ink: #e8ecf6;
-  --select-home-muted: #96a0b8;
-  --select-home-primary: #1f4fd8;
-  --select-home-primary-text: #8aa8ff;
-  --select-home-active: rgba(138, 168, 255, 0.12);
+  --select-home-surface: var(--color-surface);
+  --select-home-border: var(--ui-border);
+  --select-home-ink: var(--ui-ink);
+  --select-home-muted: var(--ui-muted);
+  --select-home-primary: var(--color-brand-logo);
+  --select-home-primary-text: var(--color-primary);
+  --select-home-active: color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
+
 
 .select-field .select-field__label {
   color: var(--select-home-muted);
@@ -629,7 +631,7 @@
   border: 1px solid var(--select-home-border);
   border-top: 3px solid var(--select-home-primary);
   background: var(--select-home-surface);
-  box-shadow: 0 22px 48px rgba(11, 23, 54, 0.22);
+  box-shadow: var(--ui-dropdown-shadow);
   animation: home-select-in 0.16s ease-out;
 }
 
@@ -706,8 +708,13 @@
   font-weight: var(--weight-bold);
 }
 
-.notice__message > :first-child { margin-top: 0; }
-.notice__message > :last-child { margin-bottom: 0; }
+.notice__message> :first-child {
+  margin-top: 0;
+}
+
+.notice__message> :last-child {
+  margin-bottom: 0;
+}
 
 .notice__action {
   flex: none;
@@ -742,7 +749,9 @@
 }
 
 @media (max-width: 560px) {
-  .notice--stack { flex-direction: column; }
+  .notice--stack {
+    flex-direction: column;
+  }
 }
 
 /* Tabs: shared Tabs component and existing tab lists (UI-01); gold underline marks the selection */
@@ -799,8 +808,13 @@
 }
 
 @media (max-width: 560px) {
-  .tabs { overflow-x: auto; }
-  .tabs__tab { flex: none; }
+  .tabs {
+    overflow-x: auto;
+  }
+
+  .tabs__tab {
+    flex: none;
+  }
 }
 
 
@@ -1495,7 +1509,7 @@
     padding: var(--space-4);
   }
 
-  .modal__footer > .btn {
+  .modal__footer>.btn {
     flex: 1 1 auto;
   }
 
@@ -1507,6 +1521,7 @@
 
 /* Respect reduced motion for dialogs and toasts; the spinner slows down instead of stopping */
 @media (prefers-reduced-motion: reduce) {
+
   .modal-backdrop,
   .modal,
   .toast {
