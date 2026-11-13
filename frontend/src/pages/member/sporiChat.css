@@ -407,6 +407,16 @@
   field-sizing: content;
 }
 
+
+/* Remove the rectangular focus ring inside the rounded composer. */
+.spori-composer textarea:focus,
+.spori-composer textarea:focus-visible {
+  outline: none;
+  border: 0;
+  box-shadow: none;
+}
+
+
 .spori-composer button {
   display: grid;
   flex: none;
