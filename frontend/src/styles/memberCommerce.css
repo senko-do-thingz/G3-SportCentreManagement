@@ -537,6 +537,37 @@
   display: block;
 }
 
+.vietqr-payment-card__qr-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: var(--space-4) 0;
+}
+
+.vietqr-payment-card__qr-frame {
+  box-sizing: border-box;
+  width: min(100%, 336px);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 2px solid var(--color-navy);
+}
+
+.vietqr-payment-card__qr-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.vietqr-payment-card__demo {
+  width: min(100%, 34rem);
+  margin: 0 auto var(--space-4);
+}
+
+.vietqr-payment-card__demo > .payment-methods__hint {
+  margin-top: var(--space-2);
+}
+
 .member-commerce-qr-box__timer {
   display: inline-flex;
   align-items: center;

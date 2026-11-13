@@ -286,22 +286,22 @@ public class PaymentControllerTest {
     }
 
     @Test
-    @DisplayName("PUT /api/v1/payments/{id}/method with unallowed method returns 400 Bad Request")
+    @DisplayName("PUT /api/v1/payments/{id}/method with unsupported method returns 400 Bad Request")
     void updatePaymentMethod_DisallowedMethod_Returns400BadRequest() throws Exception {
         CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
-                .paymentMethod(PaymentMethod.CASH)
+                .paymentMethod(PaymentMethod.CREDIT_CARD)
                 .build();
 
         when(paymentService.updatePaymentMethod(eq(1L), any(UpdatePaymentMethodRequest.class), any(UserAccount.class)))
-                .thenThrow(new BusinessRuleException("Payment method CASH is not allowed for online payment"));
+                .thenThrow(new BusinessRuleException("Payment method CREDIT_CARD is not allowed for member checkout"));
 
         mockMvc.perform(put("/api/v1/payments/1/method")
                         .with(user(member))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Payment method CASH is not allowed for online payment"));
+                .andExpect(jsonPath("$.message").value("Payment method CREDIT_CARD is not allowed for member checkout"));
     }
 
     @Test

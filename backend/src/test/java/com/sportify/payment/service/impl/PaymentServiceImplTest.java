@@ -297,10 +297,9 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    @DisplayName("Create pending payment with disallowed online methods throws BusinessRuleException")
+    @DisplayName("Create pending payment with unsupported member methods throws BusinessRuleException")
     void createPendingPayment_DisallowedOnlineMethod_ThrowsBusinessRuleException() {
         for (PaymentMethod unsupportedOnline : List.of(
-                PaymentMethod.CASH,
                 PaymentMethod.CREDIT_CARD,
                 PaymentMethod.MOMO,
                 PaymentMethod.VNPAY,
@@ -308,7 +307,7 @@ class PaymentServiceImplTest {
         )) {
             assertThatThrownBy(() -> paymentService.createPendingPayment(ownerProfile, BigDecimal.valueOf(100000.00), unsupportedOnline))
                     .isInstanceOf(BusinessRuleException.class)
-                    .hasMessageContaining("not allowed for online requests");
+                    .hasMessageContaining("not allowed for member checkout");
         }
     }
 
@@ -781,7 +780,6 @@ class PaymentServiceImplTest {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
 
         for (PaymentMethod disallowedForMember : List.of(
-                PaymentMethod.CASH,
                 PaymentMethod.CREDIT_CARD,
                 PaymentMethod.MOMO,
                 PaymentMethod.VNPAY,
@@ -793,7 +791,7 @@ class PaymentServiceImplTest {
 
             assertThatThrownBy(() -> paymentService.updatePaymentMethod(10L, request, ownerUser))
                     .isInstanceOf(BusinessRuleException.class)
-                    .hasMessageContaining("not allowed for online payment");
+                    .hasMessageContaining("not allowed for member checkout");
         }
 
         for (PaymentMethod unsupportedForStaff : List.of(

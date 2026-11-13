@@ -14,7 +14,8 @@ configure `SPORTIFY_PAYMENT_LIVE_INSTRUCTIONS_ENABLED=true`,
 `SPORTIFY_PAYMENT_BANK_BIN`, `SPORTIFY_PAYMENT_ACCOUNT_NUMBER`,
 `SPORTIFY_PAYMENT_ACCOUNT_NAME` and `SPORTIFY_PAYMENT_BANK`. The name must use uppercase
 ASCII letters/numbers/spaces, and the account must contain 6-19 digits.
-No account or credential is supplied in this change.
+No account or credential is supplied in this change. See [Local VietQR transfer QR](vietqr-local-transfer-qr.md)
+for the member checkout setup and local demo behavior.
 
 The encoder uses NAPAS account-transfer TLV fields, VND currency 704, `QRIBFTTA`,
 the actual pending amount, the unique reference `SP<paymentId>` and CRC16-CCITT.
@@ -36,8 +37,9 @@ using the same snapshot schema. Reload the application after updating that resou
 Refreshing public bank metadata never writes a database.
 All tests run offline. No provider API key or live generate request is required.
 
-Official references checked on 2026-11-04:
+Official references checked on 2026-11-12:
 
 - https://www.vietqr.io/api-bank
 - https://api.vietqr.io/v2/banks
 - https://www.vietqr.io/generate
+- https://www.vietqr.io/qr-dong

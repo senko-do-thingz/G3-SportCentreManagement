@@ -8,7 +8,7 @@ import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDate, formatDateTime, humanizeCode } from '../../utils/format'
 import { PaymentNav } from './PaymentNav'
-import { formatPaymentMoney as formatMoney, isSimulatedSettlement, methodLabel, parseIdParam, PAYMENT_PATHS } from './paymentsModel'
+import { formatPaymentMoney as formatMoney, isSimulatedSettlement, methodLabel, parseIdParam, PAYMENT_PATHS, simulatedProvenanceLabel, simulatedSettlementSource } from './paymentsModel'
 import { useMemberResource } from './useMemberResource'
 
 const ITEM_TYPE_LABELS: Record<string, string> = {
@@ -97,7 +97,7 @@ function ReceiptContent({ invoice }: { invoice: Invoice }) {
         </div>
         {simulated && (
           <p className="notice notice--warning" role="status">
-            SIMULATED SETTLEMENT - Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.
+            SIMULATED SETTLEMENT - {simulatedSettlementSource(invoice)}
           </p>
         )}
         <dl className="summary-list receipt__list">
@@ -179,7 +179,7 @@ function ReceiptContent({ invoice }: { invoice: Invoice }) {
           {simulated && (
             <div>
               <dt>Settlement provenance</dt>
-              <dd>SIMULATED ({invoice.settlementProvider ?? 'SPORTIFY_SIMULATOR'})</dd>
+              <dd>{simulatedProvenanceLabel(invoice)}</dd>
             </div>
           )}
           <div>

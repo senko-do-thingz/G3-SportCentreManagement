@@ -453,6 +453,27 @@
       "sha256_lf": "bcb4730b3508786a35cc3fdaa7941be61f37403b9020b39868b9a661e44bbeb0"
     },
     {
+      "path": "backend/src/main/resources/db/compat-vietqr/V55__add_vietqr_payment_gateway_fields.sql",
+      "version": 55,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "ad55971b2a5e74ccf58a04013d89efcdbb2e74e1f65dc5210ce6f26b59d7825d"
+    },
+    {
+      "path": "backend/src/main/resources/db/compat-vietqr/V56__allow_vietqr_sandbox_provenance.sql",
+      "version": 56,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "815b889b1e3479fb9b578cc2c2639e996786fe251d2af63943892c50317288a2"
+    },
+    {
+      "path": "backend/src/main/resources/db/compat-vietqr/V57__allow_local_vietqr_demo_provenance.sql",
+      "version": 57,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "999482b873cbc9435b6cb49a20128e74c1e26479a3de13dd8d0de9fe3d3c4d60"
+    },
+    {
       "path": "backend/src/main/resources/db/migration/catalog/V58__payment_cancellation_handoff.sql",
       "version": 58,
       "creates": [],
@@ -465,6 +486,27 @@
       "creates": [],
       "drops": [],
       "sha256_lf": "9fd73e35d84cee60dc6d4da5b1f9df06a33094ec5e7edd771befbffa9eaaf59b"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V60__add_vietqr_payment_gateway_fields.sql",
+      "version": 60,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "8ed53c634fd759663c6a2bee1cba5128c259bc77ab8d6dbbf9af656998d20a31"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V61__allow_vietqr_sandbox_provenance.sql",
+      "version": 61,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "03e12b23df4fab1fd4c887f3feca07818c435f9c34c24bdfa54a16b901437e8c"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V62__allow_local_vietqr_demo_provenance.sql",
+      "version": 62,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "cffe10722395212a28ad6eaa6cdbfd84c8c2ba361fdb7a0be3ae4948863f2167"
     }
   ],
   "create_occurrences": 82,

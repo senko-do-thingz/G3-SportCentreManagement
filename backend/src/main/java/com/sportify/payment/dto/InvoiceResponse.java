@@ -32,6 +32,7 @@ public class InvoiceResponse {
     private LocalDateTime paymentTime;
     private String settlementType;
     private String settlementProvider;
+    private String settlementEnvironment;
     private Long simulatedTransactionId;
 
     private Long memberId;

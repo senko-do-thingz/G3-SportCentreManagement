@@ -3,6 +3,8 @@ services:
     image: ghcr.io/senko-do-thingz/g3-sportcentremanagement/backend:${IMAGE_TAG:?IMAGE_TAG is required}
     restart: unless-stopped
     env_file: .env
+    environment:
+      SERVER_ADDRESS: "0.0.0.0"
     ports:
       - "8080:8080"
     depends_on:

@@ -32,7 +32,7 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
 
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
         fixture = DisposableUnifyDatabase.create(); var jdbc = fixture.jdbc();
-        Flyway.configure().dataSource(fixture.source()).locations("classpath:db/migration/identity", "classpath:db/migration/catalog", "classpath:db/demo")
+        Flyway.configure().dataSource(fixture.source()).locations("classpath:db/migration/identity", "classpath:db/migration/catalog", "classpath:db/compat-vietqr", "classpath:db/demo")
                 .cleanDisabled(true).load().migrate();
         // These are new, owned fixtures, never an existing user's identities.
         jdbc.update("UPDATE user_account SET email=REPLACE(email,'@example.com','@unified-demo.invalid') WHERE email IN ('an.gold@example.com','mai.standard@example.com')");

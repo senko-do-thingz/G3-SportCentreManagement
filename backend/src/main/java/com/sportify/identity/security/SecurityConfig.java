@@ -42,6 +42,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(req ->
                         req.requestMatchers("/api/v1/auth/**", "/error")
                                 .permitAll()
+                                // VietQR authenticates these server-to-server endpoints with its own Basic/JWT flow.
+                                .requestMatchers(HttpMethod.POST, "/api/token_generate", "/bank/api/transaction-sync")
+                                .permitAll()
                                 // Preflight requests never carry a token
                                 .requestMatchers(HttpMethod.OPTIONS, "/**")
                                 .permitAll()

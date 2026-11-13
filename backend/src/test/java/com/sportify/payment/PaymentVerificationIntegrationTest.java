@@ -81,7 +81,10 @@ import com.sportify.payment.exception.PaymentAmountMismatchException;
 import com.sportify.payment.repository.InvoiceLineRepository;
 import com.sportify.payment.repository.InvoiceRepository;
 import com.sportify.payment.repository.PaymentRepository;
+import com.sportify.payment.config.BankTransferProperties;
 import com.sportify.payment.service.PaymentVerificationService;
+import com.sportify.payment.service.VietQrTransactionCallback;
+import com.sportify.payment.service.VietQrTransactionSyncService;
 
 /**
  * BE-18 against a real SQL Server (Testcontainers). Not @Transactional: each
@@ -97,6 +100,10 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private PaymentVerificationService verificationService;
+    @Autowired
+    private VietQrTransactionSyncService vietQrCallbacks;
+    @Autowired
+    private BankTransferProperties bankTransfer;
     @Autowired
     private PaymentRepository paymentRepository;
     @Autowired
@@ -538,6 +545,40 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
 
         assertOneWinnerOneNotPending(outcomes);
         assertThat(invoiceCount(ids[0])).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("The same VietQR callback delivered twice at the same time settles once: one invoice, one activation, one log row")
+    void concurrentVietQrCallback_SettlesOnce() throws Exception {
+        Long[] ids = pendingRegistration();
+        String orderId = String.valueOf(ids[0]);
+        String content = "SPT" + ids[0];
+        jdbcTemplate.update("UPDATE payment SET vietqr_order_id = ?, vietqr_content = ?, vietqr_environment = 'SANDBOX' WHERE id = ?",
+                orderId, content, ids[0]);
+        String configuredAccount = bankTransfer.getAccountNumber();
+        bankTransfer.setAccountNumber("123456789");
+        try {
+            VietQrTransactionCallback callback = new VietQrTransactionCallback("123456789", new BigDecimal("380000"), "C", content,
+                    "TX-CONCURRENT-" + ids[0], 1700000000000L, "REF-" + ids[0], orderId, null, null, null, null, null);
+
+            List<Throwable> outcomes = runTogether(List.of(
+                    () -> vietQrCallbacks.accept(callback),
+                    () -> vietQrCallbacks.accept(callback)));
+
+            // The second delivery waits on the payment row lock, then sees its own settlement and answers as a replay.
+            assertThat(outcomes).containsOnlyNulls();
+        } finally {
+            bankTransfer.setAccountNumber(configuredAccount);
+        }
+        assertThat(invoiceCount(ids[0])).isEqualTo(1);
+        tx().executeWithoutResult(s -> {
+            Payment payment = paymentRepository.findById(ids[0]).orElseThrow();
+            assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+            assertThat(payment.getSettlementType()).isEqualTo("SIMULATED");
+            assertThat(payment.getVietQrTransactionId()).isEqualTo("TX-CONCURRENT-" + ids[0]);
+            assertThat(registrationRepository.findById(ids[1]).orElseThrow().getStatus()).isEqualTo(PackageRegistrationStatus.ACTIVE);
+            assertThat(activityRows(payment.getPaymentCode(), "PAYMENT_CONFIRMED")).isEqualTo(1);
+        });
     }
 
     @Test

@@ -79,6 +79,7 @@ export interface Invoice {
   issueDate: string | null
   settlementType?: string | null
   settlementProvider?: string | null
+  settlementEnvironment?: string | null
   simulatedTransactionId?: number | null
   lines?: InvoiceLine[] | null
 }

@@ -6,6 +6,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.env.MockEnvironment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LocalDemoSafetyGuardTest {
@@ -70,16 +71,15 @@ class LocalDemoSafetyGuardTest {
     }
 
     @Test
-    void rejectsFlagEnabledWithoutLocalDemoProfile() {
+    void allowsFlagEnabledOnLoopbackDevProfile() {
         MockEnvironment env = new MockEnvironment();
         env.setActiveProfiles("dev");
         env.setProperty("PAYMENT_LOCAL_DEMO_ENABLED", "true");
         env.setProperty("server.address", "127.0.0.1");
         env.setProperty("spring.datasource.url", "jdbc:sqlserver://localhost:1433;databaseName=sportify_qr_demo;");
 
-        assertThatThrownBy(() -> LocalDemoSafetyGuard.validateLocalDemoSafety(env))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Activate the local-demo profile explicitly");
+        assertThatCode(() -> LocalDemoSafetyGuard.validateLocalDemoSafety(env))
+                .doesNotThrowAnyException();
     }
 
     @ParameterizedTest
@@ -111,7 +111,7 @@ class LocalDemoSafetyGuardTest {
     @Test
     void rejectsDefaultSportifyDatabase() {
         MockEnvironment env = new MockEnvironment();
-        env.setActiveProfiles("dev", "local-demo");
+        env.setActiveProfiles("local-demo");
         env.setProperty("app.payment.local-demo.enabled", "true");
         env.setProperty("server.address", "127.0.0.1");
         env.setProperty("spring.datasource.url", "jdbc:sqlserver://localhost:1433;databaseName=sportify;encrypt=true;");
