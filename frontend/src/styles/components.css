@@ -713,6 +713,20 @@
   gap: var(--space-2);
 }
 
+/* With an icon: the line icon sits left of the label and figures, as on the Coach and Manager KPI cards. */
+.stat-card--icon {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.stat-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
 .stat-card__label {
   font-size: var(--text-sm);
   color: var(--color-text-muted);

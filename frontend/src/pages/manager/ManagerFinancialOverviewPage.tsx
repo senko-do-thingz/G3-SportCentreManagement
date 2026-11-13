@@ -83,11 +83,11 @@ export function ManagerFinancialOverviewPage() {
 
     {resource.status === 'loading' ? <PageLoader label="Loading financial overview" /> : resource.status === 'error' ? <ManagerError error={resource.error} onRetry={reload} /> : <>
       <section className="finance-kpis" aria-label="Financial key performance indicators">
-        <StatCard label="Paid revenue" value={formatMoney(resource.data.overview.paidRevenue)} hint={`${resource.data.overview.paidTransactions} successful transactions`} />
-        <StatCard label="Pending payments" value={formatMoney(resource.data.overview.pendingAmount)} hint={`${resource.data.overview.pendingTransactions} pending transactions`} />
-        <StatCard label="Refunded amount" value={formatMoney(resource.data.overview.refundedAmount)} hint={`${resource.data.overview.refundedTransactions} completed refunds`} />
-        <StatCard label="Net revenue" value={formatMoney(resource.data.overview.netRevenue)} hint="Paid revenue minus refunds paid out this month" />
-        <StatCard label="Demo Revenue (non-cash)" value={formatMoney(resource.data.overview.simulatedRevenue)} hint={`${resource.data.overview.simulatedTransactions} simulated transactions (excluded from actual paid revenue)`} />
+        <StatCard icon="check" label="Paid revenue" value={formatMoney(resource.data.overview.paidRevenue)} hint={`${resource.data.overview.paidTransactions} successful transactions`} />
+        <StatCard icon="clock" label="Pending payments" value={formatMoney(resource.data.overview.pendingAmount)} hint={`${resource.data.overview.pendingTransactions} pending transactions`} />
+        <StatCard icon="refund" label="Refunded amount" value={formatMoney(resource.data.overview.refundedAmount)} hint={`${resource.data.overview.refundedTransactions} completed refunds`} />
+        <StatCard icon="receipt" label="Net revenue" value={formatMoney(resource.data.overview.netRevenue)} hint="Paid revenue minus refunds paid out this month" />
+        <StatCard icon="file" label="Demo Revenue (non-cash)" value={formatMoney(resource.data.overview.simulatedRevenue)} hint={`${resource.data.overview.simulatedTransactions} simulated transactions (excluded from actual paid revenue)`} />
       </section>
 
       <div className="finance-overview-grid">
