@@ -25,17 +25,6 @@ class ActivityLogResponseTest {
         for(String action:ActivityLogQuery.ACTIONS) assertThat(new ActivityLogResponse(1L,null,null,null,null,action,"TEST",4L).shortDetail())
                 .isNotBlank().hasSizeLessThanOrEqualTo(60);
         assertThat(java.util.Arrays.stream(ActivityLogResponse.class.getRecordComponents()).map(c->c.getName()))
-                .containsExactly("id","createdAt","actorId","actorName","actorRole","action","entityType","entityId","shortDetail","previousStatus","newStatus");
-    }
-    @Test void statusChangeIncludesOnlyWhitelistedTransitions() {
-        var safe = new ActivityLogResponse(1L,null,2L,"Manager","MANAGER","USER_STATUS_CHANGED","USER_ACCOUNT",9L,
-                "Potentially private summary", "{\"from\":\"ACTIVE\",\"to\":\"INACTIVE\",\"secret\":\"do-not-expose\"}");
-        assertThat(safe.previousStatus()).isEqualTo("ACTIVE");
-        assertThat(safe.newStatus()).isEqualTo("INACTIVE");
-        assertThat(safe.toString()).doesNotContain("do-not-expose").doesNotContain("Potentially private");
-        var unknown = new ActivityLogResponse(1L,null,2L,"Manager","MANAGER","PASSWORD_CHANGED","USER_ACCOUNT",9L,
-                "No access", "{\"from\":\"ACTIVE\",\"to\":\"INACTIVE\"}");
-        assertThat(unknown.previousStatus()).isNull();
-        assertThat(unknown.newStatus()).isNull();
+                .containsExactly("id","createdAt","actorId","actorName","actorRole","action","entityType","entityId","shortDetail");
     }
 }
