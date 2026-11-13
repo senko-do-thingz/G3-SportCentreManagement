@@ -1,0 +1,81 @@
+<mxfile host="Electron" agent="Sportify Reviewed 2026">
+  <diagram id="07_VietQR_Sequence-p1" name="VietQR Payment Sequence">
+    <mxGraphModel dx="1030" dy="626" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="650" pageHeight="1240" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=25;fontStyle=1;fontColor=#000000;" value="D-09 | VietQR Checkout &amp;amp; Callback Sequence" vertex="1">
+          <mxGeometry height="45" width="570" x="40" y="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=14;fontColor=#000000;" value="Token-verified callbacks with amount/account/content/order verification and atomic settlement" vertex="1">
+          <mxGeometry height="50" width="570" x="40" y="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="footer" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=13;fontColor=#000000;" value="Local sandbox fallback creates SIMULATED / LOCAL_DEMO; production callback creates ACTUAL / GATEWAY only after verification." vertex="1">
+          <mxGeometry height="48" width="570" x="40" y="1158" as="geometry"/>
+        </mxCell>
+        <mxCell id="member" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Member selects bank transfer&lt;br&gt;and opens VietQR checkout" vertex="1">
+          <mxGeometry height="76" width="332" x="40.0" y="142.0" as="geometry"/>
+        </mxCell>
+        <mxCell id="backend" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Backend validates owned&lt;br&gt;PENDING payment" vertex="1">
+          <mxGeometry height="60" width="228" x="91.5" y="255.0" as="geometry"/>
+        </mxCell>
+        <mxCell id="create" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="VietQR API: generate QR&lt;br&gt;order ID / content / bank account" vertex="1">
+          <mxGeometry height="60" width="286" x="62.8" y="352.0" as="geometry"/>
+        </mxCell>
+        <mxCell id="persist" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Store VietQR metadata&lt;br&gt;on dbo.payment (V60)" vertex="1">
+          <mxGeometry height="60" width="210" x="100.8" y="449.0" as="geometry"/>
+        </mxCell>
+        <mxCell id="scan" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Member scans transfer QR&lt;br&gt;(or explicit sandbox test)" vertex="1">
+          <mxGeometry height="76" width="302" x="55.0" y="546.0" as="geometry"/>
+        </mxCell>
+        <mxCell id="token" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Gateway authenticates callback&lt;br&gt;/api/token_generate" vertex="1">
+          <mxGeometry height="60" width="278" x="66.8" y="659.0" as="geometry"/>
+        </mxCell>
+        <mxCell id="callback" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="POST /bank/api/transaction-sync&lt;br&gt;with bearer token" vertex="1">
+          <mxGeometry height="60" width="280" x="66.0" y="756.0" as="geometry"/>
+        </mxCell>
+        <mxCell id="validate" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Match order ID + transaction ID&lt;br&gt;amount + account + content&lt;br&gt;reject duplicates / wrong status" vertex="1">
+          <mxGeometry height="82" width="276" x="68.0" y="853.0" as="geometry"/>
+        </mxCell>
+        <mxCell id="settle" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Atomic payment SUCCESS&lt;br&gt;Entitlement + invoice + audit" vertex="1">
+          <mxGeometry height="60" width="260" x="76.0" y="972.0" as="geometry"/>
+        </mxCell>
+        <mxCell id="report" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Receipt &amp;amp; finance records&lt;br&gt;ACTUAL vs SIMULATED provenance" vertex="1">
+          <mxGeometry height="60" width="302" x="55.0" y="1069.0" as="geometry"/>
+        </mxCell>
+        <mxCell id="e0" edge="1" parent="1" source="member" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="backend" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="205.9" y="222.8"/>
+              <mxPoint x="205.9" y="222.8"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="backend" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="create" value="create order">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="create" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="persist" value="response">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="persist" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="scan" value="present QR">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="scan" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="token" value="bank callback">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="callback" value="bearer">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="callback" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="validate" value="">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="validate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="settle" value="valid and unique">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="settle" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="report" value="">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

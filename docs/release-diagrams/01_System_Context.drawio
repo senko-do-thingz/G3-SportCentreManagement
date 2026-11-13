@@ -1,0 +1,112 @@
+<mxfile host="Electron" agent="Sportify Reviewed 2026">
+  <diagram id="01_System_Context-p1" name="Context and Architecture">
+    <mxGraphModel dx="1226" dy="745" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1270" pageHeight="640" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=25;fontStyle=1;fontColor=#000000;" value="D-01 | Sportify System Context" vertex="1">
+          <mxGeometry height="45" width="1190" x="40" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=14;fontColor=#000000;" value="Desktop web; Role-aware Spring Boot; SQL Server sportify; external services shown as configurable" vertex="1">
+          <mxGeometry height="50" width="1190" x="40" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="footer" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=13;fontColor=#000000;" value="Live interfaces are optional/configuration-dependent. Bank Cash desk confirmation differs from VietQR callback and sandbox." vertex="1">
+          <mxGeometry height="48" width="1190" x="40" y="562" as="geometry" />
+        </mxCell>
+        <mxCell id="public" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Visitor&lt;br&gt;Browse / register" vertex="1">
+          <mxGeometry height="76" width="208" x="107.8" y="142" as="geometry" />
+        </mxCell>
+        <mxCell id="member" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Member&lt;br&gt;Packages / bookings" vertex="1">
+          <mxGeometry height="76" width="240" x="91.5" y="255" as="geometry" />
+        </mxCell>
+        <mxCell id="staff" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Coach / Receptionist / Manager&lt;br&gt;Assigned role actions" vertex="1">
+          <mxGeometry height="76" width="344" x="40" y="368" as="geometry" />
+        </mxCell>
+        <mxCell id="ui" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="React + TypeScript&lt;br&gt;Desktop SPA / Spori widget" vertex="1">
+          <mxGeometry height="60" width="240" x="418" y="212.9" as="geometry" />
+        </mxCell>
+        <mxCell id="api" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Spring Boot REST API&lt;br&gt;Java 25 / JWT / RBAC" vertex="1">
+          <mxGeometry height="60" width="196" x="718" y="255.3" as="geometry" />
+        </mxCell>
+        <mxCell id="db" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="SQL Server: sportify&lt;br&gt;Flyway migrations through V62" vertex="1">
+          <mxGeometry height="60" width="272" x="952.9" y="181.1" as="geometry" />
+        </mxCell>
+        <mxCell id="mail" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Gmail API / OAuth2&lt;br&gt;Password-recovery OTP" vertex="1">
+          <mxGeometry height="60" width="212" x="982.9" y="278.1" as="geometry" />
+        </mxCell>
+        <mxCell id="ai" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Gemini API (optional)&lt;br&gt;Spori generated replies" vertex="1">
+          <mxGeometry height="60" width="212" x="982.7" y="375.1" as="geometry" />
+        </mxCell>
+        <mxCell id="qr" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="VietQR API + tokenized callback&lt;br&gt;Sandbox or production" vertex="1">
+          <mxGeometry height="60" width="278" x="949.7" y="472.1" as="geometry" />
+        </mxCell>
+        <mxCell id="desk" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Front desk&lt;br&gt;Cash / bank verification" vertex="1">
+          <mxGeometry height="76" width="272" x="415" y="309.9" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" edge="1" parent="1" source="public" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="ui" value="public routes">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="538" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="member" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="ui" value="member routes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="staff" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="ui" value="role routes">
+          <mxGeometry relative="1" x="0.0937" as="geometry">
+            <Array as="points">
+              <mxPoint x="400" y="406" />
+              <mxPoint x="400" y="298" />
+              <mxPoint x="538" y="298" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="ui" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="api" value="HTTPS JSON">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="816" y="242.9" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="db" value="SQL / JPA">
+          <mxGeometry relative="1" x="-0.1639" as="geometry">
+            <Array as="points">
+              <mxPoint x="851.9" y="219.6" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="mail" value="OTP request">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="947.3" y="308.1" />
+              <mxPoint x="947.3" y="308.1" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="ai" value="scoped context">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="406" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="qr" value="checkout / callback">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="851.9" y="502.1" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="desk" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="api" value="manual settlement">
+          <mxGeometry relative="1" x="0.0649" as="geometry">
+            <Array as="points">
+              <mxPoint x="721.7" y="347.9" />
+              <mxPoint x="721.7" y="347.9" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

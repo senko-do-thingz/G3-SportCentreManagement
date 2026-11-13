@@ -1,0 +1,108 @@
+<mxfile host="Electron" agent="Sportify Reviewed 2026">
+  <diagram id="06_Use_Cases-p1" name="Role Use Cases">
+    <mxGraphModel dx="1241" dy="754" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="410" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=25;fontStyle=1;fontColor=#000000;" value="D-08 | Role-based Use Case Overview" vertex="1">
+          <mxGeometry height="45" width="1420" x="40" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=14;fontColor=#000000;" value="Four active authenticated roles; least privilege; shared inbox and assistant are role-scoped" vertex="1">
+          <mxGeometry height="50" width="1420" x="40" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="footer" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=13;fontColor=#000000;" value="Manager is unique; member passwords may be reset by Manager. Coach owns session training attendance, not Receptionist." vertex="1">
+          <mxGeometry height="48" width="1420" x="40" y="334" as="geometry" />
+        </mxCell>
+        <mxCell id="member" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="MEMBER" vertex="1">
+          <mxGeometry height="66" width="134" x="145.2" y="142" as="geometry" />
+        </mxCell>
+        <mxCell id="reception" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="RECEPTIONIST" vertex="1">
+          <mxGeometry height="66" width="184" x="310.2" y="142" as="geometry" />
+        </mxCell>
+        <mxCell id="coach" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="COACH" vertex="1">
+          <mxGeometry height="66" width="134" x="545.6" y="142" as="geometry" />
+        </mxCell>
+        <mxCell id="manager" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="MANAGER" vertex="1">
+          <mxGeometry height="66" width="144" x="792.7" y="142" as="geometry" />
+        </mxCell>
+        <mxCell id="muse" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Browse / buy / pay / book&lt;br&gt;My history / Spori / support" vertex="1">
+          <mxGeometry height="60" width="240" x="40" y="245" as="geometry" />
+        </mxCell>
+        <mxCell id="ruse" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Assisted booking / arrival&lt;br&gt;Verify funds / refunds / support" vertex="1">
+          <mxGeometry height="60" width="270" x="311" y="245" as="geometry" />
+        </mxCell>
+        <mxCell id="cuse" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Assigned roster / attendance&lt;br&gt;Result / feedback / plan" vertex="1">
+          <mxGeometry height="60" width="254" x="915" y="245" as="geometry" />
+        </mxCell>
+        <mxCell id="guse" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Users (single Manager) / reset&lt;br&gt;Classes / sessions / finance" vertex="1">
+          <mxGeometry height="60" width="262" x="1200" y="245" as="geometry" />
+        </mxCell>
+        <mxCell id="common" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Shared capability&lt;br&gt;Inbox • Theme • Avatar • Spori" vertex="1">
+          <mxGeometry height="60" width="272" x="612" y="245" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" edge="1" parent="1" source="member" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="muse" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="212.2" y="240.7" />
+              <mxPoint x="212.2" y="240.7" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="reception" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="ruse" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="446" y="240.7" />
+              <mxPoint x="446" y="240.7" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="coach" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="cuse" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="612.6" y="120" />
+              <mxPoint x="1042" y="120" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="manager" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="guse" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1331" y="170" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="member" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="common" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="212.2" y="132.9" />
+              <mxPoint x="748" y="132.9" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="reception" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="common" value="">
+          <mxGeometry relative="1" x="0.2666" as="geometry">
+            <Array as="points">
+              <mxPoint x="520" y="175" />
+              <mxPoint x="520" y="220" />
+              <mxPoint x="680" y="220" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="coach" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="common" value="">
+          <mxGeometry relative="1" x="0.25" as="geometry">
+            <Array as="points">
+              <mxPoint x="720" y="175" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="manager" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="common" value="">
+          <mxGeometry relative="1" x="0.0329" as="geometry">
+            <Array as="points">
+              <mxPoint x="780" y="175" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
