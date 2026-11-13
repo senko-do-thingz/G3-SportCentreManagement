@@ -19,5 +19,11 @@ public final class TrainingGuidanceRequest {
             this(sportId, level, goal, from, to, earliest, latest, page, size, null, null);
         }
     }
-    public record Consultation(@NotBlank @Size(max=500) String question, boolean optIn) {}
+    /** One earlier chat turn sent back by the browser; role is "user" or "assistant". Never stored. */
+    public record ChatTurn(@Size(max=10) String role, @Size(max=2000) String text) {}
+    /** {@code history} holds the earlier turns of the open chat, oldest first, so follow-up questions make sense. */
+    public record Consultation(@NotBlank @Size(max=500) String question, boolean optIn,
+                               @jakarta.validation.Valid @Size(max=12) java.util.List<ChatTurn> history) {
+        public Consultation(String question, boolean optIn) { this(question, optIn, null); }
+    }
 }
