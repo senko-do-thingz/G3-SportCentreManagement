@@ -11,7 +11,7 @@ import type { PageResponse } from './types'
  */
 
 /** Payment statuses of com.sportify.payment.entity.PaymentStatus. */
-export const PAYMENT_STATUSES = ['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'] as const
+export const PAYMENT_STATUSES = ['PENDING', 'SUCCESS', 'FAILED', 'CANCELLED', 'REFUNDED'] as const
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number]
 
 /**
@@ -42,6 +42,7 @@ export interface Payment {
   /** Discount as an amount of money, not a percent. */
   discount: number | string | null
   paymentTime: string | null
+  submittedForVerificationAt?: string | null
   /** Only sent while the payment is PENDING and the method is BANK_TRANSFER. */
   bankTransferInstructions?: BankTransferInstructions | null
   memberId: number | null
@@ -138,6 +139,12 @@ export interface MyPaymentsQuery extends RequestSignal {
 }
 
 export const paymentsApi = {
+  cancel(paymentId: number): Promise<Payment> {
+    return api.post<unknown>(`/payments/${paymentId}/cancel`).then(asPayment)
+  },
+  submit(paymentId: number): Promise<Payment> {
+    return api.post<unknown>(`/payments/${paymentId}/submit`).then(asPayment)
+  },
   payment(paymentId: number, options: RequestSignal = {}): Promise<Payment> {
     return api.get<unknown>(`/payments/${paymentId}`, options).then(asPayment)
   },

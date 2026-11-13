@@ -34,6 +34,13 @@ public class PasswordResetToken {
     @Column(name = "used_at")
     private LocalDateTime usedAt;
 
+    @Column(name = "failed_attempts", nullable = false)
+    @Builder.Default
+    private Integer failedAttempts = 0;
+
+    @Column(name = "reset_token_hash", length = 64)
+    private String resetTokenHash;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false, nullable = false)
     private LocalDateTime createdAt;

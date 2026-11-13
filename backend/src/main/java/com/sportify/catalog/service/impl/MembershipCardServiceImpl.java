@@ -466,13 +466,20 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         if (!isStaff && !card.getMember().getId().equals(actor.getId())) {
             throw new ResourceNotFoundException("Member card not found for id: " + cardId);
         }
+        // Ownership first, so another account learns nothing; a Member may cancel only before the Receptionist handoff.
+        if (!isStaff && card.getPayment() != null
+                && card.getPayment().getSubmittedForVerificationAt() != null) {
+            throw new com.sportify.core.exception.ConflictException("Payment was submitted for verification and can no longer be cancelled");
+        }
         if (card.getStatus() != CardStatus.PENDING_PAYMENT) {
             throw new BusinessRuleException("Only a card request that is waiting for payment can be cancelled.");
         }
         card.setStatus(CardStatus.CANCELLED);
         if (card.getPayment() != null) {
             String actorDescription = isStaff ? "staff user id " + actor.getId() : "member user id " + actor.getId();
-            paymentService.markPaymentFailed(card.getPayment().getId(),
+            if (isStaff) paymentService.markPaymentFailed(card.getPayment().getId(),
+                    "Payment cancelled due to card cancellation by " + actorDescription);
+            else paymentService.markPaymentCancelled(card.getPayment().getId(),
                     "Payment cancelled due to card cancellation by " + actorDescription);
         }
         return mapToCardResponse(memberCardRepository.save(card));

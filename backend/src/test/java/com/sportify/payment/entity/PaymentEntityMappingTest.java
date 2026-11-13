@@ -285,6 +285,7 @@ class PaymentEntityMappingTest {
                 PaymentStatus.PENDING,
                 PaymentStatus.SUCCESS,
                 PaymentStatus.FAILED,
+                PaymentStatus.CANCELLED,
                 PaymentStatus.REFUNDED
         );
 

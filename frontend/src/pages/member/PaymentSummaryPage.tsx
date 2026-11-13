@@ -35,6 +35,7 @@ import {
 import { sessionsLabel } from './packagesModel'
 import { useMemberResource } from './useMemberResource'
 import { qrPaymentDemoEnabled } from '../../config/env'
+import { CancelPayment } from './PaymentCancellation'
 import { demoQrPath } from '../../components/qr/demoQr'
 import '../../components/qr/demoQr.css'
 
@@ -205,6 +206,7 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
           )}
         </Card>
         <OrderSummary payment={data} singleVisit={singleVisit} onStale={reload} />
+        <CancelPayment payment={data} onChanged={reload} />
       </div>
       </div>
     </PaymentWorkspace>

@@ -42,6 +42,7 @@ const STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pending',
   SUCCESS: 'Paid',
   FAILED: 'Failed',
+  CANCELLED: 'Cancelled',
   REFUNDED: 'Refunded',
 }
 
@@ -50,6 +51,7 @@ export const PAYMENT_STATUS_TONE_CODES: Record<string, string> = {
   PENDING: 'PENDING',
   SUCCESS: 'PAID',
   FAILED: 'FAILED',
+  CANCELLED: 'FAILED',
   REFUNDED: 'REFUNDED',
 }
 

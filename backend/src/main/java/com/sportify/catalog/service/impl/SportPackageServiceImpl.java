@@ -432,6 +432,11 @@ public class SportPackageServiceImpl implements SportPackageService {
         if (!isStaff && !registration.getMember().getId().equals(actor.getId())) {
             throw new ResourceNotFoundException("Package registration not found for id: " + registrationId);
         }
+        // Ownership first, so another account learns nothing; a Member may cancel only before the Receptionist handoff.
+        if (!isStaff && registration.getPayment() != null
+                && registration.getPayment().getSubmittedForVerificationAt() != null) {
+            throw new com.sportify.core.exception.ConflictException("Payment was submitted for verification and can no longer be cancelled");
+        }
 
         if (registration.getStatus() != PackageRegistrationStatus.PENDING_PAYMENT) {
             throw new BusinessRuleException("Only a package registration that is waiting for payment can be cancelled.");
@@ -446,7 +451,9 @@ public class SportPackageServiceImpl implements SportPackageService {
         registration.setCancelReason(cancelReason);
 
         if (registration.getPayment() != null) {
-            paymentService.markPaymentFailed(registration.getPayment().getId(),
+            if (isStaff) paymentService.markPaymentFailed(registration.getPayment().getId(),
+                    "Payment cancelled due to package registration cancellation: " + cancelReason);
+            else paymentService.markPaymentCancelled(registration.getPayment().getId(),
                     "Payment cancelled due to package registration cancellation: " + cancelReason);
         }
 

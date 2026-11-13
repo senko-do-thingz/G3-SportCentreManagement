@@ -1,0 +1,16 @@
+/* Member Cancel Payment and Receptionist handoff controls. Theme tokens only. */
+.payment-cancel { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.payment-cancel--blocked { cursor: not-allowed; }
+.payment-cancel--blocked .btn:disabled { border-color: var(--color-border); background: var(--color-surface-muted); color: var(--color-text-muted); opacity: 1; }
+.payment-cancel--blocked:focus-visible { border-radius: var(--radius-md); outline: 2px solid var(--color-primary); outline-offset: 2px; }
+/* Hidden until hover or keyboard focus, but always available to screen readers through aria-describedby. */
+.payment-cancel__reason {
+  position: absolute; z-index: 5; bottom: calc(100% + 6px); left: 0; width: max-content; max-width: 280px;
+  padding: 8px 10px; border-radius: var(--radius-md); background: var(--color-text); color: var(--color-surface);
+  font-size: 0.75rem; line-height: 1.4; box-shadow: var(--shadow-md);
+  clip-path: inset(50%); opacity: 0; pointer-events: none; transition: opacity 120ms ease;
+}
+.payment-cancel--blocked:hover .payment-cancel__reason,
+.payment-cancel--blocked:focus-within .payment-cancel__reason,
+.payment-cancel--blocked:focus .payment-cancel__reason { clip-path: none; opacity: 1; }
+.payment-cancel__error { color: var(--color-danger); font-size: 0.8rem; }
