@@ -609,7 +609,7 @@ class DemoQrDatabaseIntegrationTest {
         }
         assertThat(database.queryForObject("SELECT COUNT(*) FROM sys.tables WHERE name IN ('simulated_qr_session','simulated_payment_transaction')",Integer.class)).isZero();
         assertThat(fingerprint(database)).isEqualTo(before);
-        var current=Flyway.configure().dataSource(source).locations("classpath:db/migration/identity","classpath:db/migration/catalog").cleanDisabled(true).load();
+        var current=Flyway.configure().dataSource(source).locations("classpath:db/migration/identity","classpath:db/migration/catalog","classpath:db/compat-vietqr").cleanDisabled(true).load();
         // Later features may add migrations after the QR cohort; verify all pending work.
         var pendingVersions = Arrays.stream(current.info().pending())
                 .map(migration -> migration.getVersion().getVersion()).toList();

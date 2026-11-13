@@ -12,8 +12,8 @@ class ReleaseMigrationIntegrationTest {
     @ParameterizedTest @ValueSource(booleans={false,true})
     void defaultAndDemoUpgradePreservePriorRowsChecksumsAndValidateTwice(boolean demo) {
         var fixture=DisposableUnifyDatabase.create();var jdbc=fixture.jdbc();
-        String[] locations=demo?new String[]{"classpath:db/migration/identity","classpath:db/migration/catalog","classpath:db/demo"}
-                :new String[]{"classpath:db/migration/identity","classpath:db/migration/catalog"};
+        String[] locations=demo?new String[]{"classpath:db/migration/identity","classpath:db/migration/catalog","classpath:db/compat-vietqr","classpath:db/demo"}
+                :new String[]{"classpath:db/migration/identity","classpath:db/migration/catalog","classpath:db/compat-vietqr"};
         var before=Flyway.configure().dataSource(fixture.source()).locations(locations).target(demo?"41":"40").cleanDisabled(true).validateOnMigrate(true).load();
         before.migrate();
         var history=jdbc.queryForList("SELECT version,checksum,description FROM flyway_schema_history ORDER BY installed_rank");

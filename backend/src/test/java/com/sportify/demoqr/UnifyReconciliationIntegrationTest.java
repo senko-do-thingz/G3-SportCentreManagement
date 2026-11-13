@@ -18,7 +18,8 @@ import static org.assertj.core.api.Assertions.*;
 @Tag("integration")
 class UnifyReconciliationIntegrationTest {
     private Flyway flyway(DisposableUnifyDatabase db, String target) {
-        var config = Flyway.configure().dataSource(db.source()).locations("classpath:db/migration/identity", "classpath:db/migration/catalog")
+        var config = Flyway.configure().dataSource(db.source()).locations(
+                        "classpath:db/migration/identity", "classpath:db/migration/catalog", "classpath:db/compat-vietqr")
                 .cleanDisabled(true).outOfOrder(false).baselineOnMigrate(false);
         if (target != null) config.target(target);
         return config.load();

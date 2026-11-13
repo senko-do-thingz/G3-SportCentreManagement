@@ -45,7 +45,7 @@ class UnifiedReplayLifecycleIntegrationTest {
 
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
         var fixture=DisposableUnifyDatabase.create();var jdbc=fixture.jdbc();
-        Flyway.configure().dataSource(fixture.source()).locations("classpath:db/migration/identity","classpath:db/migration/catalog","classpath:db/demo").cleanDisabled(true).load().migrate();
+        Flyway.configure().dataSource(fixture.source()).locations("classpath:db/migration/identity","classpath:db/migration/catalog","classpath:db/compat-vietqr","classpath:db/demo").cleanDisabled(true).load().migrate();
         for(String name:new String[]{"card-expiry","package-expiry","replacement","sim-refund","real-refund","reviewer"}) {
             jdbc.update("INSERT user_account(email,password_hash,full_name,role_id,status) SELECT ?,u.password_hash,'R04 lifecycle fixture',r.id,'ACTIVE' FROM user_account u CROSS JOIN role r WHERE u.email='an.gold@example.com' AND r.code=?",
                     name+"@unified-demo.invalid",name.equals("reviewer")?"MANAGER":"MEMBER");
