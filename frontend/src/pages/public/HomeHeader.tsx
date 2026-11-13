@@ -6,6 +6,7 @@ import { Brand } from '../../components/Brand'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { UserMenu } from '../../layouts/UserMenu'
 import { ThemeToggle } from '../../theme/ThemeToggle'
+import { Spinner } from '../../components/ui/Spinner'
 
 export interface HomeNavGroup {
   label: string
@@ -148,7 +149,7 @@ export function HomeHeader({ groups = [] }: { groups?: HomeNavGroup[] }) {
               <UserMenu />
             </>
           ) : status === 'loading' ? (
-            <span role="status">Restoring your session...</span>
+            <span role="status"><Spinner size="sm" inline decorative /> Restoring your session...</span>
           ) : status === 'error' ? (
             <Link className={buttonClassName('secondary', 'md')} to="/login">Recover session</Link>
           ) : (
