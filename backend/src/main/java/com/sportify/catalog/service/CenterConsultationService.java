@@ -152,6 +152,7 @@ public class CenterConsultationService {
             || intent.equals("UNKNOWN") && contains(raw,"today","h\u00F4m nay")))intent="STAFF";
         Consultation draft=switch(intent) {
             case "STAFF" -> staffOverview(vi,mode,role,memberId);
+            case "CLASS_MANAGEMENT" -> classManagement(vi,mode,role);
             case "PRIVATE","UNKNOWN" -> unknown(vi,mode);
             case "COACH" -> coach(vi,mode);
             case "FAQ" -> faq==null?unknown(vi,mode):faqAnswer(vi,mode,faq);
@@ -299,6 +300,21 @@ public class CenterConsultationService {
         return response(vi,mode,"ANSWERED",t(vi,"Here is your Sportify workspace overview:\n","T\u1ED5ng quan c\u00F4ng vi\u1EC7c Sportify c\u1EE7a b\u1EA1n:\n")+lines,sources);
     }
 
+    /**
+     * A question about performing a management action is not a request for a list of published sessions.
+     * No action is performed by this assistant, regardless of role or AI availability.
+     */
+    private static Consultation classManagement(boolean vi,String mode,String role) {
+        if("MANAGER".equals(role))return response(vi,mode,"ANSWERED",t(vi,
+            "Yes. As Manager, open My workspace > Classes > Create class. Enter the name, sport, age group, level, qualified coach and maximum members. Save the class, then create its sessions in Schedule and coaches. I can explain the steps but cannot create a class for you.",
+            "Có. Với vai trò Manager, vào My workspace > Classes > Create class. Nhập tên lớp, môn, nhóm tuổi, trình độ, Coach đủ điều kiện và số học viên tối đa. Lưu lớp rồi tạo session tại Schedule and coaches. Spori không tự tạo lớp."),
+            List.of(new ConsultationSource("PRODUCT_GUIDANCE",0,t(vi,"Manager class creation","Tạo lớp cho Manager"),
+                t(vi,"Only a Manager can create or change classes; sessions are scheduled separately.","Chỉ Manager được tạo hoặc sửa lớp; session được xếp lịch riêng."),"")));
+        return response(vi,mode,"ANSWERED",t(vi,
+            "Class creation is a Manager action. Your current role cannot create classes. Ask the Manager to set up the class; I can help you find published sessions instead.",
+            "Việc tạo lớp thuộc quyền Manager. Vai trò hiện tại của bạn không được tạo lớp. Hãy liên hệ Manager để tạo lớp; Spori có thể tìm buổi học đã công bố."),List.of());
+    }
+
     /** Up to six published sessions with booked and total places, without any Member detail. */
     private List<ConsultationSource> sessionsSummary(boolean vi,String where,Object... args) {
         try {
@@ -437,6 +453,10 @@ public class CenterConsultationService {
 
     /** Rule-based intent after the guard. */
     static String rules(String raw,String plain) {
+        // Action/permission questions must not be misclassified as schedule lookups just because they say "class".
+        if(contains(raw,"create class","create a class","create new class","add a class","add class",
+            "set up a class","make a class","manage classes","tạo lớp","thêm lớp","quản lý lớp")
+            || contains(plain,"tao lop","them lop","quan ly lop"))return "CLASS_MANAGEMENT";
         if(faq(raw,plain)!=null)return "FAQ";
         if(contains(raw,"homework","coach feedback","my feedback","my training","my progress","my results","my result",
             "b\u00E0i t\u1EADp v\u1EC1 nh\u00E0","nh\u1EADn x\u00E9t","ph\u1EA3n h\u1ED3i c\u1EE7a","k\u1EBFt qu\u1EA3 t\u1EADp","ti\u1EBFn \u0111\u1ED9")
