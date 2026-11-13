@@ -63,7 +63,7 @@ describe('Header inbox', () => {
     })
     const user = userEvent.setup()
     await user.click(await screen.findByRole('button', { name: 'Inbox' }))
-    expect(await screen.findByText('No notifications yet.')).toBeInTheDocument()
+    expect(await screen.findByText('No new notifications.')).toBeInTheDocument()
     expect(calls.some(call => call.path.startsWith('/reception/inbox') || call.path.startsWith('/member/notifications'))).toBe(false)
   })
 })
