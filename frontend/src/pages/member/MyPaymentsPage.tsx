@@ -1,6 +1,7 @@
 import { useCallback, useEffect, type ChangeEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { paymentsApi, type Payment } from '../../api/paymentsApi'
+import { CancelPayment } from './PaymentCancellation'
 import { PaymentHero } from '../../components/PaymentHero'
 import { Card, EmptyState, Select, StatusBadge, Table, type TableColumn } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
@@ -45,7 +46,7 @@ const COLUMNS: TableColumn<Payment>[] = [
       <StatusBadge status={paymentStatusToneCode(payment.status)} label={paymentStatusLabel(payment.status, payment.settlementType)} />
     ),
   },
-  { key: 'action', header: 'Action', render: (payment) => <PaymentAction payment={payment} /> },
+  { key: 'action', header: 'Action', render: (payment) => <><PaymentAction payment={payment} /> <CancelPayment payment={payment} onChanged={() => window.location.reload()} /></> },
 ]
 
 /** Check status for a pending payment, View receipt once an invoice exists, otherwise View details. */

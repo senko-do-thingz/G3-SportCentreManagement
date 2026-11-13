@@ -24,6 +24,7 @@ public class PaymentResponse {
     private BigDecimal originalPrice;
     private BigDecimal discount;
     private LocalDateTime paymentTime;
+    private LocalDateTime submittedForVerificationAt;
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private BankTransferInstructions bankTransferInstructions;

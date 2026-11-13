@@ -113,6 +113,33 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    void memberCancelsPendingCardBeforeHandoff() {
+        var card = com.sportify.catalog.entity.MemberCard.builder().id(5L).cardCode("CARD-5")
+                .member(ownerProfile).payment(pendingPayment).status(com.sportify.catalog.entity.CardStatus.PENDING_PAYMENT)
+                .pricePaid(pendingPayment.getAmount()).build();
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
+        when(memberCardRepository.findByPaymentId(10L)).thenReturn(Optional.of(card));
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(call -> call.getArgument(0));
+
+        var response = paymentService.cancelPayment(10L, ownerUser);
+
+        assertThat(response.getStatus()).isEqualTo(PaymentStatus.CANCELLED);
+        assertThat(card.getStatus()).isEqualTo(com.sportify.catalog.entity.CardStatus.CANCELLED);
+        verify(memberCardRepository).save(card);
+    }
+
+    @Test
+    void memberCannotCancelAfterHandoffOrAnotherMembersPayment() {
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
+        pendingPayment.setSubmittedForVerificationAt(LocalDateTime.now(clock));
+        assertThatThrownBy(() -> paymentService.cancelPayment(10L, ownerUser))
+                .isInstanceOf(com.sportify.core.exception.ConflictException.class);
+        assertThatThrownBy(() -> paymentService.cancelPayment(10L, otherUser))
+                .isInstanceOf(com.sportify.core.exception.ResourceNotFoundException.class);
+        verify(paymentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     @DisplayName("Create pending payment with valid online method succeeds and initializes pending status")
     void createPendingPayment_ValidOnlineMethod_Succeeds() {
         when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1001L);

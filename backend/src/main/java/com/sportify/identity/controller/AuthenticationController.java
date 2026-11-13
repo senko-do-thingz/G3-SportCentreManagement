@@ -16,6 +16,32 @@ import org.springframework.web.bind.annotation.*;
 public class AuthenticationController {
 
     private final AuthenticationService service;
+    private final com.sportify.identity.service.PasswordRecoveryService recovery;
+
+    public record RecoveryEmail(String email) {}
+    public record RecoveryOtp(String email, String otp) {}
+    public record RecoveryPassword(String authorization, String newPassword, String confirmPassword) {}
+
+    @PostMapping("/forgot-password/request")
+    public java.util.Map<String, String> requestRecovery(@RequestBody RecoveryEmail request) {
+        try {
+            recovery.request(request.email());
+        } catch (IllegalStateException deliveryOrConfigurationFailure) {
+            // Keep the same public response for known and unknown addresses.
+        }
+        return java.util.Map.of("message", "If an account exists and email is available, check your inbox for a code.");
+    }
+
+    @PostMapping("/forgot-password/verify")
+    public java.util.Map<String, String> verifyRecovery(@RequestBody RecoveryOtp request) {
+        return java.util.Map.of("authorization", recovery.verify(request.email(), request.otp()));
+    }
+
+    @PostMapping("/forgot-password/reset")
+    public java.util.Map<String, String> resetPassword(@RequestBody RecoveryPassword request) {
+        recovery.reset(request.authorization(), request.newPassword(), request.confirmPassword());
+        return java.util.Map.of("message", "Password reset. You can now log in.");
+    }
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {

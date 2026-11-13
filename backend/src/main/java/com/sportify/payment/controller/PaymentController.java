@@ -17,6 +17,18 @@ public class PaymentController {
 
     private final PaymentService paymentService;
 
+    @PostMapping("/{id}/submit")
+    @PreAuthorize("hasRole('MEMBER')")
+    public PaymentResponse submit(@PathVariable Long id, @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return paymentService.submitForVerification(id, userDetails.getUserAccount());
+    }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasRole('MEMBER')")
+    public PaymentResponse cancel(@PathVariable Long id, @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return paymentService.cancelPayment(id, userDetails.getUserAccount());
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER')")
     public PaymentResponse getPayment(

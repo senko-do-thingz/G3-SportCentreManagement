@@ -462,6 +462,10 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         MemberCard card = memberCardRepository.findById(cardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member card not found for id: " + cardId));
         boolean isStaff = SecurityUtils.isStaff(actor);
+        if (!isStaff && card.getPayment() != null
+                && card.getPayment().getSubmittedForVerificationAt() != null) {
+            throw new com.sportify.core.exception.ConflictException("Payment was submitted for verification and can no longer be cancelled");
+        }
         // MemberProfile shares its primary key with UserAccount (@MapsId user_id), so member id equals user id by design.
         if (!isStaff && !card.getMember().getId().equals(actor.getId())) {
             throw new ResourceNotFoundException("Member card not found for id: " + cardId);
@@ -472,7 +476,9 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         card.setStatus(CardStatus.CANCELLED);
         if (card.getPayment() != null) {
             String actorDescription = isStaff ? "staff user id " + actor.getId() : "member user id " + actor.getId();
-            paymentService.markPaymentFailed(card.getPayment().getId(),
+            if (isStaff) paymentService.markPaymentFailed(card.getPayment().getId(),
+                    "Payment cancelled due to card cancellation by " + actorDescription);
+            else paymentService.markPaymentCancelled(card.getPayment().getId(),
                     "Payment cancelled due to card cancellation by " + actorDescription);
         }
         return mapToCardResponse(memberCardRepository.save(card));

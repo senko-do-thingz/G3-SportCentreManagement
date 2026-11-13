@@ -52,6 +52,9 @@ public class Payment {
     @Column(name = "payment_time")
     private LocalDateTime paymentTime;
 
+    @Column(name = "submitted_for_verification_at")
+    private LocalDateTime submittedForVerificationAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "confirmed_by_user_id")
     private UserAccount confirmedByUser;

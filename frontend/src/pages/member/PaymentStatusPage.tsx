@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { parseSessionReference } from '../../api/sessionIdentity'
 import { getErrorMessage } from '../../api/errors'
 import type { Payment } from '../../api/paymentsApi'
+import { CancelPayment, SubmitPayment } from './PaymentCancellation'
 import { PaymentHero } from '../../components/PaymentHero'
 import { PaymentWorkspace } from '../../components/PaymentWorkspace'
 import { Button, Card, EmptyState, ErrorState, StatusBadge, useToast } from '../../components/ui'
@@ -110,6 +111,8 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
         <div className="payment-summary">
           <Instructions payment={payment} />
           <StatusPanel polling={polling} payment={payment} />
+          <SubmitPayment payment={payment} onChanged={refresh} />
+          <CancelPayment payment={payment} onChanged={refresh} />
         </div>
       </div>
     </PaymentWorkspace>

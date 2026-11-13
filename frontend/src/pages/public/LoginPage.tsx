@@ -16,6 +16,7 @@ import { ManagerPreviewLogin } from '../../components/ManagerPreviewLogin'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 import { AuthShell } from './AuthShell'
 import { SessionErrorPage } from './SessionErrorPage'
+import { ForgotPassword } from './ForgotPassword'
 
 /** Shown for HTTP 403 from POST /auth/login (DisabledException or LockedException on the backend). */
 export const ACCOUNT_DISABLED_MESSAGE =
@@ -23,9 +24,6 @@ export const ACCOUNT_DISABLED_MESSAGE =
 
 /** Shown for HTTP 401 from POST /auth/login. Same meaning as the backend message, as a sentence. */
 export const INVALID_CREDENTIALS_MESSAGE = 'Incorrect email or password. Check them and try again.'
-
-export const FORGOT_PASSWORD_MESSAGE =
-  "Online password reset isn't available yet. Ask the front desk to reset your password."
 
 /** Shown when another tab of this browser logged in or out and this tab lost its session. */
 export const SIGNED_OUT_ELSEWHERE_MESSAGE =
@@ -79,10 +77,11 @@ export function LoginPage() {
 
   const [email, setEmail] = useState(initialState?.email ?? '')
   const [password, setPassword] = useState('')
+  const [recovering, setRecovering] = useState(false)
   const [remember, setRemember] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-  const [infoMessage, setInfoMessage] = useState<string | null>(initialState?.notice ?? null)
+  const [infoMessage] = useState<string | null>(initialState?.notice ?? null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const formRef = useRef<HTMLFormElement>(null)
   const focusFirstInvalid = useFocusFirstInvalid(formRef)
@@ -122,6 +121,9 @@ export function LoginPage() {
   }
   if (status === 'error' && !submitting) {
     return <SessionErrorPage />
+  }
+  if (recovering) {
+    return <ForgotPassword initialEmail={email} onBack={() => setRecovering(false)} />
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -236,7 +238,7 @@ export function LoginPage() {
               className="link-button"
               onClick={() => {
                 setFormError(null)
-                setInfoMessage(FORGOT_PASSWORD_MESSAGE)
+                setRecovering(true)
               }}
             >
               Forgot password?

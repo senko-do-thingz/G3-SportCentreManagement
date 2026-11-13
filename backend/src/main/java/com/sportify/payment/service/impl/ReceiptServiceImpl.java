@@ -146,6 +146,7 @@ public class ReceiptServiceImpl implements ReceiptService {
                 .time(payment.getPaymentTime() != null ? payment.getPaymentTime() : payment.getCreatedAt())
                 .paymentTime(payment.getPaymentTime())
                 .createdAt(payment.getCreatedAt())
+                .submittedForVerificationAt(payment.getSubmittedForVerificationAt())
                 .memberId(member != null ? member.getId() : null)
                 .memberCode(member != null ? member.getMemberCode() : null)
                 .referenceCode(payment.getReferenceCode())
