@@ -35,7 +35,7 @@ export function DemoSessionSummary({ session, onDeadline }: { session: DemoSessi
     {session.state === 'PENDING' && <p>Time remaining: <span role="timer" aria-live="off">{remaining ?? '-'} seconds</span>. The server decides expiry.</p>}
     {session.state === 'AUTHORIZED_PENDING_SETTLEMENT' && <p className="notice notice--info">Legacy simulation state; refresh simulation status.</p>}
     {session.state === 'SETTLED' && <p className="notice notice--success">Paid - Simulated. Your payment was settled in simulation only; no real bank transfer occurred.</p>}
-    {session.state === 'SETTLED' && session.invoiceId && <p><a className="btn btn--secondary" href={PAYMENT_PATHS.receipt(session.invoiceId)}>View simulated receipt</a></p>}
+    {session.state === 'SETTLED' && session.invoiceId && <p><a className="btn btn--secondary btn--md" href={PAYMENT_PATHS.receipt(session.invoiceId)}>View simulated receipt</a></p>}
     {session.state === 'CANCELED' && <p className="notice notice--info">This simulation session was canceled before settlement. Your payment remains pending.</p>}
     {session.state === 'EXPIRED' && <p className="notice notice--warning">This simulation session expired before settlement. Start a new session on the desktop. Your payment remains pending.</p>}
   </>

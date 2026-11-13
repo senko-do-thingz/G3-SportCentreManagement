@@ -110,7 +110,7 @@ export function CoachTeachingSchedulePage() {
         <h2>Your week.<br /><span>Clearly organized.</span></h2>
         <p>Simple workflows. Better coaching.</p>
       </div>
-      {selectedSession && <Link className="btn btn--accent coach-schedule-hero__action" to={rosterHref(selectedSession, week)}>View class roster</Link>}
+      {selectedSession && <Link className="btn btn--accent btn--md coach-schedule-hero__action" to={rosterHref(selectedSession, week)}>View class roster</Link>}
     </section>
     {resource.status === 'loading' ? <PageLoader label="Loading your teaching schedule" /> : resource.status === 'error' ? <ErrorState title="We could not load your teaching schedule" error={resource.error} onRetry={reload} /> : <>
       <section className="coach-schedule-metrics" aria-label="Schedule summary">
@@ -165,7 +165,7 @@ export function CoachTeachingSchedulePage() {
               <div><dt>Facility</dt><dd>{selectedSession.facilityName || 'Not provided'}</dd></div>
               {selectedSession.trainingType && <div><dt>Training type</dt><dd>{selectedSession.trainingType === 'SELF_TRAINING' ? 'Self-training' : 'Coach-led'}</dd></div>}
             </dl>
-            <Link className="btn btn--primary coach-schedule-overview__action" to={rosterHref(selectedSession, week)}>View roster</Link>
+            <Link className="btn btn--primary btn--md coach-schedule-overview__action" to={rosterHref(selectedSession, week)}>View roster</Link>
           </> : <div className="coach-schedule-overview__empty"><p>No session to review</p><span>Choose another week to view assigned sessions and rosters.</span></div>}
         </Card>
       </div>
@@ -259,7 +259,7 @@ export function CoachRosterPage() {
         <h2>Know your class.<br /><span>Prepare to coach.</span></h2>
         <p>Review confirmed bookings and session details in one place.</p>
       </div>
-      <a className="btn btn--accent coach-schedule-hero__action" href="#coach-roster-picker">Choose session</a>
+      <a className="btn btn--accent btn--md coach-schedule-hero__action" href="#coach-roster-picker">Choose session</a>
     </section>
     <section className="coach-roster-metrics" aria-label="Roster summary">
       <div className="coach-schedule-metric"><RosterMetricIcon name="session" /><div><p>{selectedSession ? '1' : '--'}</p><span>Selected session</span></div></div>
@@ -290,6 +290,6 @@ export function CoachRosterPage() {
         </> : sessionsResource.status === 'error' ? <EmptyState title="Roster unavailable" description="Retry loading your sessions to choose a class roster." /> : sessionsResource.status === 'loading' ? <PageLoader label="Loading roster options" /> : selectedSessionId ? <ErrorState title="Session is not in this week's schedule" message="Choose a session from your schedule, or change the week and select it again." /> : sessions.length === 0 ? <EmptyState title="No session to review" description="Assigned sessions with confirmed bookings will appear here." /> : <EmptyState title="Choose a session to view its roster" description="Select one of your assigned sessions. Confirmed bookings will appear here." />}
       </Card>
     </div>
-    {sessionsResource.status === 'ready' && selectedSession && roster.status === 'ready' && roster.data.length > 0 && <div className="coach-print-hidden coach-roster-links"><Link className="btn btn--secondary" to={`/coach?week=${week}`}>Back to teaching schedule</Link>{selectedSession.classId && <Link className="btn btn--secondary" to={`/coach/training/progress?classId=${selectedSession.classId}`}>View class member progress</Link>}</div>}
+    {sessionsResource.status === 'ready' && selectedSession && roster.status === 'ready' && roster.data.length > 0 && <div className="coach-print-hidden coach-roster-links"><Link className="btn btn--secondary btn--md" to={`/coach?week=${week}`}>Back to teaching schedule</Link>{selectedSession.classId && <Link className="btn btn--secondary btn--md" to={`/coach/training/progress?classId=${selectedSession.classId}`}>View class member progress</Link>}</div>}
   </div>
 }

@@ -128,7 +128,7 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
       {created && <Button variant="secondary" disabled={busy} onClick={() => void operation('refresh')}>Refresh Simulation Status</Button>}
       {created?.session.state === 'PENDING' && <Button variant="secondary" disabled={busy} onClick={() => void operation('cancel')}>Cancel Simulation Session</Button>}
       {created && qr && <>
-        <a className="btn btn--secondary" href={created.confirmationUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Open simulation confirmation</a>
+        <a className="btn btn--secondary btn--md" href={created.confirmationUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Open simulation confirmation</a>
         <Button variant="secondary" disabled={busy} onClick={() => void copy()}>Copy simulation session link</Button>
       </>}
     </div>

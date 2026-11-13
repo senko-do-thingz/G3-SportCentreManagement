@@ -78,7 +78,7 @@ export function ManagerFinancialOverviewPage() {
     <PreviewNotice />
     <div className="finance-period-row">
       <Input label="Reporting period" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
-      <Link className="btn btn--primary" to={`/manager/transactions?month=${month}`}>View transactions</Link>
+      <Link className="btn btn--primary btn--md" to={`/manager/transactions?month=${month}`}>View transactions</Link>
     </div>
 
     {resource.status === 'loading' ? <PageLoader label="Loading financial overview" /> : resource.status === 'error' ? <ManagerError error={resource.error} onRetry={reload} /> : <>
@@ -110,7 +110,7 @@ export function ManagerFinancialOverviewPage() {
             <li><span>Pending payments</span><Link to="/manager/transactions?status=PENDING">{resource.data.overview.pendingTransactions} transactions</Link></li>
             <li><span>Awaiting refund approval</span><Link to="/manager/transactions#refund-queue">{resource.data.pendingRefunds.length} requests</Link></li>
           </ul>
-          <Link className="btn btn--secondary finance-attention__action" to="/manager/transactions#refund-queue">Review refunds</Link>
+          <Link className="btn btn--secondary btn--md finance-attention__action" to="/manager/transactions#refund-queue">Review refunds</Link>
         </Card>
       </div>
 
@@ -118,11 +118,11 @@ export function ManagerFinancialOverviewPage() {
         <FinanceTrendChart points={resource.data.trend} />
       </Card>
 
-      <Card title="Recent transactions" actions={<Link className="btn btn--secondary" to={`/manager/transactions?month=${month}`}>All transactions</Link>}>
+      <Card title="Recent transactions" actions={<Link className="btn btn--secondary btn--md" to={`/manager/transactions?month=${month}`}>All transactions</Link>}>
         <Table columns={recentColumns} rows={resource.data.recent.content} rowKey={(row) => row.id} caption="Recent transactions" emptyTitle="No recent transactions" emptyDescription="Payments collected in this reporting month will appear here." />
       </Card>
 
-      <Link className="btn btn--primary finance-open-report" to={`/manager/reports?${new URLSearchParams({ from: monthStart(month), to: monthEnd(month) })}`}>Open revenue report</Link>
+      <Link className="btn btn--primary btn--md finance-open-report" to={`/manager/reports?${new URLSearchParams({ from: monthStart(month), to: monthEnd(month) })}`}>Open revenue report</Link>
     </>}
   </div>
 }

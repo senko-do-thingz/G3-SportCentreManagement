@@ -283,7 +283,7 @@
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: color var(--transition-fast), background-color var(--transition-fast);
+  transition: color 0.2s ease, background-color 0.2s ease;
 }
 
 .calendar-date-field__trigger:hover:not(:disabled) {
@@ -302,9 +302,9 @@
 }
 
 .calendar-date-field__icon {
-  display: inline-block;
-  font-size: 1.15rem;
-  line-height: 1;
+  display: block;
+  width: 20px;
+  height: 20px;
   pointer-events: none;
 }
 

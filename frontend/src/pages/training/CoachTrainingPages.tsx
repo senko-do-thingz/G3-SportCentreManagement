@@ -135,7 +135,7 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
           <h3 id="coach-personal-plan-details">Plan details</h3>
           <Select label="Member booking" name="bookingId" required placeholder="Select a confirmed booking" value={bookingId} onChange={event => chooseBooking(event.target.value)}
             options={members.map(member => ({ value: String(member.bookingId), label: `${member.memberName} - Booking #${member.bookingId} - ${formatCalendarDate(member.sessionDate)}` }))} />
-          {bookingId && <Link className="btn btn--secondary" to={`/coach/training/progress?classId=${classId}&memberId=${selectedMemberId ?? ''}`}>View selected member progress</Link>}
+          {bookingId && <Link className="btn btn--secondary btn--md" to={`/coach/training/progress?classId=${classId}&memberId=${selectedMemberId ?? ''}`}>View selected member progress</Link>}
           <Input label="Plan title" name="title" required maxLength={150} value={title} onChange={event => setTitle(event.target.value)} placeholder="Enter plan title (e.g. Footwork & basic drills)" />
           <TrainingTextarea label="Plan description" name="description" maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} />
         </section>
