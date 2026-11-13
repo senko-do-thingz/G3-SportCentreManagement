@@ -82,9 +82,11 @@
   line-height: 1.15;
 }
 
-/* Field groups: a Home border instead of the browser's grooved frame; the legend reads like a field label. */
-:is(.staff-layout, .member-layout) main fieldset {
+/* Field groups with a visible legend: a Home border with inner padding instead of the browser's grooved frame;
+   the legend reads like a field label. Fieldsets without a legend (Profile forms) stay unframed. */
+:is(.staff-layout, .member-layout) main fieldset:has(> legend) {
   min-width: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
 }

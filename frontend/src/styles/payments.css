@@ -348,6 +348,11 @@
   color: var(--color-text-muted);
 }
 
+/* Amounts and methods never break inside the value ("1.140.000 / VND"); the service text takes the wrapping. */
+.payment-row__value {
+  white-space: nowrap;
+}
+
 /* Receipt */
 .receipt__head {
   display: flex;

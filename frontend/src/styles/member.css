@@ -755,7 +755,7 @@
 }
 
 .member-ui .card {
-  padding: var(--space-4);
+  padding: var(--space-6);
   border-radius: 0;
   box-shadow: none;
 }
