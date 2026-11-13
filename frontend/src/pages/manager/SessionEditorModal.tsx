@@ -47,7 +47,7 @@ export function SessionEditorModal({ item, classes, facilities, manualFacility =
     if (draft.trainingType === 'COACH_LED' && (coaches.status !== 'ready' || !coaches.data.some((entry) => entry.id === Number(draft.coachId)))) errors.coachId = 'Choose a coach qualified for this sport.'
     const capacity = Number(draft.capacity)
     if (bookedMinimum > allowedMax) errors.capacity = `The selected facility/class cannot accommodate ${bookedMinimum} existing bookings. Choose a facility with more space.`
-    else if (!Number.isInteger(capacity) || capacity < bookedMinimum || capacity > allowedMax) errors.capacity = `Capacity must be a whole number from ${bookedMinimum} to ${allowedMax} (limited by both class and facility).`
+    else if (!Number.isInteger(capacity) || capacity < bookedMinimum || capacity > allowedMax) errors.capacity = `Capacity must be a whole number from ${bookedMinimum} to ${allowedMax}.`
     return errors
   }, async () => {
     setConflicts([])
