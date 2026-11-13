@@ -213,7 +213,7 @@ public class CenterConsultationService {
     private List<AssistantReplyWriter.Fact> publicContext(boolean vi) {
         var facts=new ArrayList<AssistantReplyWriter.Fact>();
         var sportsAnswer=sportsCatalog(vi,RULES_MODE);
-        facts.add(new AssistantReplyWriter.Fact(t(vi,"Sports offered","Các môn thể thao"),sportsAnswer.answer()));
+        facts.add(new AssistantReplyWriter.Fact(t(vi,"Sports offered","C\u00E1c m\u00F4n th\u1EC3 thao"),sportsAnswer.answer()));
         for(var source:packages(vi,RULES_MODE,null).sources())facts.add(new AssistantReplyWriter.Fact(source.title(),source.detail()));
         for(var source:sessions(vi,RULES_MODE,null,"UPCOMING").sources())facts.add(new AssistantReplyWriter.Fact(source.title(),source.detail()));
         return facts;

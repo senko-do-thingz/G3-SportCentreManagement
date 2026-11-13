@@ -30,6 +30,20 @@ function inline(text: string): ReactNode {
     : <Fragment key={index}>{part}</Fragment>)
 }
 
+const ICON_PATHS = {
+  calendar: 'M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z',
+  flame: 'M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.2 1-3.6 2-4.6.3 1.6 1 2.6 2 3.1C11 9 11.2 6 12 3z',
+  ticket: 'M4 7a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v3a2 2 0 0 0 0 4v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a2 2 0 0 0 0-4zM14 6v12',
+  card: 'M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M7 15h4',
+  note: 'M6 3h9l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM9 12h6M9 16h6M9 8h3',
+} as const
+export type SporiIconName = keyof typeof ICON_PATHS
+
+/** Line icon for suggested questions (the team convention forbids emoji in source). */
+export function SporiIcon({ name }: { name: SporiIconName }) {
+  return <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d={ICON_PATHS[name]} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" /></svg>
+}
+
 export function SporiAvatar({ size = 'sm' }: { size?: 'sm' | 'md' | 'lg' }) {
   return <span className={`spori-avatar spori-avatar--${size}`} aria-hidden="true"><SporiRobotMark /></span>
 }

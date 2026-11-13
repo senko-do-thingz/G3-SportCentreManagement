@@ -4,7 +4,7 @@ import { type Consultation } from '../../api/trainingGuidanceApi'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { safeMemberReturnTo } from './assistantNavigation'
-import { SporiAiBadge, SporiAvatar, SporiComposer, SporiCopyButton, SporiSources, SporiText, SporiTyping } from './sporiChat'
+import { SporiAiBadge, SporiAvatar, SporiComposer, SporiIcon, SporiCopyButton, SporiSources, SporiText, SporiTyping } from './sporiChat'
 import { formatTime, useSporiChat, useSporiScroll } from './useSporiChat'
 
 export function MemberAssistantLink({ onNavigate, className, label = 'Open center assistant' }: {
@@ -30,11 +30,11 @@ export function MemberAssistantLink({ onNavigate, className, label = 'Open cente
 
 // One example per supported theme: schedules, center services, general exercise and the Member's own records.
 const ASSISTANT_EXAMPLES = [
-  { icon: '📅', text: 'Which classes are available in the next two weeks?' },
-  { icon: '💳', text: 'What are the package prices?' },
-  { icon: '🔥', text: 'How should I warm up before practice?' },
-  { icon: '🎟️', text: 'How many sessions do I have left?' },
-  { icon: '📝', text: 'What is my homework?' },
+  { icon: 'calendar', text: 'Which classes are available in the next two weeks?' },
+  { icon: 'card', text: 'What are the package prices?' },
+  { icon: 'flame', text: 'How should I warm up before practice?' },
+  { icon: 'ticket', text: 'How many sessions do I have left?' },
+  { icon: 'note', text: 'What is my homework?' },
 ] as const
 
 const SOURCE_KIND_LABELS: Record<string, string> = {
@@ -148,11 +148,11 @@ function CenterConsultationWorkspace() {
           <div ref={logRef} className={'spori-log spori-page__log' + (started ? '' : ' is-empty')} role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation">
             {!started && <div className="spori-hero">
               <SporiAvatar size="lg" />
-              <h2>Hi, I'm Spori 👋</h2>
+              <h2>Hi, I'm Spori!</h2>
               <p>Ask about classes, prices, or your own packages, bookings and homework, in English or Vietnamese.</p>
               <div className="spori-hero__grid" role="group" aria-label="Example questions">
                 {ASSISTANT_EXAMPLES.map(example => <button key={example.text} type="button" onClick={() => pickExample(example.text)}>
-                  <span aria-hidden="true">{example.icon}</span>{example.text}
+                  <span aria-hidden="true"><SporiIcon name={example.icon} /></span>{example.text}
                 </button>)}
               </div>
             </div>}

@@ -32,13 +32,13 @@ class AssistantReplyWriterTest {
     @Test
     void aGreetingGetsTheWrittenReply() {
         var writer = mock(AssistantReplyWriter.class);
-        when(writer.write(any())).thenReturn(new Reply("Chào bạn! Mình là Spori.", true));
+        when(writer.write(any())).thenReturn(new Reply("Ch\u00E0o b\u1EA1n! M\u00ECnh l\u00E0 Spori.", true));
 
-        var answer = service(writer).answer(7L, "xin chào", true);
+        var answer = service(writer).answer(7L, "xin ch\u00E0o", true);
 
         assertThat(answer.mode()).isEqualTo("AI_GENERATED");
         assertThat(answer.status()).isEqualTo("ANSWERED");
-        assertThat(answer.answer()).isEqualTo("Chào bạn! Mình là Spori.");
+        assertThat(answer.answer()).isEqualTo("Ch\u00E0o b\u1EA1n! M\u00ECnh l\u00E0 Spori.");
         assertThat(answer.language()).isEqualTo("vi");
     }
 
@@ -112,7 +112,7 @@ class AssistantReplyWriterTest {
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(200);
         when(response.body()).thenReturn("{\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"parts\":[{\"text\":"
-                + "\"{\\\"reply\\\":\\\"Gói rẻ nhất là 500.000 VND.\\\",\\\"answered\\\":true}\"}]}}]}");
+                + "\"{\\\"reply\\\":\\\"G\u00F3i r\u1EBB nh\u1EA5t l\u00E0 500.000 VND.\\\",\\\"answered\\\":true}\"}]}}]}");
         var writer = new GeminiReplyWriter((uri, key, body, timeout) -> {
             sentBodies.add(body);
             sentKeys.add(key);
@@ -120,10 +120,10 @@ class AssistantReplyWriterTest {
             return response;
         }, GeminiReplyWriter.DEFAULT_ENDPOINT, "gemini-test", "test-key", Duration.ofSeconds(5), JSON);
 
-        var reply = writer.write(new ReplyRequest("vi", "gói nào rẻ nhất?", List.of(new Turn("user", "chào")),
-                "PACKAGES", "Giá gốc...", List.of(new AssistantReplyWriter.Fact("Gói cơ bản", "500.000 VND")), "2026-11-12"));
+        var reply = writer.write(new ReplyRequest("vi", "g\u00F3i n\u00E0o r\u1EBB nh\u1EA5t?", List.of(new Turn("user", "ch\u00E0o")),
+                "PACKAGES", "Gi\u00E1 g\u1ED1c...", List.of(new AssistantReplyWriter.Fact("G\u00F3i c\u01A1 b\u1EA3n", "500.000 VND")), "2026-11-12"));
 
-        assertThat(reply.text()).isEqualTo("Gói rẻ nhất là 500.000 VND.");
+        assertThat(reply.text()).isEqualTo("G\u00F3i r\u1EBB nh\u1EA5t l\u00E0 500.000 VND.");
         assertThat(reply.answered()).isTrue();
         assertThat(sentKeys).containsExactly("test-key");
         var body = JSON.readTree(sentBodies.getFirst());

@@ -2079,3 +2079,4 @@
   .member-concept__assistant-launcher.spori-fab, .member-concept__assistant-launcher.spori-fab > .spori-fab__icon { transition: none; }
   .member-concept__assistant-launcher.spori-fab::before { animation: none; }
 }
+.spori-suggest__icon, .spori-hero__grid button span { color: var(--color-primary); }

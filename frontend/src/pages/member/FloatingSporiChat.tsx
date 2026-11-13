@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { SporiRobotMark } from './SporiRobotMark'
-import { SporiAiBadge, SporiAvatar, SporiComposer, SporiCopyButton, SporiSources, SporiText, SporiTyping } from './sporiChat'
+import { SporiAiBadge, SporiAvatar, SporiComposer, SporiIcon, SporiCopyButton, SporiSources, SporiText, SporiTyping } from './sporiChat'
 import { formatTime, useSporiChat, useSporiScroll, type SporiMessage } from './useSporiChat'
 
 const PROMPTS = [
-  { icon: '📅', text: 'Which classes are available soon?' },
-  { icon: '🔥', text: 'How should I warm up before practice?' },
-  { icon: '🎟️', text: 'How many sessions do I have left?' },
+  { icon: 'calendar', text: 'Which classes are available soon?' },
+  { icon: 'flame', text: 'How should I warm up before practice?' },
+  { icon: 'ticket', text: 'How many sessions do I have left?' },
 ] as const
 
 export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
@@ -98,14 +98,14 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
 
         <div ref={messageLog} className="spori-log" role="log" aria-live="polite" aria-relevant="additions">
           <div className={'spori-welcome' + (chat.messages.length ? ' is-compact' : '')}>
-            <p className="spori-welcome__title">Hi there 👋</p>
+            <p className="spori-welcome__title">Hi there!</p>
             <p className="spori-welcome__copy">I'm Spori. Ask me about classes, packages, or your own records, in English or Vietnamese.</p>
           </div>
           {chat.messages.length === 0 && enabled && (
             <div className="spori-suggest" aria-label="Suggested questions">
               <p className="spori-suggest__label">Popular questions</p>
               {PROMPTS.map((prompt) => <button type="button" key={prompt.text} onClick={() => { setDraft(prompt.text); input.current?.focus() }}>
-                <span className="spori-suggest__icon" aria-hidden="true">{prompt.icon}</span>
+                <span className="spori-suggest__icon" aria-hidden="true"><SporiIcon name={prompt.icon} /></span>
                 <span className="spori-suggest__text">{prompt.text}</span>
                 <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>)}
