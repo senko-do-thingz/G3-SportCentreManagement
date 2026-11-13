@@ -1,4 +1,5 @@
 import { SessionContext } from '../../components/SessionContext'
+import { StatIcon } from '../../components/ui'
 import { sessionIdText } from '../../api/sessionIdentity'
 import { formatCalendarDate } from '../../utils/date'
 import { useState, type FormEvent } from 'react'
@@ -39,28 +40,28 @@ export function ManagerAttendanceBackfillPage() {
     <TrainingData key={revision} load={api.workspace}>{workspace => <>
       <div className="concept-stats">
         <div className="concept-stat">
-          <span className="concept-stat__icon" aria-hidden="true">R</span>
+          <StatIcon name="shield" />
           <div>
             <strong>{workspace.enabled ? 'Enabled' : 'Disabled'}</strong>
             <small>Recovery status</small>
           </div>
         </div>
         <div className="concept-stat">
-          <span className="concept-stat__icon" aria-hidden="true">E</span>
+          <StatIcon name="list" />
           <div>
             <strong>{String(workspace.bookings.length).padStart(2, '0')}</strong>
             <small>Eligible bookings</small>
           </div>
         </div>
         <div className="concept-stat">
-          <span className="concept-stat__icon" aria-hidden="true">W</span>
+          <StatIcon name="clock" />
           <div>
             <strong>{workspace.window || 'Not set'}</strong>
             <small>Cutoff window</small>
           </div>
         </div>
         <div className="concept-stat">
-          <span className="concept-stat__icon" aria-hidden="true">M</span>
+          <StatIcon name="note" />
           <div>
             <strong>3-500 chars</strong>
             <small>Required reason</small>

@@ -3,9 +3,16 @@
 .manager-page .page-header { margin-bottom: var(--space-2); }
 .manager-preview { font-size: var(--text-sm); }
 .manager-preview strong { margin-right: var(--space-2); }
-.manager-filters { display: grid; grid-template-columns: minmax(200px, 2fr) repeat(2, minmax(130px, 1fr)) auto; align-items: end; gap: var(--space-3); margin-bottom: var(--space-6); }
-.manager-filters--activity { grid-template-columns: minmax(200px, 1.5fr) minmax(150px, 1fr) minmax(140px, 1fr); }
-.manager-filters .field { min-width: 0; }
+/* Filter toolbar: every field and the clear action on one row at 1280px and up. The search field takes the extra
+   width, each select keeps room for its longest default label, and Clear filters is a compact button. */
+.manager-filters { display: flex; align-items: flex-end; gap: var(--space-3); margin-bottom: var(--space-6); }
+.manager-filters > .field { flex: 1 1 0; min-width: 0; }
+.manager-filters > .field:first-child { flex-grow: 1.5; }
+.manager-filters > .btn { flex: none; height: var(--ui-control-height); padding-inline: var(--space-4); font-size: var(--text-sm); }
+/* Date fields keep a feedback slot under the control; inside a filter row it must not add a gap and lift that
+   control above its neighbours, so the spacing sits under the label instead. */
+.manager-filters > .field { row-gap: 0; }
+.manager-filters .field__label-row { margin-bottom: 6px; }
 .manager-filters .field > .btn { width: 100%; justify-content: flex-start; white-space: normal; min-height: 42px; }
 .manager-cell { display: flex; flex-direction: column; gap: var(--space-1); overflow-wrap: anywhere; }
 .manager-cell strong, .manager-cell-primary { color: var(--color-text); font-size: var(--text-sm); }
@@ -64,9 +71,8 @@
 .manager-page--users .card { padding: var(--space-8); border-radius: var(--radius-xl); box-shadow: var(--shadow-md); }
 .manager-page--users .card__header { margin-bottom: var(--space-6); }
 .manager-page--users .field__label { font-size: var(--text-md); }
-.manager-page--users .input, .manager-page--users .select { height: 48px; font-size: var(--text-base); padding-left: var(--space-4); }
-.manager-page--users .manager-filters { grid-template-columns: minmax(280px, 2.4fr) repeat(2, minmax(180px, 1fr)) auto; gap: var(--space-5); padding: var(--space-5); margin-bottom: var(--space-6); background: var(--color-surface-muted); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
-.manager-page--users .manager-filters .field > .btn, .manager-page--users .manager-filters > .btn { height: 48px; padding: 0 var(--space-5); font-size: var(--text-md); }
+.manager-page--users .input, .manager-page--users .select { height: var(--ui-control-height); font-size: var(--text-base); padding-left: var(--space-4); }
+.manager-page--users .manager-filters { gap: var(--space-5); padding: var(--space-5); margin-bottom: var(--space-6); background: var(--color-surface-muted); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
 .manager-page--users .table-scroll { border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
 .manager-page--users .table { font-size: var(--text-base); }
 .manager-page--users .table th { padding: var(--space-4) var(--space-5); font-size: var(--text-xs); }
@@ -107,3 +113,6 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .manager-page--users .manager-cell strong { color: var(--color-text); } }
 :root[data-theme="dark"] .manager-page--users .manager-cell strong { color: var(--color-text); }
 @media (max-width: 640px) { .manager-page--users .page-header { padding: var(--space-5); } }
+/* Attendance overview filters: dates, class search, class and coach on one row at 1280px and up. */
+.training-form-grid.attendance-overview-filters { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-3); }
+.attendance-overview-filters + p { margin-top: var(--space-4); }

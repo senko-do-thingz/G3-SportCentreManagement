@@ -301,6 +301,14 @@
   opacity: 0.5;
 }
 
+/* KPI card icon (components/ui/StatIcon): a 32px blue line icon, as on the Coach schedule metrics. */
+.stat-icon {
+  flex: 0 0 2rem;
+  width: 2rem;
+  height: 2rem;
+  color: var(--color-primary);
+}
+
 .calendar-date-field__icon {
   display: block;
   width: 20px;

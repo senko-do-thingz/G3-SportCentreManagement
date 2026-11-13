@@ -237,19 +237,7 @@
   border-radius: 0;
 }
 
-.concept-stat__icon {
-  width: 40px;
-  height: 40px;
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  border-radius: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 900;
-  font-size: var(--text-md);
-  flex: none;
-}
+/* KPI icons: components/ui/StatIcon, styled in components.css like the Coach metrics. */
 
 .concept-stat strong {
   font-size: var(--text-2xl);
