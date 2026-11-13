@@ -2,6 +2,7 @@ import { Fragment, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { type Consultation } from '../../api/trainingGuidanceApi'
 import { SporiRobotMark } from './SporiRobotMark'
+import { Spinner } from '../../components/ui/Spinner'
 
 /** Message pieces shared by the floating Spori widget and the full assistant page. */
 
@@ -52,7 +53,7 @@ export function SporiTyping({ label }: { label: string }) {
   return (
     <div className="spori-row spori-row--bot" role="status">
       <SporiAvatar />
-      <div className="spori-bubble spori-typing"><span /><span /><span /><span className="member-concept__sr-only">{label}</span></div>
+      <div className="spori-bubble spori-typing"><Spinner size="sm" inline decorative /><span className="member-concept__sr-only">{label}</span></div>
     </div>
   )
 }
