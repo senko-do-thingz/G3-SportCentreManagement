@@ -46,7 +46,8 @@ class DemoProfileSafetyConfigurationTest {
         runner(profiles, created, migrated).run(context -> {
             assertThat(context).hasNotFailed();
             var properties = context.getBean(FlywayProperties.class);
-            assertThat(properties.getLocations()).containsExactly("classpath:db/migration/identity", "classpath:db/migration/catalog");
+            assertThat(properties.getLocations()).containsExactly("classpath:db/migration/identity", "classpath:db/migration/catalog",
+                    "classpath:db/compat-vietqr");
             assertThat(properties.isOutOfOrder()).isFalse();
             assertThat(discoveredScripts(properties)).doesNotContain("V28__seed_demo_accounts.sql", "V29__seed_demo_classes_and_sessions.sql");
             assertThat(created).hasValue(1);
@@ -63,7 +64,7 @@ class DemoProfileSafetyConfigurationTest {
             assertThat(context).hasNotFailed();
             var properties = context.getBean(FlywayProperties.class);
             assertThat(properties.getLocations()).containsExactly("classpath:db/migration/identity",
-                    "classpath:db/migration/catalog", "classpath:db/demo");
+                    "classpath:db/migration/catalog", "classpath:db/compat-vietqr", "classpath:db/demo");
             assertThat(properties.isOutOfOrder()).isFalse();
             assertThat(discoveredScripts(properties)).contains("V27__refund_request_payment_link.sql", "V28__seed_demo_accounts.sql",
                     "V29__seed_demo_classes_and_sessions.sql");
