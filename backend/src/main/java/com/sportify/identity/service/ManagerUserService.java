@@ -21,7 +21,7 @@ public interface ManagerUserService {
     PageResponse<ManagerUserResponse> listUsers(String role, UserStatus status, String search, int page, int size);
 
     /**
-     * Creates a RECEPTIONIST, COACH or MANAGER account. A COACH also gets a coach profile and coach sport rows.
+     * Creates a RECEPTIONIST or COACH account. A COACH also gets a coach profile and coach sport rows.
      *
      * @throws com.sportify.core.exception.ConflictException     email or phone already used
      * @throws com.sportify.core.exception.BusinessRuleException unsupported role or invalid sport list
@@ -35,4 +35,6 @@ public interface ManagerUserService {
      * @throws com.sportify.core.exception.ResourceNotFoundException unknown user id
      */
     ManagerUserResponse changeStatus(Long userId, UserStatus status, UserAccount actor);
+
+    void resetMemberPassword(Long userId, UserAccount actor);
 }

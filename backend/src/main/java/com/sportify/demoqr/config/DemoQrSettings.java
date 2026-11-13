@@ -6,10 +6,22 @@ import java.util.Locale;
 
 /** Explicit configuration only; request Host headers and client origins never create links. */
 public record DemoQrSettings(String publicBaseUrl, long lifetimeSeconds) {
+    /** Local frontend used when no public HTTPS base is configured. */
+    public static final String LOCAL_FRONTEND_BASE = "http://localhost:5173/";
+
     public DemoQrSettings {
         lifetimeSeconds = validateLifetime(lifetimeSeconds);
-        URI uri = URI.create(publicBaseUrl);
-        publicBaseUrl = validate(publicBaseUrl, uri.getScheme() + "://" + uri.getRawAuthority());
+        if (publicBaseUrl == null || publicBaseUrl.isBlank()) publicBaseUrl = LOCAL_FRONTEND_BASE;
+        publicBaseUrl = publicBaseUrl.endsWith("/") ? publicBaseUrl : publicBaseUrl + "/";
+    }
+
+    /** Uses the strict public HTTPS base when it is valid, otherwise the local frontend. */
+    public static DemoQrSettings lenient(String base, String allowedOrigins, long seconds) {
+        try {
+            return new DemoQrSettings(base, allowedOrigins, false, seconds);
+        } catch (IllegalArgumentException ex) {
+            return new DemoQrSettings(base == null || base.isBlank() ? LOCAL_FRONTEND_BASE : base, 300);
+        }
     }
 
     public DemoQrSettings(String base, String allowedOrigins, boolean ignoredLegacyLanHttp, long seconds) {

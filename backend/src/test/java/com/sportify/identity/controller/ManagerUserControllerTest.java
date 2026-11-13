@@ -144,6 +144,23 @@ class ManagerUserControllerTest {
     }
 
     @Test
+    void resetPassword_requiresManager() throws Exception {
+        mockMvc.perform(post(BASE_URL + "/7/reset-password")).andExpect(status().isUnauthorized());
+        for (String token : List.of(COACH_TOKEN, RECEPTIONIST_TOKEN, MEMBER_TOKEN)) {
+            mockMvc.perform(post(BASE_URL + "/7/reset-password")
+                    .header(HttpHeaders.AUTHORIZATION, bearer(token))).andExpect(status().isForbidden());
+        }
+        verifyNoInteractions(managerUserService);
+    }
+
+    @Test
+    void resetPassword_asManager_callsService() throws Exception {
+        mockMvc.perform(post(BASE_URL + "/7/reset-password")
+                .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))).andExpect(status().isNoContent());
+        verify(managerUserService).resetMemberPassword(eq(7L), any(UserAccount.class));
+    }
+
+    @Test
     void changeStatus_withoutToken_shouldReturn401() throws Exception {
         mockMvc.perform(patch(BASE_URL + "/7/status").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"INACTIVE\"}"))
@@ -387,14 +404,14 @@ class ManagerUserControllerTest {
     @Test
     void create_memberRole_shouldReturn400() throws Exception {
         when(managerUserService.createStaffAccount(any(StaffAccountCreateRequest.class), any(UserAccount.class)))
-                .thenThrow(new BusinessRuleException("Role must be one of RECEPTIONIST, COACH, MANAGER"));
+                .thenThrow(new BusinessRuleException("Role must be one of RECEPTIONIST, COACH"));
 
         mockMvc.perform(post(BASE_URL)
                         .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_COACH_BODY.replace("\"COACH\"", "\"MEMBER\"")))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Role must be one of RECEPTIONIST, COACH, MANAGER"));
+                .andExpect(jsonPath("$.message").value("Role must be one of RECEPTIONIST, COACH"));
     }
 
     // ---------------------------------------------------------------------

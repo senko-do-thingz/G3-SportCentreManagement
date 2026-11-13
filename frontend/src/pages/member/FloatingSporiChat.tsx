@@ -99,7 +99,7 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
         <div ref={messageLog} className="spori-log" role="log" aria-live="polite" aria-relevant="additions">
           <div className={'spori-welcome' + (chat.messages.length ? ' is-compact' : '')}>
             <p className="spori-welcome__title">Hi there 👋</p>
-            <p className="spori-welcome__copy">I'm Spori. Ask me about classes, packages, or your own records — in English or Vietnamese.</p>
+            <p className="spori-welcome__copy">I'm Spori. Ask me about classes, packages, or your own records, in English or Vietnamese.</p>
           </div>
           {chat.messages.length === 0 && enabled && (
             <div className="spori-suggest" aria-label="Suggested questions">

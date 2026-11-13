@@ -149,7 +149,7 @@ function CenterConsultationWorkspace() {
             {!started && <div className="spori-hero">
               <SporiAvatar size="lg" />
               <h2>Hi, I'm Spori 👋</h2>
-              <p>Ask about classes, prices, or your own packages, bookings and homework — in English or Vietnamese.</p>
+              <p>Ask about classes, prices, or your own packages, bookings and homework, in English or Vietnamese.</p>
               <div className="spori-hero__grid" role="group" aria-label="Example questions">
                 {ASSISTANT_EXAMPLES.map(example => <button key={example.text} type="button" onClick={() => pickExample(example.text)}>
                   <span aria-hidden="true">{example.icon}</span>{example.text}

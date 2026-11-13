@@ -121,6 +121,10 @@
 .home-account .btn--secondary { color: #ffffff; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.55); }
 .home-account .btn--secondary:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); box-shadow: inset 0 0 0 1.5px #ffffff; }
 .home-account .user-menu, .home-account .user-menu__text, .home-account [role='status'] { color: #ffffff; }
+/* The hero header is always dark, so the signed-in name, role and Log out keep the navbar colors in every theme. */
+.home-account .user-menu__name, .home-account .user-menu__logout { color: var(--color-on-hero); }
+.home-account .user-menu__role { color: var(--color-on-hero-muted); }
+.home-account .user-menu__logout:hover { background: transparent; color: var(--color-on-hero); text-decoration: underline; }
 .home-menu-toggle { display: none; }
 
 /* Hero */
