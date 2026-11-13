@@ -105,6 +105,8 @@ export interface ActivityLog {
   entityType: string | null
   entityId: number | null
   shortDetail: string
+  previousStatus?: 'ACTIVE' | 'INACTIVE' | null
+  newStatus?: 'ACTIVE' | 'INACTIVE' | null
 }
 
 export interface ActivityQuery {
