@@ -40,7 +40,8 @@ class CatalogSchemaIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void seed_shouldContainSixSports() {
-        List<String> codes = jdbc.queryForList("SELECT code FROM sport ORDER BY id", String.class);
+        // Only the seeded rows: other integration tests sharing this database add their own sports later.
+        List<String> codes = jdbc.queryForList("SELECT TOP 6 code FROM sport ORDER BY id", String.class);
 
         assertThat(codes).containsExactly("FOOTBALL", "BADMINTON", "BASKETBALL", "VOLLEYBALL", "SWIMMING", "TENNIS");
     }

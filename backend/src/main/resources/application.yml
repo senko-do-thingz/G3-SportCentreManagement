@@ -63,10 +63,16 @@ app:
       # only from center data. Off by default; any failure uses the keyword rules. Only the question text, with
       # e-mail addresses and phone numbers removed, is sent. Private and health questions are never sent.
       enabled: ${AI_ASSISTANT_ENABLED:false}
-      # claude (ANTHROPIC_API_KEY) or gemini (GEMINI_API_KEY). Provider and model need CODEOWNER approval.
-      provider: ${AI_ASSISTANT_PROVIDER:claude}
+      # gemini (GEMINI_API_KEY, default) or claude (ANTHROPIC_API_KEY). Provider and model need CODEOWNER approval.
+      provider: ${AI_ASSISTANT_PROVIDER:gemini}
       model: ${AI_ASSISTANT_MODEL:claude-opus-5-5}
       gemini-model: ${AI_ASSISTANT_GEMINI_MODEL:gemini-flash-lite-latest}
+      reply:
+        # With AI on and provider gemini, Gemini also writes the chat reply from the center data the rules found
+        # (question text with e-mails and phone numbers removed, plus the open chat history). Private and health
+        # questions are still answered by the guard and never sent. Set false to keep only intent classification.
+        enabled: ${AI_ASSISTANT_REPLY_ENABLED:true}
+        gemini-model: ${AI_ASSISTANT_REPLY_GEMINI_MODEL:${AI_ASSISTANT_GEMINI_MODEL:gemini-flash-lite-latest}}
       timeout-seconds: ${AI_ASSISTANT_TIMEOUT_SECONDS:15}
   cors:
     # Comma separated list of origins allowed to call the API from a browser.
