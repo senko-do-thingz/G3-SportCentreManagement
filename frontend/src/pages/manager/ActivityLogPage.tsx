@@ -142,7 +142,7 @@ export function ActivityLogPage() {
       <p className="manager-activity__footnote">Activity records are read-only. Times use the center timezone (Asia/Ho_Chi_Minh). Only the safe fields returned by the activity service are shown.</p>
     </Card>
     {picking && <ActorPickerModal onClose={() => setPicking(false)} onSelect={(selectedActor) => { setActor(selectedActor); setPicking(false); setPage(0) }} />}
-    {selected && <Modal open title="Activity details" description="Full read-only audit metadata available for this event." onClose={() => setSelected(null)} footer={<Button variant="secondary" onClick={() => setSelected(null)}>Close</Button>}>
+    {selected && <Modal open title="Activity details" description="Read-only audit event details from verified safe fields." onClose={() => setSelected(null)} footer={<Button variant="secondary" onClick={() => setSelected(null)}>Close</Button>}>
       <div className="manager-activity__detail">
         <h3>Recorded event</h3>
         <p className="manager-detail-text">{selected.shortDetail || humanizeCode(selected.action)}. This action was recorded in the Sportify audit trail.</p>
@@ -156,12 +156,8 @@ export function ActivityLogPage() {
           { label: 'Audit action code', value: selected.action },
           { label: 'Target record type', value: selected.entityType ? humanizeCode(selected.entityType) : 'Not recorded' },
           { label: 'Target record ID', value: selected.entityId ?? 'Not recorded' },
-          ...(selected.previousStatus && selected.newStatus ? [
-            { label: 'Previous account status', value: selected.previousStatus },
-            { label: 'New account status', value: selected.newStatus },
-          ] : []),
         ]} />
-        <p className="manager-activity__footnote">Only verified audit fields are shown. Sensitive payloads, private account data and unrecorded before/after values are not exposed.</p>
+        <p className="manager-activity__footnote">Sensitive audit payloads and unverified before/after values are intentionally excluded. These are all the verified details available for this event.</p>
       </div>
     </Modal>}
   </div>
