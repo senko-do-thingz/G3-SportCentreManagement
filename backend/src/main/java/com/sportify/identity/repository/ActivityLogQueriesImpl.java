@@ -35,7 +35,8 @@ public class ActivityLogQueriesImpl implements ActivityLogQueries {
         Join<UserAccount, Role> role = actor.join("role", JoinType.LEFT);
         data.select(cb.construct(ActivityLogResponse.class, log.get("id"), log.get("createdAt"),
                 log.get("actor").get("id"), actor.get("fullName"), role.get("code"),
-                log.get("action"), log.get("entityType"), log.get("entityId")))
+                log.get("action"), log.get("entityType"), log.get("entityId"),
+                log.get("summary"), log.get("details")))
                 .where(predicates(filter, cb, log, actor))
                 .orderBy(cb.desc(log.get("createdAt")), cb.desc(log.get("id")));
         var page = PageRequest.of(filter.page(), filter.size());
