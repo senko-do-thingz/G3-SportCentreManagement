@@ -4,12 +4,12 @@
 
 | Item | Value |
 | --- | --- |
-| Source commit (`main`) | `4c0edb0153aa28ca3e1d9b185416c364b4afc3ee` (PR #339 merge) |
-| Capture date | 2026-11-13 (Asia/Ho_Chi_Minh, evening) |
+| Source commit (`main`) | `3235a9e562903a22312e664f986e308b71817ab2` (PR #341 merge) |
+| Capture date | 2026-11-13 (Asia/Ho_Chi_Minh, about 22:20) |
 | Browser | Chromium 141.0.7390.37 (Playwright 1.56.1, headless) |
 | Viewport | 1440 x 900, device scale factor 1, light theme, reduced motion |
 | Frontend | Vite dev server (`npm run dev`) on the source commit |
-| Backend | Spring Boot (`mvn spring-boot:run`, profile `dev`) on the local `sportify` SQL Server database, Flyway at V59. The backend process was started from `98ebca9c`; the only commits between `98ebca9c` and `4c0edb01` change two frontend CSS files, so the backend code is identical. |
+| Backend | Spring Boot (`mvn spring-boot:run`, profile `dev`) on the local `sportify` SQL Server database, Flyway at V59. The backend process was started from `98ebca9c`; the only commits between `98ebca9c` and `3235a9e5` change only frontend CSS files, so the backend code is identical. |
 | Screenshots | 65 |
 
 All screenshots are unedited browser captures of real application states. Nothing was retouched, mocked or stubbed: every value comes from the running backend and the `sportify` database. Each image is the visible 1440 x 900 viewport unless the file name says `Full-Page`.
@@ -191,9 +191,9 @@ These four questions were stored by the assistant like any other chat message. N
 
 ## Unavailable screens and limitations
 
-- **Member-Payment-Cancel-Dialog.png** - not captured. Member account Mai has no PENDING payment in the sportify database (only INV-1008, Paid); the pending-payment screens and the Cancel Payment dialog for a pending payment cannot be shown without creating a new payment.
 - **Member-Payment-Summary.png** - not captured. Member account Mai has no PENDING payment in the sportify database (only INV-1008, Paid); the pending-payment screens and the Cancel Payment dialog for a pending payment cannot be shown without creating a new payment.
 - **Member-Payment-VietQR-Instructions.png** - not captured. Member account Mai has no PENDING payment in the sportify database (only INV-1008, Paid); the pending-payment screens and the Cancel Payment dialog for a pending payment cannot be shown without creating a new payment.
+- **Member-Payment-Cancel-Dialog.png** - not captured. Member account Mai has no PENDING payment in the sportify database (only INV-1008, Paid); the pending-payment screens and the Cancel Payment dialog for a pending payment cannot be shown without creating a new payment.
 - The Member payments screens therefore show only a completed payment (`Member-Payments.png`, `Member-Receipt.png`). The VietQR payment flow is shown from the desk side (`Receptionist-Payment-QR-Display.png`).
 - Screens that need data that does not exist in `sportify` (for example a coach session open for first marking today) were not created for this evidence. Creating data was out of scope.
 - All people shown are demo accounts in the local `sportify` database. The Manager user list and the receptionist screens show their demo names, emails and phone numbers as stored. Please check that this is acceptable before you reuse those images in a public document.
