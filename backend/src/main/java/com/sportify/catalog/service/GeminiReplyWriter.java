@@ -144,8 +144,8 @@ class GeminiReplyWriter implements AssistantReplyWriter {
                 "generationConfig", Map.of(
                         "responseMimeType", "application/json",
                         "responseSchema", RESPONSE_SCHEMA,
-                        "temperature", 0.4,
-                        "maxOutputTokens", 1024));
+                        "temperature", 0.5,
+                        "maxOutputTokens", 2048));
         HttpResponse<String> response;
         try {
             String payload = json.writeValueAsString(body);
