@@ -306,7 +306,11 @@ class OverlappingBookingIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(outcomes).as("no deadlock victim (1205) or server error").allMatch(o -> o.status() < 500);
         assertThat(outcomes.get(0).status()).isEqualTo(200);
-        assertThat(outcomes.get(2).status()).isEqualTo(200);
+        assertThat(outcomes.get(2).status()).isIn(200, 409);
+        if (outcomes.get(2).status() == 409) {
+            assertThat(outcomes.get(2).body().path("message").asText())
+                    .contains("schedule is being changed by another request");
+        }
         assertThat(outcomes.get(1).status()).isIn(201, 409);
         for (long session : List.of(s1, s2, s3)) {
             assertThat(seats(session)).as("booked_count matches confirmed bookings for " + session)

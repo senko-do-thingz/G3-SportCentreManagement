@@ -15,7 +15,8 @@ import java.util.regex.Pattern;
 /**
  * Strict safety guard for local demo mode.
  * Enforces non-production profile, loopback server bind (127.0.0.1/localhost),
- * and throwaway database allowlist before any beans or database operations run.
+ * and loopback database checks before any beans or database operations run. The normal local
+ * development database is permitted only with the explicit local demo flag enabled.
  */
 @Configuration(proxyBeanMethods = false)
 public class LocalDemoSafetyGuard {
@@ -47,12 +48,13 @@ public class LocalDemoSafetyGuard {
             return;
         }
 
-        boolean profileActive = environment.matchesProfiles("local-demo");
         String flagValue = environment.getProperty("app.payment.local-demo.enabled");
         if (flagValue == null || flagValue.isBlank()) {
             flagValue = environment.getProperty("PAYMENT_LOCAL_DEMO_ENABLED");
         }
         boolean flagEnabled = "true".equalsIgnoreCase(flagValue);
+        boolean profileActive = environment.matchesProfiles("local-demo")
+                || environment.matchesProfiles("dev") && flagEnabled;
 
         if (!profileActive && !flagEnabled) {
             return;
@@ -64,8 +66,7 @@ public class LocalDemoSafetyGuard {
         }
 
         if (flagEnabled && !profileActive) {
-            throw new IllegalStateException("Local demo mode flag is enabled but local-demo profile is not active. "
-                    + "Activate the local-demo profile explicitly.");
+            throw new IllegalStateException("Local demo mode flag is enabled outside an allowed local profile.");
         }
 
         // 2. Server loopback bind invariants
@@ -133,12 +134,16 @@ public class LocalDemoSafetyGuard {
         }
 
         String normalizedDb = dbName.toLowerCase(Locale.ROOT);
-        if (normalizedDb.equals("sportify")) {
+        boolean localDevDatabase = normalizedDb.equals("sportify")
+                && environment.matchesProfiles("dev") && flagEnabled;
+        if (normalizedDb.equals("sportify") && !localDevDatabase) {
             throw new IllegalStateException("Local demo mode strictly forbids running against the default 'sportify' database. "
-                    + "Configure an approved throwaway database such as 'sportify_qr_demo'.");
+                    + "Enable the guarded dev-only local demo flag while the server and database remain loopback-bound, "
+                    + "or configure an approved throwaway database such as 'sportify_qr_demo'.");
         }
 
-        if (!ALLOWED_DEMO_DATABASES.contains(normalizedDb) && !normalizedDb.matches("sportify_qr04_test_[0-9]{14}")) {
+        if (!localDevDatabase && !ALLOWED_DEMO_DATABASES.contains(normalizedDb)
+                && !normalizedDb.matches("sportify_qr04_test_[0-9]{14}")) {
             throw new IllegalStateException("Local demo mode rejected database '" + dbName
                     + "'. Only approved throwaway databases (" + ALLOWED_DEMO_DATABASES + ") are permitted.");
         }

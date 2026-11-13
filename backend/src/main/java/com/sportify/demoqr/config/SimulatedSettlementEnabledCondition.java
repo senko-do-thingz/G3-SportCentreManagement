@@ -7,8 +7,8 @@ import org.springframework.core.type.AnnotatedTypeMetadata;
 
 /**
  * Condition guarding simulated QR components: active only when non-production AND
- * either the qr-simulator profile is active with simulator enabled, OR the local-demo
- * profile is active with local-demo enabled.
+ * either the qr-simulator profile is active with simulator enabled, OR a non-production
+ * local-demo/dev profile is active with local-demo enabled.
  */
 public class SimulatedSettlementEnabledCondition implements Condition {
 
@@ -25,9 +25,10 @@ public class SimulatedSettlementEnabledCondition implements Condition {
         boolean qrSimActive = env.matchesProfiles("qr-simulator")
                 && "true".equalsIgnoreCase(env.getProperty("app.payment.simulator.enabled"));
 
-        boolean localDemoActive = env.matchesProfiles("local-demo")
-                && ("true".equalsIgnoreCase(env.getProperty("app.payment.local-demo.enabled"))
-                || "true".equalsIgnoreCase(env.getProperty("PAYMENT_LOCAL_DEMO_ENABLED")));
+        boolean localDemoEnabled = "true".equalsIgnoreCase(env.getProperty("app.payment.local-demo.enabled"))
+                || "true".equalsIgnoreCase(env.getProperty("PAYMENT_LOCAL_DEMO_ENABLED"));
+        boolean localDemoActive = localDemoEnabled
+                && (env.matchesProfiles("local-demo") || env.matchesProfiles("dev"));
 
         return qrSimActive || localDemoActive || UnifiedDemoSafetyGuard.isEnabled(env);
     }

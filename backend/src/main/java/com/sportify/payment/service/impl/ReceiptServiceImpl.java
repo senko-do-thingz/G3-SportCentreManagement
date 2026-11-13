@@ -152,6 +152,7 @@ public class ReceiptServiceImpl implements ReceiptService {
                 .referenceCode(payment.getReferenceCode())
                 .settlementType(payment.getSettlementType())
                 .settlementProvider(payment.getSettlementProvider())
+                .settlementEnvironment(payment.getVietQrEnvironment())
                 .simulatedTransactionId(payment.getSimulatedTransactionId())
                 .invoiceId(invoice != null ? invoice.getId() : null)
                 .invoiceNumber(invoice != null ? invoice.getInvoiceNumber() : null)

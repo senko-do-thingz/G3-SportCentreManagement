@@ -35,6 +35,7 @@ public class PaymentResponse {
     private String referenceCode;
     private String settlementType;
     private String settlementProvider;
+    private String settlementEnvironment;
     private Long simulatedTransactionId;
     private Long invoiceId;
     private String invoiceNumber;

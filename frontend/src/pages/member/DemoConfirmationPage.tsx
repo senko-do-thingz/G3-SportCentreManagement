@@ -9,7 +9,7 @@ import { PaymentWorkspace } from '../../components/PaymentWorkspace'
 import { DemoSessionSummary } from '../../components/qr/DemoSessionSummary'
 import { Button, Card, Input, PasswordInput } from '../../components/ui'
 import { ThemeToggle } from '../../theme/ThemeToggle'
-import { qrPaymentDemoEnabled } from '../../config/env'
+import { qrPaymentDemoFlag } from '../../config/env'
 import '../../components/qr/demoSession.css'
 
 import { confirmationToken } from '../../components/qr/confirmationLink'
@@ -18,9 +18,9 @@ export function DemoConfirmationPage() {
   const location = useLocation()
   const navigate = useNavigate()
   useLayoutEffect(() => {
-    if (!qrPaymentDemoEnabled() && location.hash) navigate({ pathname: location.pathname, search: '', hash: '' }, { replace: true, state: null })
+    if (qrPaymentDemoFlag() === false && location.hash) navigate({ pathname: location.pathname, search: '', hash: '' }, { replace: true, state: null })
   }, [location.hash, location.pathname, navigate])
-  if (!qrPaymentDemoEnabled()) return <DemoConfirmationDisabled />
+  if (qrPaymentDemoFlag() === false) return <DemoConfirmationDisabled />
   return <DemoConfirmationContent />
 }
 

@@ -50,6 +50,7 @@ public class StaffPaymentResponse {
 
     private String settlementType;
     private String settlementProvider;
+    private String settlementEnvironment;
     private Long simulatedTransactionId;
 
     private LocalDateTime createdAt;

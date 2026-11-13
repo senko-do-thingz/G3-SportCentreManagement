@@ -41,6 +41,7 @@ final class InvoiceResponseMapper {
                 .paymentTime(payment != null ? payment.getPaymentTime() : null)
                 .settlementType(payment != null ? payment.getSettlementType() : null)
                 .settlementProvider(payment != null ? payment.getSettlementProvider() : null)
+                .settlementEnvironment(payment != null ? payment.getVietQrEnvironment() : null)
                 .simulatedTransactionId(payment != null ? payment.getSimulatedTransactionId() : null)
                 .memberId(member != null ? member.getId() : null)
                 .memberCode(member != null ? member.getMemberCode() : null)

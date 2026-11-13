@@ -15,11 +15,10 @@ export const PAYMENT_STATUSES = ['PENDING', 'SUCCESS', 'FAILED', 'CANCELLED', 'R
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number]
 
 /**
- * Methods a member may choose online: PaymentService.ONLINE_ALLOWED_PAYMENT_METHODS. CASH is
- * staff only and is rejected with a 400 for a member.
+ * Methods a member may choose at checkout: bank transfer QR or cash at reception.
  */
-export const ONLINE_PAYMENT_METHODS = ['BANK_TRANSFER'] as const
-export type OnlinePaymentMethod = (typeof ONLINE_PAYMENT_METHODS)[number]
+export const MEMBER_PAYMENT_METHODS = ['BANK_TRANSFER', 'CASH'] as const
+export type MemberPaymentMethod = (typeof MEMBER_PAYMENT_METHODS)[number]
 
 /** Mirrors com.sportify.payment.dto.BankTransferInstructions. */
 export interface BankTransferInstructions {
@@ -27,6 +26,8 @@ export interface BankTransferInstructions {
   accountNumber: string | null
   bank: string | null
   transferContent: string | null
+  payable?: boolean | null
+  notice?: string | null
 }
 
 /** Mirrors com.sportify.payment.dto.PaymentResponse (GET /payments/{id}). */
@@ -56,7 +57,24 @@ export interface Payment {
   referenceCode?: string | null
   settlementType?: string | null
   settlementProvider?: string | null
+  settlementEnvironment?: string | null
   simulatedTransactionId?: number | null
+}
+
+export interface VietQrInstructions {
+  paymentId: number
+  paymentCode: string
+  payable: boolean
+  notice: string
+  bankBin: string | null
+  bankName: string | null
+  accountNumber: string | null
+  accountName: string | null
+  amount: number | string
+  currency: string
+  transferReference: string | null
+  qrPayload: string | null
+  requiresStaffConfirmation: boolean
 }
 
 /** BE-20 InvoiceLineResponse. */
@@ -91,6 +109,7 @@ export interface Invoice {
   issueDate: string | null
   settlementType?: string | null
   settlementProvider?: string | null
+  settlementEnvironment?: string | null
   simulatedTransactionId?: number | null
   lines?: InvoiceLine[] | null
 }
@@ -104,6 +123,14 @@ function asPayment(value: unknown): Payment {
     throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
   }
   return value as unknown as Payment
+}
+
+function asVietQrInstructions(value: unknown): VietQrInstructions {
+  if (!isObject(value) || typeof value.paymentId !== 'number' || typeof value.payable !== 'boolean'
+      || typeof value.notice !== 'string' || typeof value.requiresStaffConfirmation !== 'boolean') {
+    throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+  }
+  return value as unknown as VietQrInstructions
 }
 
 /** Require pagination metadata rather than silently treating a partial result as all payments. */
@@ -152,6 +179,11 @@ export const paymentsApi = {
   /** PUT /payments/{id}/method with {paymentMethod}; only a PENDING payment can change. */
   updateMethod(paymentId: number, paymentMethod: string): Promise<Payment> {
     return api.put<unknown>(`/payments/${paymentId}/method`, { paymentMethod }).then(asPayment)
+  },
+
+  /** Returns an offline-generated VietQR transfer payload for the configured beneficiary. */
+  vietQrInstructions(paymentId: number, options: RequestSignal = {}): Promise<VietQrInstructions> {
+    return api.get<unknown>(`/payments/${paymentId}/vietqr-instructions`, options).then(asVietQrInstructions)
   },
 
   /** BE-20: zero-based page, size 1..100; omit status for All. */

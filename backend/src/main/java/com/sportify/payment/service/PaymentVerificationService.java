@@ -13,6 +13,7 @@ import com.sportify.payment.entity.PaymentStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * Front desk payment verification (Flow 3: F3-04 Payment Requests, F3-05 Verify and Record Payment,
@@ -35,6 +36,10 @@ public interface PaymentVerificationService {
      * A different amount answers 409 PAYMENT_AMOUNT_MISMATCH, keeps the payment PENDING and records a note.
      */
     StaffPaymentResponse confirmPayment(Long paymentId, ConfirmPaymentRequest request, UserAccount actor);
+
+    /** Settles a pending bank-transfer payment from VietQR; sandbox settlements remain marked simulated. */
+    Invoice confirmVietQrPayment(Long paymentId, String referenceNumber, String transactionId,
+                                 LocalDateTime transactionTime, String environment);
 
     /**
      * Receipt of a payment that has just become SUCCESS: issues the PAID invoice with its line and writes the

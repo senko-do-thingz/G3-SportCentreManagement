@@ -2,7 +2,8 @@
  * Pure provenance classification helper for Reception payments, invoices, and receipts.
  * Strictly guarantees truthful presentation of settlement provenance:
  * - VALID_SIMULATED: explicit simulated settlement label, warning banner, excluded from real cash.
- *   Strictly requires settlementType = 'SIMULATED', provider = 'SPORTIFY_SIMULATOR', and positive txId.
+ *   This includes Sportify simulator records with a transaction row, VietQR gateway sandbox records and
+ *   local VietQR demo records (provider LOCAL_DEMO, environment SANDBOX).
  * - ACTUAL: truthful actual settlement presentation where supported by provider data.
  * - LEGACY_UNVERIFIED: explicit 'Legacy unverified' classification for records with NULL/missing provenance.
  * - INCONSISTENT: explicit unverified/inconsistent classification for contradictory metadata.
@@ -25,7 +26,29 @@ export interface ProvenanceSubject {
   paymentStatus?: string | null
   settlementType?: string | null
   settlementProvider?: string | null
+  settlementEnvironment?: string | null
   simulatedTransactionId?: number | null
+}
+
+/** VietQR sandbox settlements: the gateway sandbox (GATEWAY) and the guarded local demo (LOCAL_DEMO). */
+const VIETQR_SANDBOX_PROVIDERS = ['GATEWAY', 'LOCAL_DEMO']
+
+function isVietQrSandbox(subject: ProvenanceSubject, provider: string, txId: number | null | undefined): boolean {
+  return VIETQR_SANDBOX_PROVIDERS.includes(provider)
+    && (subject.settlementEnvironment ?? '').trim().toUpperCase() === 'SANDBOX'
+    && txId == null
+}
+
+function simulatedProvenanceLabel(provider: string): string {
+  if (provider === 'GATEWAY') return 'SIMULATED (VIETQR SANDBOX)'
+  if (provider === 'LOCAL_DEMO') return 'SIMULATED (VIETQR LOCAL DEMO)'
+  return 'SIMULATED (SPORTIFY_SIMULATOR)'
+}
+
+function simulatedWarning(provider: string): string {
+  if (provider === 'GATEWAY') return 'VIETQR SANDBOX - The local test transaction did not move real money.'
+  if (provider === 'LOCAL_DEMO') return 'VIETQR LOCAL DEMO - Completed in local demo mode. No real money was moved.'
+  return 'SIMULATED SETTLEMENT - Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.'
 }
 
 export interface ProvenancePresentation {
@@ -73,7 +96,8 @@ export function classifyProvenance(
 
     // Refunded genuine ACTUAL settlement
     if (type === 'ACTUAL') {
-      if (provider === 'SPORTIFY_SIMULATOR' || txId != null) {
+      if (provider === 'SPORTIFY_SIMULATOR' || txId != null
+          || (subject.settlementEnvironment ?? '').trim().toUpperCase() === 'SANDBOX') {
         return {
           classification: 'INCONSISTENT',
           statusBadgeLabel: 'Refunded - Inconsistent provenance',
@@ -107,20 +131,19 @@ export function classifyProvenance(
 
     // Refunded genuine SIMULATED settlement
     if (type === 'SIMULATED') {
-      if (provider === 'SPORTIFY_SIMULATOR' && hasValidTxId) {
+      if ((provider === 'SPORTIFY_SIMULATOR' && hasValidTxId) || isVietQrSandbox(subject, provider, txId)) {
         return {
           classification: 'REFUNDED',
           statusBadgeLabel: 'Refunded',
           statusBadgeTone: 'neutral',
-          provenanceLabel: 'SIMULATED (SPORTIFY_SIMULATOR)',
+          provenanceLabel: simulatedProvenanceLabel(provider),
           isVerifiedActual: false,
           isSimulatedSuccess: true,
           isLegacyUnverified: false,
           isInconsistent: false,
           canPrintReceipt: true,
           receiptHeroDescription: 'This payment was refunded to the member.',
-          receiptWarningMessage:
-            'SIMULATED SETTLEMENT - Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.',
+          receiptWarningMessage: simulatedWarning(provider),
           receiptWarningTone: 'warning',
         }
       }
@@ -249,20 +272,19 @@ export function classifyProvenance(
     // Case 1: Valid Simulated Settlement
     // Strictly requires settlementType = 'SIMULATED', provider = 'SPORTIFY_SIMULATOR', and valid positive txId
     if (type === 'SIMULATED') {
-      if (provider === 'SPORTIFY_SIMULATOR' && hasValidTxId) {
+      if ((provider === 'SPORTIFY_SIMULATOR' && hasValidTxId) || isVietQrSandbox(subject, provider, txId)) {
         return {
           classification: 'VALID_SIMULATED',
           statusBadgeLabel: 'Paid - Simulated',
           statusBadgeTone: 'success',
-          provenanceLabel: 'SIMULATED (SPORTIFY_SIMULATOR)',
+          provenanceLabel: simulatedProvenanceLabel(provider),
           isVerifiedActual: false,
           isSimulatedSuccess: true,
           isLegacyUnverified: false,
           isInconsistent: false,
           canPrintReceipt: true,
           receiptHeroDescription: 'Simulated payment record - no real money was transferred.',
-          receiptWarningMessage:
-            'SIMULATED SETTLEMENT - Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.',
+          receiptWarningMessage: simulatedWarning(provider),
           receiptWarningTone: 'warning',
         }
       }
@@ -286,7 +308,8 @@ export function classifyProvenance(
     // Case 2: Actual Settlement
     // Strictly requires settlementType = 'ACTUAL' and NO simulated provider or transaction ID
     if (type === 'ACTUAL') {
-      if (provider === 'SPORTIFY_SIMULATOR' || txId != null) {
+      if (provider === 'SPORTIFY_SIMULATOR' || txId != null
+          || (subject.settlementEnvironment ?? '').trim().toUpperCase() === 'SANDBOX') {
         return {
           classification: 'INCONSISTENT',
           statusBadgeLabel: 'Paid - Inconsistent provenance',
@@ -492,6 +515,17 @@ export function reconcileProvenance(
           'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting settlement providers.',
         )
       }
+      if (VIETQR_SANDBOX_PROVIDERS.includes(invProv)) {
+        const invEnv = (invoiceSubject.settlementEnvironment ?? '').trim().toUpperCase()
+        const payEnv = (paymentSubject.settlementEnvironment ?? '').trim().toUpperCase()
+        if (invEnv !== 'SANDBOX' || payEnv !== 'SANDBOX' || invTx !== null || payTx !== null) {
+          return buildInconsistentPresentation(
+            true,
+            'INCONSISTENT PROVENANCE - VietQR sandbox settlement details do not match.',
+          )
+        }
+        return invoicePres
+      }
       if (invTx === null || payTx === null || invTx !== payTx) {
         return buildInconsistentPresentation(
           true,
@@ -518,6 +552,26 @@ export function reconcileProvenance(
   }
 
   if (invoicePres.classification === 'VALID_SIMULATED') {
+    const invProvider = (invoiceSubject.settlementProvider ?? '').trim().toUpperCase()
+    const payProvider = (paymentSubject.settlementProvider ?? '').trim().toUpperCase()
+    if (invProvider !== payProvider) {
+      return buildInconsistentPresentation(
+        isRefund,
+        'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting settlement providers.',
+      )
+    }
+    if (VIETQR_SANDBOX_PROVIDERS.includes(invProvider)) {
+      const invEnv = (invoiceSubject.settlementEnvironment ?? '').trim().toUpperCase()
+      const payEnv = (paymentSubject.settlementEnvironment ?? '').trim().toUpperCase()
+      if (invEnv !== 'SANDBOX' || payEnv !== 'SANDBOX'
+          || invoiceSubject.simulatedTransactionId != null || paymentSubject.simulatedTransactionId != null) {
+        return buildInconsistentPresentation(
+          isRefund,
+          'INCONSISTENT PROVENANCE - VietQR sandbox settlement details do not match.',
+        )
+      }
+      return invoicePres
+    }
     const invTx = invoiceSubject.simulatedTransactionId
     const payTx = paymentSubject.simulatedTransactionId
     if (invTx !== payTx) {

@@ -68,6 +68,24 @@ public class Payment {
     @Column(name = "simulated_transaction_id")
     private Long simulatedTransactionId;
 
+    @Column(name = "vietqr_order_id", length = 13)
+    private String vietQrOrderId;
+
+    @Column(name = "vietqr_content", length = 23)
+    private String vietQrContent;
+
+    @Column(name = "vietqr_qr_code", length = 1500)
+    private String vietQrQrCode;
+
+    @Column(name = "vietqr_qr_link", length = 2048)
+    private String vietQrQrLink;
+
+    @Column(name = "vietqr_transaction_id", length = 100)
+    private String vietQrTransactionId;
+
+    @Column(name = "vietqr_environment", length = 12)
+    private String vietQrEnvironment;
+
     @Version
     @Column(name = "version", nullable = false)
     private Integer version;

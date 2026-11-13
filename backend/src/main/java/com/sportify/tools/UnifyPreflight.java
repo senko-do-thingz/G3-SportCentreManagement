@@ -32,14 +32,14 @@ public final class UnifyPreflight {
         String database = jdbc.queryForObject("SELECT DB_NAME()", String.class);
         require(!disposableDemo || database.matches("sportify_unify_test_[0-9]{14}(?:_[a-z0-9]+)?"), "DEMO_HISTORY_REQUIRES_DISPOSABLE_TARGET");
         var locations = disposableDemo
-                ? new String[]{"classpath:db/migration/identity", "classpath:db/migration/catalog", "classpath:db/demo"}
-                : new String[]{"classpath:db/migration/identity", "classpath:db/migration/catalog"};
+                ? new String[]{"classpath:db/migration/identity", "classpath:db/migration/catalog", "classpath:db/compat-vietqr", "classpath:db/demo"}
+                : new String[]{"classpath:db/migration/identity", "classpath:db/migration/catalog", "classpath:db/compat-vietqr"};
         var flyway = Flyway.configure().dataSource(source).locations(locations).cleanDisabled(true)
                 .outOfOrder(false).baselineOnMigrate(false).ignoreMigrationPatterns(new String[0]).load();
         // validate and info only: never migrate, baseline, repair or clean.
         require(flyway.validateWithResult().validationSuccessful, "FLYWAY_HISTORY_MISMATCH");
-        require(flyway.info().current() != null && "59".equals(flyway.info().current().getVersion().toString())
-                && flyway.info().pending().length == 0, "V59_REQUIRED");
+        require(flyway.info().current() != null && "62".equals(flyway.info().current().getVersion().toString())
+                && flyway.info().pending().length == 0, "V62_REQUIRED");
         require(zero(jdbc, "SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0 AND schema_id<>SCHEMA_ID('dbo')"), "UNDECLARED_SCHEMA");
         require(zero(jdbc, "SELECT COUNT(*) FROM sys.foreign_keys WHERE is_disabled=1 OR is_not_trusted=1"), "FOREIGN_KEY_DRIFT");
         require(zero(jdbc, "SELECT COUNT(*) FROM sys.check_constraints WHERE is_disabled=1 OR is_not_trusted=1"), "CHECK_CONSTRAINT_DRIFT");

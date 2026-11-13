@@ -21,9 +21,9 @@ export const PAYMENT_PATHS = {
 } as const
 
 /**
- * Methods a member can pay with online today. Only BANK_TRANSFER is supported online.
+ * Methods a member can choose at checkout. Bank transfer uses the VietQR code; cash is paid at reception.
  */
-export const AVAILABLE_ONLINE_METHODS: readonly string[] = ['BANK_TRANSFER']
+export const AVAILABLE_ONLINE_METHODS: readonly string[] = ['BANK_TRANSFER', 'CASH']
 
 /** Method preselected on the summary; Continue switches any other method to it. */
 export const DEFAULT_PAYMENT_METHOD = 'BANK_TRANSFER'
@@ -66,7 +66,10 @@ export function isSimulatedSettlement(item: { settlementType?: string | null } |
   return item?.settlementType === 'SIMULATED'
 }
 
-/** "Paid" for SUCCESS, as in Figma F3-03; "Paid - Simulated" when settled via Sportify QR simulator. */
+/**
+ * "Paid" for SUCCESS, as in Figma F3-03; "Paid - Simulated" for any simulated settlement: the Sportify QR simulator,
+ * a VietQR gateway sandbox callback or the local VietQR demo. No real money moved in any of them.
+ */
 export function paymentStatusLabel(status: string | null | undefined, settlementType?: string | null): string {
   if (!status) {
     return 'Unknown'
@@ -75,6 +78,22 @@ export function paymentStatusLabel(status: string | null | undefined, settlement
     return 'Paid - Simulated'
   }
   return STATUS_LABELS[status] ?? status
+}
+
+type SettlementSource = { settlementProvider?: string | null }
+
+/** Provenance line for a simulated settlement, named after where it was simulated. */
+export function simulatedProvenanceLabel(item: SettlementSource): string {
+  if (item.settlementProvider === 'GATEWAY') return 'SIMULATED (VIETQR SANDBOX)'
+  if (item.settlementProvider === 'LOCAL_DEMO') return 'SIMULATED (VIETQR LOCAL DEMO)'
+  return `SIMULATED (${item.settlementProvider ?? 'SPORTIFY_SIMULATOR'})`
+}
+
+/** Where a simulated settlement came from, always stating that no real money moved. */
+export function simulatedSettlementSource(item: SettlementSource): string {
+  if (item.settlementProvider === 'GATEWAY') return 'Completed by a VietQR sandbox test transaction. No real money was moved.'
+  if (item.settlementProvider === 'LOCAL_DEMO') return 'Completed in VietQR local demo mode. No real money was moved.'
+  return 'Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.'
 }
 
 /** Code given to StatusBadge so that SUCCESS gets the green tone of PAID. */

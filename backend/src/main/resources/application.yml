@@ -29,7 +29,7 @@ spring:
 
   flyway:
     enabled: true
-    locations: classpath:db/migration/identity,classpath:db/migration/catalog
+    locations: classpath:db/migration/identity,classpath:db/migration/catalog,classpath:db/compat-vietqr
     clean-disabled: true
     out-of-order: false
     validate-on-migrate: true
@@ -98,6 +98,17 @@ app:
       account-name: ${SPORTIFY_PAYMENT_ACCOUNT_NAME}
       account-number: ${SPORTIFY_PAYMENT_ACCOUNT_NUMBER}
       bank: ${SPORTIFY_PAYMENT_BANK}
+    vietqr:
+      enabled: ${VIETQR_ENABLED:false}
+      environment: ${VIETQR_ENVIRONMENT:sandbox}
+      local-callback-fallback: ${VIETQR_LOCAL_CALLBACK_FALLBACK:false}
+      api-username: ${VIETQR_API_USERNAME:}
+      api-password: ${VIETQR_API_PASSWORD:}
+      bank-code: ${VIETQR_BANK_CODE:}
+      callback-username: ${VIETQR_CALLBACK_USERNAME:}
+      callback-password: ${VIETQR_CALLBACK_PASSWORD:}
+      callback-jwt-secret: ${VIETQR_CALLBACK_JWT_SECRET:}
+      callback-token-ttl-seconds: ${VIETQR_CALLBACK_TOKEN_TTL_SECONDS:300}
 
 management:
   endpoints:

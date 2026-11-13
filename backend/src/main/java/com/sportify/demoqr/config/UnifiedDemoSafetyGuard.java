@@ -20,7 +20,7 @@ public class UnifiedDemoSafetyGuard {
     public static final String ENABLED = "app.payment.unified-demo.enabled";
     public static final String TEST_ENABLED = "app.payment.unified-demo.test-enabled";
     public static final String MEMBER_IDS = "app.payment.unified-demo.member-ids";
-    private static final String LOCATIONS = "classpath:db/migration/identity,classpath:db/migration/catalog";
+    private static final String LOCATIONS = "classpath:db/migration/identity,classpath:db/migration/catalog,classpath:db/compat-vietqr";
     private static final Pattern URL = Pattern.compile(
             "jdbc:sqlserver://(127\\.0\\.0\\.1|\\[::1\\]):([0-9]{1,5});databaseName=([a-z0-9_]+)"
             + ";encrypt=(true|false);trustServerCertificate=(true|false)");

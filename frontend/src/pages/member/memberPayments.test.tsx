@@ -47,6 +47,26 @@ function paymentsBackend(options: Options = {}) {
       index += 1
       return answer instanceof Response ? answer.clone() : json(200, answer)
     }
+    if (call.path === '/payments/52/vietqr-instructions') {
+      const answer = answers[Math.max(0, Math.min(index - 1, answers.length - 1))]
+      if (answer instanceof Response) return backendError(404, 'Payment not found')
+      const transfer = answer.bankTransferInstructions
+      return json(200, {
+        paymentId: answer.id,
+        paymentCode: answer.code,
+        payable: true,
+        notice: 'Transfer instructions only. Staff must verify actual receipt before confirming payment.',
+        bankBin: '970416',
+        bankName: transfer?.bank ?? 'Demo Bank',
+        accountNumber: transfer?.accountNumber ?? '0123456789',
+        accountName: transfer?.accountName ?? 'SPORTIFY CENTER',
+        amount: answer.amount,
+        currency: 'VND',
+        transferReference: transfer?.transferContent ?? answer.code,
+        qrPayload: '000201010212',
+        requiresStaffConfirmation: true,
+      })
+    }
     if (call.path === '/payments/52/method' && call.method === 'PUT') {
       return options.onMethod
         ? options.onMethod(call)
@@ -140,26 +160,22 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
     expect(calls.some((call) => call.method === 'PUT')).toBe(false)
   })
 
-  it('TC-FE11-005 only bank transfer is offered online; a non-bank-transfer payment is switched to bank transfer by Continue', async () => {
+  it('TC-FE11-005 Cash stays selected at checkout and directs the member to reception', async () => {
     const user = userEvent.setup()
-    const { calls } = paymentsBackend({
-      payments: [payment({ method: 'CASH', bankTransferInstructions: null }), payment()],
-    })
+    const { calls } = paymentsBackend({ payments: [payment({ method: 'CASH', bankTransferInstructions: null })] })
     renderApp('/member/payments/52')
     const order = await screen.findByRole('region', { name: 'Order summary' })
-    expect(within(order).getByRole('radio', { name: 'Bank transfer' })).toBeChecked()
-    expect(within(order).getAllByRole('radio')).toHaveLength(1)
+    expect(within(order).getByRole('radio', { name: 'Cash' })).toBeChecked()
+    expect(within(order).getAllByRole('radio')).toHaveLength(2)
     for (const unsupported of ['MoMo', 'VNPay', 'ZaloPay', 'Credit card']) {
       expect(within(order).queryByRole('radio', { name: unsupported })).not.toBeInTheDocument()
     }
 
     await user.click(within(order).getByRole('button', { name: 'Continue to payment' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Payment Instructions and Status' })).toBeInTheDocument()
-    const put = calls.filter((call) => call.method === 'PUT')
-    expect(put).toHaveLength(1)
-    expect(put[0].path).toBe('/payments/52/method')
-    expect(put[0].body).toEqual({ paymentMethod: 'BANK_TRANSFER' })
-    expect(await screen.findByRole('region', { name: 'Bank transfer' })).toHaveTextContent('0123456789')
+    expect(calls.some((call) => call.method === 'PUT')).toBe(false)
+    expect(await screen.findByRole('region', { name: 'Payment instructions' }))
+      .toHaveTextContent('Pay at reception with this payment reference')
   })
 
   it('TC-FE11-006 a rejected method change shows the backend message and stays on the summary', async () => {
@@ -170,6 +186,7 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
     })
     renderApp('/member/payments/52')
     const order = await screen.findByRole('region', { name: 'Order summary' })
+    await user.click(within(order).getByRole('radio', { name: 'Bank transfer' }))
     await user.click(within(order).getByRole('button', { name: 'Continue to payment' }))
     const alert = await within(order).findByRole('alert')
     expect(alert).toHaveTextContent('Only pending payments can have their payment method updated')
@@ -912,11 +929,15 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     expect(screen.queryByRole('button', { name: 'Print receipt' })).not.toBeInTheDocument()
   })
 
-  it('QR-05 displays Paid - Simulated and explicit simulation provenance across summary, history and receipt', async () => {
+  it.each([
+    ['SPORTIFY_SIMULATOR', 52, 'SIMULATED (SPORTIFY_SIMULATOR)', 'Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.'],
+    ['LOCAL_DEMO', null, 'SIMULATED (VIETQR LOCAL DEMO)', 'Completed in VietQR local demo mode. No real money was moved.'],
+  ])('QR-05 shows Paid - Simulated and the %s provenance on summary, status, history and receipt', async (provider, txId, provenance, source) => {
     const simulatedPayment = payment({
       status: 'SUCCESS',
       settlementType: 'SIMULATED',
-      settlementProvider: 'SPORTIFY_SIMULATOR',
+      settlementProvider: provider,
+      settlementEnvironment: provider === 'LOCAL_DEMO' ? 'SANDBOX' : null,
       referenceCode: 'SIM-QR-52-00000052',
       invoiceId: 7,
       invoiceNumber: 'INV-0007',
@@ -924,8 +945,9 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     })
     const simulatedInvoice = invoice({
       settlementType: 'SIMULATED',
-      settlementProvider: 'SPORTIFY_SIMULATOR',
-      simulatedTransactionId: 52,
+      settlementProvider: provider,
+      settlementEnvironment: provider === 'LOCAL_DEMO' ? 'SANDBOX' : null,
+      simulatedTransactionId: txId,
       paymentReference: 'SIM-QR-52-00000052',
     })
     paymentsBackend({
@@ -936,10 +958,15 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
 
     const summary = renderApp('/member/payments/52')
     expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
-    expect(screen.getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeInTheDocument()
+    expect(screen.getByText(provenance)).toBeInTheDocument()
     expect(screen.getByText('SIM-QR-52-00000052')).toBeInTheDocument()
     expect(screen.getByText('Paid (Simulated) with: Bank transfer')).toBeInTheDocument()
     summary.unmount()
+
+    const status = renderApp('/member/payments/52/status')
+    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
+    expect(screen.getByText(`Settled in simulation only. ${source}`)).toBeInTheDocument()
+    status.unmount()
 
     const history = renderApp('/member/payments')
     expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
@@ -948,8 +975,8 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
 
     renderApp('/member/payments/receipts/7')
     const receipt = await screen.findByRole('region', { name: 'Receipt INV-0007' })
-    expect(within(receipt).getByText(/SIMULATED SETTLEMENT - Completed via Sportify QR Simulator/)).toBeInTheDocument()
-    expect(within(receipt).getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeInTheDocument()
+    expect(within(receipt).getByText(`SIMULATED SETTLEMENT - ${source}`)).toBeInTheDocument()
+    expect(within(receipt).getByText(provenance)).toBeInTheDocument()
     expect(within(receipt).getByText('Paid - Simulated')).toBeInTheDocument()
   })
 })

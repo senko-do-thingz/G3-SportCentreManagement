@@ -170,6 +170,43 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         return toResponse(payment, refreshed, invoice);
     }
 
+    @Override
+    @Transactional
+    public Invoice confirmVietQrPayment(Long paymentId, String referenceNumber, String transactionId,
+                                        LocalDateTime transactionTime, String environment) {
+        boolean sandbox = "SANDBOX".equalsIgnoreCase(environment);
+        if (!sandbox && !"PRODUCTION".equalsIgnoreCase(environment)) {
+            throw new BusinessRuleException("VietQR settlement environment must be SANDBOX or PRODUCTION");
+        }
+        Payment payment = lockPayment(paymentId);
+        requirePending(payment, "confirmed");
+        if (payment.getPaymentMethod() != PaymentMethod.BANK_TRANSFER) {
+            throw new BusinessRuleException("VietQR can settle only a bank-transfer payment");
+        }
+        PaymentItem item = itemResolver.findItem(payment)
+                .orElseThrow(() -> new BusinessRuleException("Payment " + payment.getPaymentCode()
+                        + " is not linked to a membership card or a package registration"));
+
+        if (item.type() == InvoiceItemType.MEMBERSHIP_CARD) {
+            membershipCardService.activateCardForPaymentConfirmation(item.id(), null, PaymentMethod.BANK_TRANSFER);
+        } else {
+            sportPackageService.activateRegistrationForPaymentConfirmation(item.id(), null, PaymentMethod.BANK_TRANSFER);
+        }
+
+        payment.setReferenceCode(referenceNumber);
+        payment.setPaymentTime(transactionTime);
+        boolean localDemo = sandbox && transactionId.startsWith("LOCAL-SANDBOX-");
+        payment.setSettlementType(sandbox ? "SIMULATED" : "ACTUAL");
+        payment.setSettlementProvider(localDemo ? "LOCAL_DEMO" : "GATEWAY");
+        payment.setVietQrTransactionId(transactionId);
+        payment.setVietQrEnvironment(environment);
+        Invoice invoice = recordPaymentConfirmed(payment.getId(), null,
+                sandbox ? "VietQR sandbox transaction " + transactionId + " (no real money moved)"
+                        : "Settled by VietQR transaction " + transactionId);
+        flushPayment();
+        return invoice;
+    }
+
     /**
      * BE-19 desk sale: the same evidence rules as the confirmation (a reference for every method except CASH), then a
      * SUCCESS payment. Cash may be more than the amount (the change is written in the payment notes); any other
@@ -439,6 +476,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                 .confirmedByName(confirmedBy != null ? confirmedBy.getFullName() : null)
                 .settlementType(payment.getSettlementType())
                 .settlementProvider(payment.getSettlementProvider())
+                .settlementEnvironment(payment.getVietQrEnvironment())
                 .simulatedTransactionId(payment.getSimulatedTransactionId())
                 .invoiceId(invoice != null ? invoice.getId() : null)
                 .invoiceNumber(invoice != null ? invoice.getInvoiceNumber() : null)
