@@ -541,6 +541,7 @@
   flex: none;
 }
 
+/* Same round control as the Home theme toggle beside it. */
 .header-inbox__button {
   position: relative;
   display: inline-flex;
@@ -549,10 +550,17 @@
   width: 42px;
   height: 42px;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--color-on-hero) 35%, transparent);
-  background: color-mix(in srgb, var(--color-on-hero) 12%, transparent);
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-on-hero) 14%, transparent);
   color: var(--color-on-hero);
   cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.header-inbox__button:hover,
+.header-inbox__button[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--color-on-hero) 26%, transparent);
 }
 
 .header-inbox__button:focus-visible,
@@ -562,18 +570,16 @@
   outline-offset: 2px;
 }
 
-.header-inbox__count {
+/* Unread indicator: a green dot only; the unread count is in the button's accessible name. */
+.header-inbox__dot {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 1.25rem;
-  padding: 0 4px;
-  background: var(--color-danger);
-  color: var(--color-text-inverse);
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1.25rem;
-  text-align: center;
+  top: 7px;
+  right: 7px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--ui-header-bg);
+  border-radius: 50%;
+  background: var(--ui-unread-dot);
 }
 
 .header-inbox__panel {

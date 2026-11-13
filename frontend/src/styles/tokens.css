@@ -132,6 +132,7 @@
   --ui-kicker-size: 14px;
   --ui-section-title-size: 20px;
   --ui-dropdown-shadow: 0 22px 48px rgba(11, 23, 54, 0.22);
+  --ui-unread-dot: #22c55e;
 
   /* Layout */
   --header-height: 64px;

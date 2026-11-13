@@ -20,7 +20,7 @@ function setup(role: string, path: string, routes: (path: string, method: string
 }
 
 describe('Header inbox', () => {
-  it('shows the Member unread count beside the avatar and marks read without other side effects', async () => {
+  it('shows a Member unread dot (no number) beside the avatar and marks read without other side effects', async () => {
     let read = false
     const { calls } = setup('MEMBER', '/member/support', (path, method) => {
       if (path === '/member/notifications/5/read' && method === 'PUT') { read = true; return new Response(null, { status: 204 }) }
@@ -30,10 +30,13 @@ describe('Header inbox', () => {
     const user = userEvent.setup()
     const button = await screen.findByRole('button', { name: 'Inbox, 1 unread' })
     expect(button.closest('.workspace-header__account')?.querySelector('.user-menu')).not.toBeNull()
+    expect(button.querySelector('.header-inbox__dot')).not.toBeNull()
+    expect(button.textContent).not.toMatch(/\d/)
     await user.click(button)
     const panel = screen.getByRole('region', { name: 'Recent notifications' })
     await user.click(within(panel).getByRole('button', { name: /Booked session schedule changed/ }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Inbox' })).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Inbox' }).querySelector('.header-inbox__dot')).toBeNull()
     expect(within(panel).getByRole('link', { name: 'View all' })).toHaveAttribute('href', '/member/notifications')
     expect(calls.filter(call => call.method === 'PUT').map(call => call.path)).toEqual(['/member/notifications/5/read'])
     await user.keyboard('{Escape}')
