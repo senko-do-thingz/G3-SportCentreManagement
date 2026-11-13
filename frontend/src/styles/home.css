@@ -430,3 +430,22 @@
 .home-page .credits-item__use { font-weight: 700; }
 .credits-item a { color: var(--h-primary-text); font-size: 13px; overflow-wrap: anywhere; }
 .credits-footer { padding-top: 0; }
+
+/* Home actions use square corners; cards, menus, and modal containers keep their existing geometry. */
+.home-page :is(
+  button,
+  a.btn,
+  a.home-btn,
+  a.home-more,
+  .home-play > span,
+  .home-highlight a,
+  .home-sport__go
+),
+.home-page .home-faq__list summary::after {
+  border-radius: 0;
+}
+
+/* Home dialogs are portalled to body, outside the .home-page element. */
+body:has(.home-page) .modal :is(button, .btn) {
+  border-radius: 0;
+}
