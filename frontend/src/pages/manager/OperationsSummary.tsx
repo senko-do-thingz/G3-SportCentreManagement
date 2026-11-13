@@ -10,8 +10,8 @@ export function OperationsSummary({ from, to }: { from: string; to: string }) {
     <p>Registrations and class bookings in {formatCalendarDate(from)} - {formatCalendarDate(to)}. Revenue and CSV export use the same date controls below.</p>
     <TrainingData load={load}>{report => <>
       <section className="finance-kpis" aria-label="Member registrations">
-        <StatCard label="Members registered in range" value={report.registeredMembers.toLocaleString('en-US')} />
-        <StatCard label="Currently enabled among those registered" value={report.currentlyEnabledMembersRegistered.toLocaleString('en-US')} />
+        <StatCard icon="users" label="Members registered in range" value={report.registeredMembers.toLocaleString('en-US')} />
+        <StatCard icon="user-check" label="Currently enabled among those registered" value={report.currentlyEnabledMembersRegistered.toLocaleString('en-US')} />
       </section>
       <p>The enabled count reflects current account status, not historical status at the end of the range.</p>
       <dl className="browse-facts" aria-label="Class bookings">

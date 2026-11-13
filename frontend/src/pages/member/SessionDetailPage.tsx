@@ -19,7 +19,7 @@ export function SessionDetailPage() {
   const [params] = useSearchParams()
   const id = parseSessionReference(sessionId)
   const returnTo = safeBrowseReturn(params.get('returnTo'))
-  if (!id) return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Session Unavailable" /><p role="alert">Choose a valid session.</p><Link to={returnTo}>Back to results</Link></div>
+  if (!id) return <div className="page browse-page"><MemberScheduleNav /><PageHeader eyebrow="Member workspace" title="Session Unavailable" /><p role="alert">Choose a valid session.</p><Link to={returnTo}>Back to results</Link></div>
   return <SessionDetailContent key={id} id={id} returnTo={returnTo} />
 }
 
@@ -36,7 +36,7 @@ function SessionDetailContent({ id, returnTo }: { id: number | SessionId; return
     return () => { document.removeEventListener('visibilitychange', refresh) }
   }, [reload, resource.status, profileOpen])
   if (resource.status === 'loading') return <div className="page browse-page"><MemberScheduleNav /><PageLoader label="Loading session detail" /></div>
-  if (resource.status === 'error') return <div className="page browse-page"><MemberScheduleNav /><PageHeader title={resource.error instanceof ApiError && resource.error.status === 404 ? 'Session Unavailable' : 'Session Detail'} /><BrowseError error={resource.error} onRetry={reload} /><Link to={returnTo}>Back to results</Link></div>
+  if (resource.status === 'error') return <div className="page browse-page"><MemberScheduleNav /><PageHeader eyebrow="Member workspace" title={resource.error instanceof ApiError && resource.error.status === 404 ? 'Session Unavailable' : 'Session Detail'} /><BrowseError error={resource.error} onRetry={reload} /><Link to={returnTo}>Back to results</Link></div>
   const detail = resource.data, session = detail.session
   const state = resolveSessionDetailState(detail), copy = ELIGIBILITY_COPY[state]
   const self = session.trainingFormat === 'SELF_TRAINING'

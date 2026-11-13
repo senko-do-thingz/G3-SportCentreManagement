@@ -5,6 +5,7 @@ import { useAuth } from '../auth/useAuth'
 import { INBOX_CHANGED_EVENT, loadInbox, markInboxRead } from '../components/headerInboxData'
 import { Button, EmptyState, ErrorState, Notice, PageHeader, Spinner } from '../components/ui'
 import { useResource } from '../hooks/useResource'
+import { MEMBER_AREA, STAFF_AREAS } from '../layouts/navigation'
 import { formatDateTime } from '../utils/dateDisplay'
 
 /** "View all" target of the header inbox for Member, Manager and Coach. Shows only the caller's own notifications. */
@@ -27,8 +28,12 @@ function NotificationsList({ role }: { role: Role }) {
     try { await markInboxRead(role, id); window.dispatchEvent(new Event(INBOX_CHANGED_EVENT)) } catch (failure) { setError(getErrorMessage(failure)) }
   }
   return (
-    <div className="notifications-page">
-      <PageHeader title="Inbox" />
+    <div className="page notifications-page">
+      <PageHeader
+        eyebrow={(role === 'MEMBER' ? MEMBER_AREA : STAFF_AREAS[role]).workspaceLabel}
+        title="Inbox"
+        description="Your own notifications, newest first. Marking one as read does not complete any task."
+      />
       {error && <Notice tone="danger">{error}</Notice>}
       {resource.status === 'loading' && <Spinner label="Loading notifications" />}
       {resource.status === 'error' && <ErrorState error={resource.error} onRetry={reload} />}

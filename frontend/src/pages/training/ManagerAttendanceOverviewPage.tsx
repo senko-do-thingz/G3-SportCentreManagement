@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { managerAttendanceApi as api } from '../../api/managerAttendanceApi'
 import { managerClassesApi } from '../../api/managerClassesApi'
 import { businessDate, formatCalendarDate } from '../../utils/date'
-import { Button, CalendarDateField, Card, Input, Select } from '../../components/ui'
+import { Button, CalendarDateField, Card, Input, Select, StatIcon } from '../../components/ui'
 import { TrainingData } from '../member/TrainingData'
 import { PreviewNotice } from '../manager/ManagerShared'
 import '../member/training.css'
@@ -40,7 +40,7 @@ export function ManagerAttendanceOverviewPage() {
 
     <PreviewNotice />
     <Card title="Attendance filters">
-      <div className="training-form-grid">
+      <div className="training-form-grid attendance-overview-filters">
         <CalendarDateField label="From date" value={from} max={to} onValidityChange={setFromValid} onChange={(value, valid) => { if (valid === false) return; select(''); setFrom(value) }} required />
         <CalendarDateField label="To date" value={to} min={from} onValidityChange={setToValid} onChange={(value, valid) => { if (valid === false) return; select(''); setTo(value) }} required />
         <Input label="Search classes" value={classSearch} disabled={!datesValid} onChange={event => { setClassSearch(event.target.value); setClassId(''); select('') }} />
@@ -52,28 +52,28 @@ export function ManagerAttendanceOverviewPage() {
     {datesValid && <TrainingData load={load}>{overview => <>
       <div className="concept-stats">
         <div className="concept-stat">
-          <span className="concept-stat__icon" aria-hidden="true">S</span>
+          <StatIcon name="calendar" />
           <div>
             <strong>{String(overview.sessions.length).padStart(2, '0')}</strong>
             <small>Matching sessions</small>
           </div>
         </div>
         <div className="concept-stat">
-          <span className="concept-stat__icon" aria-hidden="true">C</span>
+          <StatIcon name="user-check" />
           <div>
             <strong>{String(overview.sessions.reduce((sum, item) => sum + item.confirmed, 0)).padStart(2, '0')}</strong>
             <small>Confirmed bookings</small>
           </div>
         </div>
         <div className="concept-stat">
-          <span className="concept-stat__icon" aria-hidden="true">P</span>
+          <StatIcon name="check" />
           <div>
             <strong>{String(overview.sessions.reduce((sum, item) => sum + item.present + item.late, 0)).padStart(2, '0')}</strong>
             <small>Present + Late</small>
           </div>
         </div>
         <div className="concept-stat">
-          <span className="concept-stat__icon" aria-hidden="true">U</span>
+          <StatIcon name="question" />
           <div>
             <strong>{String(overview.sessions.reduce((sum, item) => sum + item.unmarked, 0)).padStart(2, '0')}</strong>
             <small>Unmarked bookings</small>

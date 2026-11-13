@@ -40,6 +40,26 @@ the shared brand tokens below carry the same Royal and Gold values so every othe
 Neutral, status, spacing, radius, typography and elevation tokens are unchanged from the earlier
 Figma baseline.
 
+## Role workspace tokens (Home language for Manager, Member, Receptionist and Coach)
+
+These mirror the `--h-*` values in `styles/home.css`, which stays the design reference and keeps its own copies,
+so changing them never changes Home. `styles/workspaceUi.css` applies them inside `.staff-layout` and
+`.member-layout` only (desktop, no extra breakpoints).
+
+| Token | Light | Dark | Use |
+|-------|-------|------|-----|
+| `--ui-font-body` | `'Segoe UI', Arial, sans-serif` | same | Body text, buttons and controls (Home `--h-body`) |
+| `--ui-font-display` | `var(--font-display)` | same | Page titles (uppercase, Home section headings) |
+| `--ui-ink` / `--ui-muted` | `#0e1a33` / `#5a6782` | `#e8ecf6` / `#96a0b8` | Text tones of Home |
+| `--ui-border` | `#e4e8f0` | `#232d47` | Card and panel borders |
+| `--ui-band` | `#f5f7fb` | `#0e1526` | Table header band |
+| `--ui-shadow` | `0 18px 40px rgba(14, 26, 51, 0.08)` | `0 18px 40px rgba(0, 0, 0, 0.4)` | Raised surfaces |
+| `--ui-header-bg` | `var(--color-navy)` | `var(--color-hero)` | Solid workspace header (Home header after the hero) |
+| `--ui-radius` | `0` | same | Square buttons, inputs, cards, dialogs (radius tokens are zeroed in workspaces; pills stay) |
+| `--ui-title-size` / `--ui-title-weight` | `40px` / `800` | same | The one page-title style |
+| `--ui-control-height` | `44px` | same | Inputs, selects, header action buttons |
+| `--ui-button-weight` | `700` | same | Button labels |
+
 ## Rules
 
 - Never use gold (`--color-accent`, `--color-highlight`) as text on a light surface; it is for fills,

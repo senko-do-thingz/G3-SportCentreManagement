@@ -7,7 +7,7 @@ import { ApiError } from '../../api/errors'
 import { managerClassesApi } from '../../api/managerClassesApi'
 import { managerSessionsApi, type ManagerSession } from '../../api/managerSessionsApi'
 import { facilitiesApi } from '../../api/facilitiesApi'
-import { Button, Card, EmptyState, Input, PageLoader, Select, StatusBadge, useToast } from '../../components/ui'
+import { Button, Card, EmptyState, Input, PageLoader, Select, StatusBadge, useToast, StatIcon } from '../../components/ui'
 import { ConfirmationModal, ManagerError, PreviewNotice } from './ManagerShared'
 import { useResource } from './useManagerTools'
 import { loadScheduleClasses } from './loadScheduleClasses'
@@ -86,28 +86,28 @@ export function ManagerSchedulePage() {
 
     <div className="concept-stats">
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">W</span>
+        <StatIcon name="calendar" />
         <div>
           <strong>{weekSessionsCount}</strong>
           <small>Week sessions</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">P</span>
+        <StatIcon name="send" />
         <div>
           <strong>{publishedCount}</strong>
           <small>Published in week</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">C</span>
+        <StatIcon name="coach" />
         <div>
           <strong>{coachesCount}</strong>
           <small>Active coaches</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">V</span>
+        <StatIcon name="pin" />
         <div>
           <strong>{facilitiesCount}</strong>
           <small>Venues / Courts</small>

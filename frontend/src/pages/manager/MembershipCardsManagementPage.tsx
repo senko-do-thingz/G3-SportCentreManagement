@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { managerCardTiersApi } from '../../api/managerCardTiersApi'
-import { Badge, Button, Card, EmptyState, Spinner, StatusBadge, Table, useToast, type TableColumn } from '../../components/ui'
+import { Badge, Button, Card, EmptyState, Spinner, StatusBadge, Table, useToast, type TableColumn, StatIcon } from '../../components/ui'
 import { formatMoney } from '../../utils/format'
 import type { ManagerCardTier } from '../../types/manager'
 import { EditMembershipCardModal } from './EditMembershipCardModal'
@@ -97,28 +97,28 @@ export function MembershipCardsManagementPage() {
 
     <div className="concept-stats">
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">T</span>
+        <StatIcon name="card" />
         <div>
           <strong>{publishedTiers}</strong>
           <small>Published tiers</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">A</span>
+        <StatIcon name="check" />
         <div>
           <strong>{activeCount}</strong>
           <small>Active tiers</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">D</span>
+        <StatIcon name="percent" />
         <div>
           <strong>{maxDiscount}</strong>
           <small>Max package discount</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">S</span>
+        <StatIcon name="star" />
         <div>
           <strong>{defaultTierLabel}</strong>
           <small>Standard tier</small>

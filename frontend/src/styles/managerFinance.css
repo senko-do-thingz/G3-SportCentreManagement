@@ -40,24 +40,13 @@
 .finance-review-result--rejected p { color: var(--color-danger); }
 .finance-review-result--warning { background: var(--color-warning-soft); }
 .finance-review-result--warning p { color: var(--color-warning); }
-.manager-filters--revenue {
-  grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) minmax(160px, 1.2fr) minmax(200px, 1.5fr);
-  align-items: start;
-}
 .manager-filters--revenue .field__hint { display: none; }
-.manager-filters--revenue .finance-filter-hint { align-self: center; margin-top: 24px; color: var(--color-text-muted); font-size: var(--text-sm); }
+.manager-filters.manager-filters--revenue > .field,
+.manager-filters.manager-filters--revenue > .field:first-child { flex: 1 1 13rem; }
+.manager-filters--revenue .finance-filter-hint { flex: 1 1 11rem; align-self: center; margin-top: 24px; color: var(--color-text-muted); font-size: var(--text-sm); }
 
-.manager-filters--transactions {
-  grid-template-columns: minmax(200px, 1.8fr) repeat(3, minmax(135px, 1fr));
-  align-items: start;
-  gap: var(--space-3);
-}
 .manager-filters--transactions .field__hint { display: none; }
-.manager-filters--transactions > .btn {
-  grid-column: 1 / -1;
-  justify-self: start;
-  min-height: 38px;
-}
+.manager-filters--transactions > .field:first-child { flex-grow: 1.8; }
 .finance-revenue-chart-wrap { min-width: 0; }
 .finance-revenue-legend { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: 0 0 var(--space-3); padding: 0; list-style: none; }
 .finance-revenue-legend li { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text-muted); font-size: var(--text-xs); }

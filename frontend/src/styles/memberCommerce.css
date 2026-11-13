@@ -30,30 +30,10 @@
   min-width: 0;
 }
 
-.member-commerce__eyebrow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-primary);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-eyebrow);
-  text-transform: uppercase;
-  margin-bottom: var(--space-1);
-}
-
-.member-commerce__eyebrow::before {
-  content: '';
-  display: inline-block;
-  width: 20px;
-  height: 2px;
-  background: var(--color-primary);
-}
-
 .member-commerce__title {
   margin: 0 0 var(--space-1);
   font-family: var(--font-display);
-  font-size: var(--text-3xl);
+  font-size: var(--ui-title-size);
   font-weight: 800;
   letter-spacing: -0.025em;
   line-height: 1.15;
@@ -92,7 +72,7 @@
   justify-content: space-between;
   gap: var(--space-6);
   min-height: 110px;
-  padding: var(--space-5) var(--space-7);
+  padding: var(--space-5) var(--space-8);
   overflow: hidden;
   border-radius: 0;
   background: linear-gradient(108deg, var(--color-hero) 0%, var(--color-navy) 58%, var(--color-primary) 100%);
@@ -722,7 +702,7 @@
   border-radius: 0;
   background: linear-gradient(108deg, var(--color-hero) 0%, var(--color-navy) 58%, var(--color-primary) 100%);
   border: 1px solid var(--color-navy);
-  padding: var(--space-5) var(--space-7);
+  padding: var(--space-5) var(--space-8);
 }
 
 .member-commerce .payment-hero__eyebrow {
@@ -736,7 +716,7 @@
 
 .member-commerce .payment-hero__title {
   font-family: var(--font-display);
-  font-size: var(--text-2xl);
+  font-size: var(--ui-title-size);
   font-weight: 800;
   color: var(--color-on-hero);
   text-transform: uppercase;
