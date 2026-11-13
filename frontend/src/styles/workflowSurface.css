@@ -10,8 +10,6 @@
   color: var(--h-ink);
 }
 .home-page.workflow-surface h2, .home-page.workflow-surface h3 {
-  text-transform: none;
-  letter-spacing: -0.02em;
   line-height: 1.3;
 }
 /* The page title follows the shared workspace title (styles/workspaceUi.css), like every other role page. */
@@ -28,7 +26,6 @@
   margin-bottom: 0;
   border-bottom: 1px solid var(--h-border);
 }
-.workflow-surface .page-header__title { font-size: var(--ui-title-size); }
 .workflow-surface .page-header__description { max-width: 72ch; margin-top: var(--space-2); line-height: 1.65; }
 .workflow-surface .card { border-color: var(--h-border); border-radius: 0; box-shadow: none; }
 .workflow-surface .training-list p { margin-block: var(--space-2); }

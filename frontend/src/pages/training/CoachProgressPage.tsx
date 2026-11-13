@@ -12,7 +12,7 @@ import '../../styles/coachUi.css'
 
 export function CoachProgressPage() {
   return <div className="training-page coach-ui coach-progress-page">
-    <PageHeader title="Member progress" description="Review the goals and recorded outcomes of members in your assigned classes." />
+    <PageHeader eyebrow="Coach workspace" title="Member progress" description="Review the goals and recorded outcomes of members in your assigned classes." />
     <TrainingData load={staffTrainingApi.coachClasses}>{classes => <ProgressWorkspace classes={classes} />}</TrainingData>
   </div>
 }

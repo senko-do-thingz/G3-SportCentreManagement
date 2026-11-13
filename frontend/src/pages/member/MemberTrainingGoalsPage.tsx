@@ -29,7 +29,7 @@ export function MemberTrainingGoalsPage() {
   }, [])
   return <div className="training-page">
     <RecommendationTabs />
-    <PageHeader title="My training goals" description="Tell us what you want to achieve and when you can train. Recommendations use these preferences; you always choose what to book." />
+    <PageHeader eyebrow="Member workspace" title="My training goals" description="Tell us what you want to achieve and when you can train. Recommendations use these preferences; you always choose what to book." />
     <TrainingData key={memberId} load={load}>{data => <div className="training-form-grid">
       <GoalsForm data={data} memberId={memberId} />
       <Card title="Your training context">

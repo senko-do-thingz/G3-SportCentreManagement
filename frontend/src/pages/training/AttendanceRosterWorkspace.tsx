@@ -29,7 +29,7 @@ function AttendanceBrowser() {
   const [message, setMessage] = useState('')
   const [focusBooking, setFocusBooking] = useState<number | null>(null)
   return <div className="training-page">
-    <PageHeader title="Session attendance" description="Record participation for your assigned sessions. Corrections require a reason. Saved results require Present or Late attendance." />
+    <PageHeader eyebrow="Coach workspace" title="Session attendance" description="Record participation for your assigned sessions. Corrections require a reason. Saved results require Present or Late attendance." />
     {message && <p className="notice notice--success" role="status" aria-live="polite">{message}</p>}
     <TrainingData key={revision} load={training.coachSessions}>{sessions => {
       const ordered = [...sessions].sort((a, b) => Number(actionable(b)) - Number(actionable(a)))

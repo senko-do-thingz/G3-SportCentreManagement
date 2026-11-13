@@ -326,10 +326,6 @@
   gap: 18px;
 }
 
-.member-concept .member-ui--dashboard .page-header__title {
-  font-size: var(--ui-title-size);
-}
-
 .member-concept__dashboard-heading {
   color: var(--color-navy);
 }
@@ -1170,7 +1166,6 @@
   }
 
   .member-concept .member-ui--dashboard .page-header__title {
-    font-size: var(--ui-title-size);
     line-height: 1.08;
   }
 
@@ -1765,11 +1760,6 @@
     align-items: start;
   }
 
-  .assistant-workspace__heading .page-header__title {
-    font-size: var(--ui-title-size);
-    letter-spacing: -0.03em;
-  }
-
   .assistant-workspace__heading .page-header__description {
     max-width: 82ch;
     font-size: 0.8rem;
@@ -1806,11 +1796,6 @@
   .member-concept .member-support-page > a:first-child {
     width: fit-content;
     font-size: 0.76rem;
-  }
-
-  .member-concept .member-support-page .page-header__title {
-    font-size: var(--ui-title-size);
-    letter-spacing: -0.03em;
   }
 
   .member-concept .member-support-page .card {

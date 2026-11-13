@@ -10,7 +10,7 @@ import { formatDateTime } from '../../utils/format'
 import '../../styles/coachUi.css'
 
 export function MemberClassesPage() {
-  return <div className="training-page"><PageHeader title="My classes" description="Class information, your participation and conversations with your coach." />
+  return <div className="training-page"><PageHeader eyebrow="Member workspace" title="My classes" description="Class information, your participation and conversations with your coach." />
     <TrainingData load={learning.classes}>{classes => classes.length ? <Card><ul className="training-list">{classes.map(item => <li key={item.id}><h2>{item.name}</h2><p>{item.sportName} - {item.level ?? 'All levels'} - Coach: {item.coachName ?? 'Not assigned'}</p><Link to={`/member/training/classes/${item.id}`}>View class: {item.name}</Link></li>)}</ul></Card> : <EmptyState title="No booked classes yet" action={<Link to="/member/classes">Find a class</Link>} />}</TrainingData></div>
 }
 export function MemberClassDetailPage() {
@@ -19,7 +19,7 @@ export function MemberClassDetailPage() {
   return <TrainingData load={load}>{({ learningClass: item, sessions }) => (
     <div className="training-page">
       <Link to="/member/training/classes">Back to my classes</Link>
-      <PageHeader title={item.name} description={`${item.sportName} - ${item.level ?? 'All levels'}`} />
+      <PageHeader eyebrow="Member workspace" title={item.name} description={`${item.sportName} - ${item.level ?? 'All levels'}`} />
       <Card title="Class information">
         <dl className="class-facts">
           <div><dt>Coach</dt><dd>{item.coachName ?? 'Not assigned'}</dd></div>
@@ -69,7 +69,7 @@ function MemberQuestionsPage() {
     setReplyBody('')
     action.reset()
   }
-  return <div className="training-page"><PageHeader title="Ask your coach" description="Discuss class exercises and supplementary practice with the assigned coach." />
+  return <div className="training-page"><PageHeader eyebrow="Member workspace" title="Ask your coach" description="Discuss class exercises and supplementary practice with the assigned coach." />
     <TrainingData load={learning.classes}>{classes => <AskForm classes={classes} disabled={action.pending} onSaved={id => { selectQuestion(String(id)); refresh(value => value + 1) }} />}</TrainingData>
     <div className="training-actions"><Button variant="secondary" disabled={action.pending} onClick={() => { action.reset(); refresh(value => value + 1) }}>Refresh conversations</Button></div>
     <TrainingData key={revision} load={load}>{questions => questions.length ? <Card title="Conversations"><Select label="Class question" placeholder="Select a conversation" value={selected} disabled={action.pending} onChange={event => selectQuestion(event.target.value)} options={questions.map(q => ({ value: String(q.id), label: `${q.className} - ${q.memberName} - ${q.subject}` }))} /></Card> : <EmptyState title="No class questions yet" />}</TrainingData>

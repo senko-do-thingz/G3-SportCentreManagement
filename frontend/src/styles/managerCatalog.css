@@ -2,7 +2,6 @@
 .manager-catalog { gap: var(--space-5); }
 .manager-catalog > .page-header { align-items: center; margin-bottom: 0; }
 .manager-catalog .page-header__text { gap: var(--space-1); }
-.manager-catalog .page-header__title { font-family: var(--font-display); font-size: var(--text-2xl); letter-spacing: -0.035em; }
 .manager-catalog .page-header__description { max-width: 58ch; font-size: var(--text-sm); }
 .manager-catalog__panel.card { padding: 0; overflow: hidden; border-radius: var(--radius-lg); box-shadow: none; }
 .manager-catalog__panel > .card__header {

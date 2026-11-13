@@ -79,7 +79,7 @@ export function BookingOptionsPage() {
     return (
       <div className="page browse-page member-commerce">
         <MemberScheduleNav />
-        <PageHeader title="Booking unavailable" />
+        <PageHeader eyebrow="Member workspace" title="Booking unavailable" />
         <Card>
           <p role="alert">Choose a valid session from the schedule before booking.</p>
           <Link className={buttonClassName()} to={returnTo}>
@@ -225,7 +225,7 @@ export function BookingReviewPage() {
     return (
       <div className="page browse-page member-commerce">
         <MemberScheduleNav />
-        <PageHeader title="Booking review unavailable" />
+        <PageHeader eyebrow="Member workspace" title="Booking review unavailable" />
         <Card>
           <p role="alert">Return to the session and choose an eligible package before reviewing.</p>
           <Link className={buttonClassName()} to={returnTo}>
@@ -347,7 +347,7 @@ function BookingReviewContent({
     return (
       <div className="page browse-page member-commerce">
         <MemberScheduleNav />
-        <PageHeader title="Booking review" />
+        <PageHeader eyebrow="Member workspace" title="Booking review" />
         <BrowseError error={resource.error} onRetry={reload} />
       </div>
     )
@@ -507,7 +507,7 @@ export function BookingConfirmedPage() {
     return (
       <div className="page browse-page member-commerce">
         <MemberScheduleNav />
-        <PageHeader title="Booking confirmation" />
+        <PageHeader eyebrow="Member workspace" title="Booking confirmation" />
         <BrowseError error={resource.error} />
         <Link className={buttonClassName()} to="/member/bookings">
           My Bookings
@@ -518,7 +518,7 @@ export function BookingConfirmedPage() {
     return (
       <div className="page browse-page member-commerce">
         <MemberScheduleNav />
-        <PageHeader title="Booking confirmation" />
+        <PageHeader eyebrow="Member workspace" title="Booking confirmation" />
         <Card>
           <p role="status">This booking is not in your upcoming list. It may have been cancelled or changed.</p>
           <Link className={buttonClassName()} to="/member/bookings?when=UPCOMING">

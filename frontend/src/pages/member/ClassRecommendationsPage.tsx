@@ -52,7 +52,7 @@ export function ClassRecommendationsPage() {
       ...(text('format') ? { format: text('format') } : {}), ...(days.length ? { days: days.join(',') } : {}) })
   }
   const initialDays = initial.days?.split(',') ?? []
-  return <div className="training-page"><RecommendationTabs /><PageHeader title="Class recommendations" description="Personalized class and session recommendations based on your sport preferences, skill level and training goals." />
+  return <div className="training-page"><RecommendationTabs /><PageHeader eyebrow="Member workspace" title="Class recommendations" description="Personalized class and session recommendations based on your sport preferences, skill level and training goals." />
     <Card title="Your preferences"><form className="training-form" onSubmit={submit}>
       <TrainingData load={loadSports}>{sports => <Select label="Preferred sport" name="sportId" placeholder="All sports" defaultValue={initial.sportId ? String(initial.sportId) : ''} options={sports.map(s => ({ value: String(s.id), label: s.name }))} />}</TrainingData>
       <Select label="Preferred level" name="level" placeholder="Use saved level" defaultValue={initial.level ?? ''} options={LEVEL_OPTIONS} />

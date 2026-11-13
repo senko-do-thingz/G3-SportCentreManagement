@@ -21,7 +21,7 @@ import '../../styles/coachUi.css'
 export function CoachTrainingPlansPage() {
   return (
     <div className="training-page coach-ui coach-plans-page">
-      <PageHeader title="Assign plans and feedback" description="Assign a personal plan using a confirmed booking in a class you coach, or a plan for the whole class. Members can view plans and feedback as soon as you save them." />
+      <PageHeader eyebrow="Coach workspace" title="Assign plans and feedback" description="Assign a personal plan using a confirmed booking in a class you coach, or a plan for the whole class. Members can view plans and feedback as soon as you save them." />
       <TrainingData load={training.coachClasses}>{classes => <CoachPlansWorkspace classes={classes} />}</TrainingData>
     </div>
   )
@@ -419,7 +419,7 @@ function PublishFeedbackForm({ planId }: { planId: number }) {
 export function CoachTrainingResultsPage() {
   return (
     <div className="training-page coach-ui coach-results-page">
-      <PageHeader title="Record training results" description="Record results for members marked Present or Late in sessions you coach. Results are visible as soon as you save them." />
+      <PageHeader eyebrow="Coach workspace" title="Record training results" description="Record results for members marked Present or Late in sessions you coach. Results are visible as soon as you save them." />
       <TrainingData load={training.coachSessions}>{sessions => <CoachResultsWorkspace sessions={sessions} />}</TrainingData>
     </div>
   )

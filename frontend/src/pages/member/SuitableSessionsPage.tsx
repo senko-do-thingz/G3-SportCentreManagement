@@ -21,7 +21,7 @@ export function SuitableSessionsPage() {
   if (!Number.isSafeInteger(classId) || classId <= 0) return <EmptyState title="Class not found" />
   return <div className="training-page">
     <RecommendationTabs />
-    <PageHeader title="Suitable sessions" description="Choose a session; final booking checks happen before confirmation." />
+    <PageHeader eyebrow="Member workspace" title="Suitable sessions" description="Choose a session; final booking checks happen before confirmation." />
     <TrainingData load={load} refreshLabel="Refresh sessions">{data => <Card title={`${data.className}${data.coachName ? ` / ${data.coachName}` : ''}`}>
       <p>{data.sportName}{data.level ? ` - ${data.level}` : ''}{data.ageGroup ? ` - age group ${data.ageGroup}` : ''}</p>
       {data.sessions.length === 0 ? <EmptyState title="No upcoming sessions" description="This class has no published sessions in the next 30 days." />

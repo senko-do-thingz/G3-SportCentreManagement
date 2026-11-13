@@ -1,7 +1,6 @@
 /* FE-06 uses the existing staff shell and Figma's blue and white panels. */
 .manager-page { gap: var(--space-5); }
 .manager-page .page-header { margin-bottom: var(--space-2); }
-.manager-page .page-header__title { letter-spacing: -0.035em; }
 .manager-preview { font-size: var(--text-sm); }
 .manager-preview strong { margin-right: var(--space-2); }
 .manager-filters { display: grid; grid-template-columns: minmax(200px, 2fr) repeat(2, minmax(130px, 1fr)) auto; align-items: end; gap: var(--space-3); margin-bottom: var(--space-6); }
@@ -60,7 +59,6 @@
 .staff-content:has(> .manager-page--users) { max-width: 1640px; padding: var(--space-10) var(--space-12); }
 .manager-page--users { gap: var(--space-6); }
 .manager-page--users .page-header { align-items: center; padding-bottom: var(--space-5); border-bottom: 1px solid var(--color-border); margin-bottom: 0; }
-.manager-page--users .page-header__title { font-family: var(--font-display); font-size: var(--text-3xl); letter-spacing: -0.03em; }
 .manager-page--users .page-header__description { font-size: var(--text-base); line-height: 1.6; }
 .manager-page--users .page-header__actions .btn { height: 48px; padding: 0 var(--space-6); font-size: var(--text-base); box-shadow: var(--shadow-sm); }
 .manager-page--users .card { padding: var(--space-8); border-radius: var(--radius-xl); box-shadow: var(--shadow-md); }
@@ -89,7 +87,6 @@
 /* User Management colour (scoped): navy-to-royal header band, gold call to action, tinted table. */
 .manager-page--users .page-header { padding: var(--space-8); border: 0; border-radius: var(--radius-xl); background: linear-gradient(120deg, var(--color-hero-deep) 0%, var(--color-navy) 45%, var(--color-primary) 100%); box-shadow: var(--shadow-md); }
 .manager-page--users .page-header .eyebrow { color: var(--color-hero-highlight); }
-.manager-page--users .page-header__title { color: var(--color-on-hero); }
 .manager-page--users .page-header__description { color: var(--color-on-hero-muted); }
 .manager-page--users .page-header__actions .btn--primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); }
 .manager-page--users .page-header__actions .btn--primary:hover:not(:disabled) { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }

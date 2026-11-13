@@ -2,11 +2,6 @@
   gap: var(--space-4);
 }
 
-.manager-activity .page-header__title {
-  font-family: var(--font-display);
-  letter-spacing: -0.035em;
-}
-
 .manager-activity .page-header__description {
   max-width: 68ch;
   line-height: 1.55;
