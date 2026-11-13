@@ -120,11 +120,14 @@ export function CoachTeachingSchedulePage() {
         <div className="coach-schedule-metric"><ScheduleMetricIcon name="week" /><div><p>{weekMetricLabel(week, weekEnd)}</p><span>Week in view</span></div></div>
       </section>
       <div className="coach-schedule-layout">
-        <Card className="coach-schedule-weekly" title="Weekly schedule" actions={<Button variant="secondary" size="sm" onClick={() => setParams((current) => changeWeekParams(current, browseMonday(browseToday())))}>This week</Button>}>
-          <div className="coach-schedule-week-nav" aria-label="Teaching week navigation">
-            <Button variant="secondary" size="sm" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, -7)))}>Previous week</Button>
+        <Card className="coach-schedule-weekly" title="Weekly schedule">
+          <div className="coach-schedule-week-nav" role="group" aria-label="Teaching week navigation">
+            <div className="coach-week-controls">
+              <Button variant="secondary" size="sm" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, -7)))}>Previous week</Button>
+              <Button variant="secondary" size="sm" onClick={() => setParams((current) => changeWeekParams(current, browseMonday(browseToday())))}>This week</Button>
+              <Button variant="secondary" size="sm" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, 7)))}>Next week</Button>
+            </div>
             <strong>{browseDate(week)} - {browseDate(weekEnd)}</strong>
-            <Button variant="secondary" size="sm" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, 7)))}>Next week</Button>
           </div>
           {sessions.length === 0 ? <div className="coach-schedule-empty"><EmptyState title="No assigned sessions this week" description="Your schedule will show sessions assigned to your coach account." /></div> : <>
             <div className="coach-schedule-week-scroll" role="region" aria-label={`Sessions from ${browseDate(week)} to ${browseDate(weekEnd)}`} tabIndex={0}>
@@ -270,12 +273,16 @@ export function CoachRosterPage() {
     <div className="coach-roster-layout">
       <Card className="coach-roster-picker" title="Choose a session" id="coach-roster-picker">
         <div className="coach-roster-picker__body">
-          <p className="coach-roster-field-label">Schedule week</p>
-          <div className="coach-roster-week-nav" aria-label="Roster week navigation">
-            <strong>{browseDate(week)} - {browseDate(weekEnd)}</strong>
-            <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, -7)))}>Previous</Button>
-            <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseMonday(browseToday())))}>This week</Button>
-            <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, 7)))}>Next</Button>
+          <div className="coach-roster-picker__week">
+            <p className="coach-roster-field-label">Schedule week</p>
+            <div className="coach-schedule-week-nav coach-roster-week-nav" role="group" aria-label="Roster week navigation">
+              <div className="coach-week-controls">
+                <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, -7)))}>Previous week</Button>
+                <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseMonday(browseToday())))}>This week</Button>
+                <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, 7)))}>Next week</Button>
+              </div>
+              <strong>{browseDate(week)} - {browseDate(weekEnd)}</strong>
+            </div>
           </div>
           {sessionsResource.status === 'error' ? <ErrorState title="We could not load your sessions" error={sessionsResource.error} onRetry={reloadSessions} /> : sessionsResource.status === 'loading' ? <PageLoader label="Loading your sessions" /> : sessions.length === 0 ? <EmptyState title="No assigned sessions this week" description="Change the week to find one of your sessions." /> : <Select label="Session" placeholder="Choose an assigned session" value={selectedSession ? sessionRouteReference(selectedSession) : ''} options={options} onChange={(event) => selectSession(event.target.value)} />}
           <p className="coach-roster-picker__note">Only sessions assigned to your coach account are available. The roster contains confirmed bookings only.</p>

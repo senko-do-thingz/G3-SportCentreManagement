@@ -62,7 +62,7 @@ function AttendanceBrowser() {
           onActionStart={() => setMessage('')}
           onRefresh={() => refresh(value => value + 1)}
           onSaved={(bookingId, correcting) => { setFocusBooking(bookingId); setMessage(correcting ? 'Attendance corrected and the reason saved. The roster is updated.' : 'Attendance saved and the list updated.'); select(key(active)); refresh(value => value + 1) }} />
-          : <EmptyState title="Choose a session to view its member roster" />}
+          : <Card title="Member roster" className="attendance-placeholder"><EmptyState variant="plain" title="Choose a session to view its member roster" description="Select a session on the left. Its confirmed members and attendance appear here." /></Card>}
       </div>
     }}</TrainingData>
   </div>
