@@ -92,7 +92,7 @@ describe('Member Concept B shell', () => {
 
   it('keeps a consented Spori conversation in the floating panel', async () => {
     tokenStorage.startSession({ accessToken: 'test-assistant-access', refreshToken: 'test-assistant-refresh' })
-    const { calls } = installFakeFetch(call => json(200, call.path === '/users/me' ? MEMBER : call.path.includes('/consultation') ? {
+    const { calls } = installFakeFetch(call => json(200, call.path === '/users/me' ? MEMBER : call.path.includes('/assistant/chat') ? {
       mode: 'KNOWLEDGE_BASED', status: 'ANSWERED', answer: "Hello! I'm Spori.", historyStored: false, sources: [], language: 'en',
     } : []))
     const user = userEvent.setup()
@@ -110,7 +110,7 @@ describe('Member Concept B shell', () => {
 
     expect(await within(dialog).findByText("Hello! I'm Spori.")).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Center assistant' })).not.toBeInTheDocument()
-    expect(calls.find(call => call.path.includes('/consultation'))?.body).toEqual({ question: 'Hello', optIn: true })
+    expect(calls.find(call => call.path.includes('/assistant/chat'))?.body).toEqual({ question: 'Hello'})
     expect(within(dialog).getByRole('link', { name: 'Open full assistant' })).toBeInTheDocument()
   })
 
@@ -153,7 +153,7 @@ describe('Member Concept B shell', () => {
     const dialog = screen.getByRole('dialog', { name: 'Spori AI' })
     await user.type(within(dialog).getByRole('textbox', { name: 'Ask Spori a question' }), '   ')
     expect(within(dialog).getByRole('button', { name: 'Send' })).toBeDisabled()
-    expect(calls.some(call => call.path.includes('/consultation'))).toBe(false)
+    expect(calls.some(call => call.path.includes('/assistant/chat'))).toBe(false)
   })
 
   it('preserves the receptionist member summary flex layout', () => {

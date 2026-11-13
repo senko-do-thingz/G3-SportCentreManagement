@@ -8,6 +8,7 @@ import { itemHref, pageTitle, STAFF_AREAS } from './navigation'
 import { PaymentWorkspaceHeader } from './PaymentWorkspaceHeader'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import { WorkflowSurface } from '../components/WorkflowSurface'
+import { FloatingSporiChat } from '../pages/member/FloatingSporiChat'
 import '../styles/workspaceUi.css'
 
 /** Coach, reception and manager workspaces share a Home-branded header and role-aware sidebar. */
@@ -72,6 +73,8 @@ export function StaffLayout() {
           {workflowRoute ? <WorkflowSurface><Outlet /></WorkflowSurface> : <Outlet />}
         </main>
       </div>
+      {/* Same Spori chat as Members; the server limits answers to this staff role's data. */}
+      <FloatingSporiChat />
     </div>
   )
 }

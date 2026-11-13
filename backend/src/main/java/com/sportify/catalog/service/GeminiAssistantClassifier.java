@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
  * app.assistant.ai.provider=gemini; the key comes from GEMINI_API_KEY and is sent in the x-goog-api-key header.
  */
 @Service
-@ConditionalOnExpression("${app.assistant.ai.enabled:false} and '${app.assistant.ai.provider:claude}'.equalsIgnoreCase('gemini')")
+@ConditionalOnExpression("${app.assistant.ai.enabled:false} and '${app.assistant.ai.provider:gemini}'.equalsIgnoreCase('gemini')")
 class GeminiAssistantClassifier implements AssistantIntentClassifier {
     static final String DEFAULT_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/";
     private static final Pattern MODEL = Pattern.compile("[a-z0-9][a-z0-9.\\-]{0,63}");
