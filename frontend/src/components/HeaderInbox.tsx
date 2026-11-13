@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Spinner } from './ui/Spinner'
 import type { Role } from '../api/types'
 import { useAuth } from '../auth/useAuth'
 import { formatDateTime } from '../utils/dateDisplay'
@@ -92,7 +93,7 @@ function HeaderInboxForRole({ role }: { role: Role }) {
       <div id={panelId} className="header-inbox__panel" role="region" aria-label="Recent notifications" hidden={!open}>
         <p className="header-inbox__title">Inbox</p>
         {failed && !feed ? <p className="header-inbox__empty" role="status">Notifications are unavailable right now.</p>
-          : !feed ? <p className="header-inbox__empty" role="status">Loading notifications...</p>
+          : !feed ? <p className="header-inbox__empty" role="status"><Spinner size="sm" inline decorative /> Loading notifications...</p>
           : <>
             {unread === 0 && <p className="header-inbox__empty" role="status">No new notifications.</p>}
             {recent.length > 0 && <ul className="header-inbox__list">{recent.map(entry => (
