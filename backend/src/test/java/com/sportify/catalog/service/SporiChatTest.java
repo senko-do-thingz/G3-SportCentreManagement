@@ -140,6 +140,17 @@ class SporiChatTest {
     }
 
     @Test
+    void classCreationQuestionUsesRolePermissionsInsteadOfScheduleKeywords() {
+        assertThat(CenterConsultationService.rules("can i create a class", "can i create a class"))
+                .isEqualTo("CLASS_MANAGEMENT");
+        var manager = service(null).chat(11L, "MANAGER", "can I create a class", List.of());
+        assertThat(manager.status()).isEqualTo("ANSWERED");
+        assertThat(manager.answer()).contains("Create class").contains("qualified coach");
+        var coach = service(null).chat(12L, "COACH", "can I create a class", List.of());
+        assertThat(coach.answer()).contains("Manager action").contains("cannot create");
+    }
+
+    @Test
     void geminiCategoriesAreReadAndUnknownOnesFallBackToSportify() {
         var writer = new GeminiReplyWriter((uri, key, body, timeout) -> null, "http://localhost/", "gemini-test", "k",
                 Duration.ofSeconds(1), new ObjectMapper());

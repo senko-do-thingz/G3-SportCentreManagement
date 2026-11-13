@@ -20,13 +20,13 @@ function setCalendarDate(input: HTMLElement, iso: string) {
   fireEvent.blur(input)
 }
 
-function backend(conflict = false, facilitiesMissing: boolean | number = false, schedule: unknown[] = [session, cancelledSession], editResult: unknown = session) {
+function backend(conflict = false, facilitiesMissing: boolean | number = false, schedule: unknown[] = [session, cancelledSession], editResult: unknown = session, courtMax?: number) {
   return installFakeFetch((call) => {
     const path = call.path.split('?')[0]
     if (path === '/users/me') return json(200, MANAGER)
     if (path === '/manager/classes') return json(200, { content: [item], page: 0, size: 100, totalElements: 1, totalPages: 1 })
     if (path === '/coaches') return json(200, [{ id: 3, fullName: 'Quan Coach', sportIds: [1] }])
-    if (path === '/facilities') return facilitiesMissing ? backendError(typeof facilitiesMissing === 'number' ? facilitiesMissing : 404, 'Facility endpoint unavailable') : json(200, [{ id: 1, name: 'Court A', active: true }])
+    if (path === '/facilities') return facilitiesMissing ? backendError(typeof facilitiesMissing === 'number' ? facilitiesMissing : 404, 'Facility endpoint unavailable') : json(200, [{ id: 1, name: 'Court A', active: true, capacity: courtMax }])
     if (path === '/manager/sessions') return json(200, schedule)
     if (path === '/manager/classes/5/sessions' && call.method === 'POST') return conflict ? json(409, { status: 409, message: 'Schedule conflict', details: { conflicts: [{ sessionId: 7, requestedDate: date, date, startTime: '09:00:00', endTime: '10:00:00', class: session.class, coach: session.coach, facility: session.facility, conflictType: 'BOTH' }, { sessionId: 9, requestedDate: date, date, startTime: '09:15:00', endTime: '10:15:00', class: null, coach: null, facility: null, conflictType: 'FACILITY' }] } }) : json(201, [session])
     if (path === '/manager/sessions/7/cancel') return json(200, session)
@@ -290,6 +290,35 @@ describe('FE-07 schedule', () => {
     await user.click(screen.getByRole('button', { name: 'Publish' }))
     await user.click(screen.getByRole('button', { name: 'Publish session' }))
     await waitFor(() => expect(api.calls.some((call) => call.path === '/manager/sessions/9/publish' && call.method === 'PUT')).toBe(true))
+  })
+  it('shows physical court capacity and keeps the class maximum as an additional guard', async () => {
+    backend(false, false, [], session, 10)
+    const user = userEvent.setup()
+    renderApp(`/manager/schedule?classId=5`)
+    await waitFor(() => expect(screen.getByRole('button', { name: '+ Create session' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: '+ Create session' }))
+    const dialog = screen.getByRole('dialog', { name: 'Create session' })
+    expect(within(dialog).getByLabelText(/^Capacity/)).toHaveValue(20)
+    expect(within(dialog).getByText(/Choose a facility to see its physical limit/)).toBeInTheDocument()
+    await user.selectOptions(within(dialog).getByLabelText(/^Facility/), '1')
+    expect(within(dialog).getByLabelText(/^Capacity/)).toHaveValue(10)
+    expect(within(dialog).getByText(/Physical facility capacity: 10 members/)).toBeInTheDocument()
+    expect(within(dialog).getAllByText(/Allowed session maximum: 10 members/).length).toBeGreaterThan(0)
+    fireEvent.change(within(dialog).getByLabelText(/^Capacity/), { target: { value: '15' } })
+    await user.click(within(dialog).getByRole('button', { name: 'Create schedule' }))
+    expect(await within(dialog).findByText('Capacity must be a whole number from 1 to 10.')).toBeInTheDocument()
+  })
+  it('never exceeds the class limit when a court is larger than its class', async () => {
+    backend(false, false, [], session, 30)
+    const user = userEvent.setup()
+    renderApp(`/manager/schedule?classId=5`)
+    await waitFor(() => expect(screen.getByRole('button', { name: '+ Create session' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: '+ Create session' }))
+    const dialog = screen.getByRole('dialog', { name: 'Create session' })
+    await user.selectOptions(within(dialog).getByLabelText(/^Facility/), '1')
+    expect(within(dialog).getByLabelText(/^Capacity/)).toHaveValue(20)
+    expect(within(dialog).getByText(/Physical facility capacity: 30 members/)).toBeInTheDocument()
+    expect(within(dialog).getAllByText(/Allowed session maximum: 20 members/).length).toBeGreaterThan(0)
   })
   it('creates a weekly schedule using weekdays and range, without a date or draft status', async () => {
     const api = backend()

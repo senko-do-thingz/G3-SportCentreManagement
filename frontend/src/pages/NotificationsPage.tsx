@@ -37,16 +37,17 @@ function NotificationsList({ role }: { role: Role }) {
       {error && <Notice tone="danger">{error}</Notice>}
       {resource.status === 'loading' && <Spinner label="Loading notifications" />}
       {resource.status === 'error' && <ErrorState error={resource.error} onRetry={reload} />}
-      {resource.status === 'ready' && (resource.data.entries.length === 0
-        ? <EmptyState title="No notifications yet" />
-        : <ul className="inbox-list">{resource.data.entries.map(entry => (
+      {resource.status === 'ready' && <>
+        {resource.data.unread === 0 && <EmptyState title="No new notifications" description={resource.data.entries.length ? 'Your earlier notifications remain below.' : undefined} />}
+        {resource.data.entries.length > 0 && <ul className="inbox-list">{resource.data.entries.map(entry => (
           <li key={entry.id} className={'inbox-item' + (entry.read ? '' : ' inbox-item--unread')}>
             <p><strong>{entry.title}</strong></p>
             <p>{entry.content}</p>
             <p className="inbox-item__meta">{formatDateTime(entry.createdAt)}{entry.read ? ' · Read' : ' · Unread'}</p>
             {!entry.read && <Button variant="secondary" size="sm" onClick={() => void markRead(entry.id)}>Mark as read</Button>}
           </li>
-        ))}</ul>)}
+        ))}</ul>}
+      </>}
     </div>
   )
 }
