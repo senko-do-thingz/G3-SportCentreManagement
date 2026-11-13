@@ -87,7 +87,7 @@ function HeaderInboxForRole({ role }: { role: Role }) {
         onClick={toggle}
       >
         <EnvelopeIcon />
-        {unread > 0 && <span className="header-inbox__count" aria-hidden="true">{unread > 99 ? '99+' : unread}</span>}
+        {unread > 0 && <span className="header-inbox__dot" aria-hidden="true" />}
       </button>
       <div id={panelId} className="header-inbox__panel" role="region" aria-label="Recent notifications" hidden={!open}>
         <p className="header-inbox__title">Inbox</p>

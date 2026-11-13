@@ -105,7 +105,7 @@ export function TokenQrPaymentCard({ payment, onSettled }: { payment: Payment; o
     {result && <div role="status" className="notice notice--success">
       <strong>Payment Successful - Demo</strong>
       <p>Settlement provenance: SIMULATED. Invoice {result.invoiceNumber} is available.</p>
-      <a className="btn btn--secondary" href={PAYMENT_PATHS.receipt(result.invoiceId!)}>View receipt</a>
+      <a className="btn btn--secondary btn--md" href={PAYMENT_PATHS.receipt(result.invoiceId!)}>View receipt</a>
     </div>}
     {error && <p role="alert" className="notice notice--danger">{error}</p>}
   </Card>

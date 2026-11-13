@@ -52,7 +52,7 @@
 .payment-hero__title {
   margin: 0;
   color: var(--color-on-feature);
-  font-size: clamp(28px, 3.6vw, 42px);
+  font-size: var(--ui-title-size);
   font-weight: 850;
   letter-spacing: 0.02em;
   line-height: 1.1;
@@ -346,6 +346,11 @@
 .payment-row__reference span {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+}
+
+/* Amounts and methods never break inside the value ("1.140.000 / VND"); the service text takes the wrapping. */
+.payment-row__value {
+  white-space: nowrap;
 }
 
 /* Receipt */

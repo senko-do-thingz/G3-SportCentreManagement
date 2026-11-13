@@ -346,6 +346,29 @@ export function itemHref(area: RoleArea, item: NavItem): string {
   return item.path ? `${area.basePath}/${item.path}` : area.basePath
 }
 
+/**
+ * Breadcrumb names of pages that are not in the side menu, by path relative to the area base path. A key ending in
+ * '/' also names every page below it.
+ */
+const SUB_PAGE_TITLES: Record<string, string> = {
+  notifications: 'Inbox',
+  inbox: 'Action inbox',
+  'check-in-pass': 'Check-in pass',
+  assistant: 'Center assistant',
+  'sessions/': 'Session detail',
+  'classes/new': 'Create class',
+  'classes/': 'Edit class',
+}
+
+/** Name of the current page for the breadcrumb: its menu item, else a known sub page, else the workspace name. */
+export function pageTitle(area: RoleArea, pathname: string): string {
+  const item = findActiveItem(area, pathname)
+  if (item) return item.title
+  const relative = pathname.startsWith(`${area.basePath}/`) ? pathname.slice(area.basePath.length + 1) : ''
+  const key = Object.keys(SUB_PAGE_TITLES).find((path) => (path.endsWith('/') ? relative.startsWith(path) : relative === path))
+  return key ? SUB_PAGE_TITLES[key] : area.workspaceLabel
+}
+
 /** Finds the nav item that matches the current location, for page titles and breadcrumbs. */
 export function findActiveItem(area: RoleArea, pathname: string): NavItem | undefined {
   const items = areaItems(area)

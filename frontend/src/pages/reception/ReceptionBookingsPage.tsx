@@ -191,7 +191,7 @@ function ReceptionBookingsContent() {
       />
     </Card>
 
-    {memberId && <Card title="Member bookings" actions={resource.status === 'ready' ? <Link className="btn btn--primary" to={`/reception/bookings/new?${new URLSearchParams({ memberId: String(memberId), q: query })}`}>Book for member</Link> : undefined}>
+    {memberId && <Card title="Member bookings" actions={resource.status === 'ready' ? <Link className="btn btn--primary btn--md" to={`/reception/bookings/new?${new URLSearchParams({ memberId: String(memberId), q: query })}`}>Book for member</Link> : undefined}>
       {resource.status === 'loading' ? <PageLoader label="Loading member bookings" /> : resource.status === 'error' ? <ErrorState title="We could not load this member's bookings" error={resource.error} onRetry={reloadResource} /> : <>
         <section className="reception-booking-member" aria-label="Selected member">
           <MemberHeader member={resource.data.member} />
@@ -209,7 +209,7 @@ function ReceptionBookingsContent() {
           <Select label="Booking status" placeholder="All statuses" value={status ?? ''} options={[{ value: 'CONFIRMED', label: 'Confirmed' }, { value: 'CANCELLED', label: 'Cancelled' }]} onChange={(event) => setParams((current) => withQuery(current, { status: event.target.value || null, page: null }))} />
           <Button variant="ghost" onClick={reloadResource}>Refresh bookings</Button>
         </div>
-        {resource.data.bookings.content.length === 0 ? <EmptyState title={`No ${when.toLowerCase()} bookings`} description="Bookings for this member will appear here." action={<Link className="btn btn--secondary" to={`/reception/bookings/new?${new URLSearchParams({ memberId: String(memberId), q: query })}`}>Book a session</Link>} /> : <div className="booking-list">
+        {resource.data.bookings.content.length === 0 ? <EmptyState title={`No ${when.toLowerCase()} bookings`} description="Bookings for this member will appear here." action={<Link className="btn btn--secondary btn--md" to={`/reception/bookings/new?${new URLSearchParams({ memberId: String(memberId), q: query })}`}>Book a session</Link>} /> : <div className="booking-list">
           {resource.data.bookings.content.map((booking) => <article className="booking-history-card" key={booking.id}>
             <div className="booking-history-card__heading">
               <div><p className="booking-history-card__date">{bookingDate(booking.sessionDate)} / {bookingTime(booking.startTime)} - {bookingTime(booking.endTime)}</p><h2>{bookingTitle(booking)}</h2></div>
@@ -306,7 +306,7 @@ function ReceptionEligibilityCard({ memberId, query, session }: { memberId: numb
       return <>
         <div className="browse-eligibility" role="status"><Badge tone={state === 'ELIGIBLE' ? 'success' : 'warning'}>{state === 'ELIGIBLE' ? 'Eligible' : ELIGIBILITY_COPY[state].title}</Badge><p>{state === 'ELIGIBLE' ? 'A suitable paid package is available. The booking request will recheck seat and credit availability.' : ELIGIBILITY_COPY[state].message}</p></div>
         {registrations.length ? <fieldset className="booking-package-options"><legend className="visually-hidden">Eligible package registrations</legend>{registrations.map((registration) => <label className={`booking-package${selected?.registrationId === registration.registrationId ? ' booking-package--selected' : ''}`} key={registration.registrationId}><input type="radio" name="packageRegistrationId" value={registration.registrationId} checked={selected?.registrationId === registration.registrationId} onChange={() => setSelectedRegistrationId(registration.registrationId)} /><span className="booking-package__body"><strong>{registration.packageName}</strong><span>Registration {registration.registrationCode}</span><span>{registration.remainingSessions} sessions before booking / {registration.remainingSessions - 1} after</span><span>Valid {bookingDate(registration.startDate)} - {bookingDate(registration.endDate)}</span></span></label>)}</fieldset> : PACKAGE_RECOVERY_REASONS.some((reason) => reason === state) ? <SessionPackageRecommendations session={session} memberId={memberId} /> : null}
-        {submitError && <div className="booking-error" role="alert"><strong>{outcomeUnknown ? 'Booking outcome not verified' : 'Booking not completed'}</strong><p>{submitError}</p>{outcomeUnknown && <Link className="btn btn--secondary" to={`/reception/bookings?${new URLSearchParams({ memberId: String(memberId), q: query })}`}>Check member bookings</Link>}</div>}
+        {submitError && <div className="booking-error" role="alert"><strong>{outcomeUnknown ? 'Booking outcome not verified' : 'Booking not completed'}</strong><p>{submitError}</p>{outcomeUnknown && <Link className="btn btn--secondary btn--md" to={`/reception/bookings?${new URLSearchParams({ memberId: String(memberId), q: query })}`}>Check member bookings</Link>}</div>}
         <div className="browse-actions booking-actions"><Button loading={submitting} disabled={!canBook || submitting || outcomeUnknown} onClick={() => selected && void createBooking(selected.registrationId)}>Confirm booking</Button></div>
       </>
     })()}
@@ -335,9 +335,9 @@ export function ReceptionAssistedBookingPage() {
     setParams((current) => withQuery(current, { week: date, sessionId: null }))
   }
 
-  if (!memberId) return <ReceptionScreen className="reception-page reception-ui25-page home-page reception-bookings-page"><PageHeader eyebrow="Receptionist workspace" title="Book for member" /><Card><ErrorState title="Choose a member first" message="Search for a member before creating a booking." /><Link className="btn btn--primary" to="/reception/bookings">Member booking search</Link></Card></ReceptionScreen>
+  if (!memberId) return <ReceptionScreen className="reception-page reception-ui25-page home-page reception-bookings-page"><PageHeader eyebrow="Receptionist workspace" title="Book for member" /><Card><ErrorState title="Choose a member first" message="Search for a member before creating a booking." /><Link className="btn btn--primary btn--md" to="/reception/bookings">Member booking search</Link></Card></ReceptionScreen>
   return <ReceptionScreen className="reception-page reception-ui25-page home-page reception-bookings-page">
-    <PageHeader eyebrow="Receptionist workspace" title="Book for Member" description="Choose an available session and a package that covers it. Booking uses Vietnam time (UTC+7)." actions={<Link className="btn btn--secondary" to={`/reception/bookings?${new URLSearchParams({ memberId: String(memberId), q: query })}`}>Back to bookings</Link>} />
+    <PageHeader eyebrow="Receptionist workspace" title="Book for Member" description="Choose an available session and a package that covers it. Booking uses Vietnam time (UTC+7)." actions={<Link className="btn btn--secondary btn--md" to={`/reception/bookings?${new URLSearchParams({ memberId: String(memberId), q: query })}`}>Back to bookings</Link>} />
       {base.status === 'loading' ? <PageLoader label="Loading member and session options" /> : base.status === 'error' ? <ErrorState title="We could not load booking options" error={base.error} onRetry={reloadBase} /> : <>
       <Card title="Member"><MemberHeader member={base.data.member} /><p className="browse-muted">The selected member is attached to the booking request. Package credits are checked again when the booking is submitted.</p></Card>
       <Card title="Choose a session">
@@ -374,8 +374,8 @@ export function ReceptionBookingConfirmedPage() {
   const returnTo = typeof stateValue.returnTo === 'string' && stateValue.returnTo.startsWith('/reception/bookings')
     ? stateValue.returnTo : memberId ? `/reception/bookings?${new URLSearchParams({ memberId: String(memberId), q: params.get('q') ?? '' })}` : '/reception/bookings'
   if (resource.status === 'loading') return <ReceptionScreen className="reception-page reception-ui25-page home-page reception-bookings-page"><PageLoader label="Loading booking confirmation" /></ReceptionScreen>
-  if (resource.status === 'error') return <ReceptionScreen className="reception-page reception-ui25-page home-page reception-bookings-page"><PageHeader title="Booking confirmation" /><ErrorState title="We could not load the booking confirmation" error={resource.error} onRetry={reloadConfirmation} /><Link className="btn btn--primary" to={returnTo}>Back to member bookings</Link></ReceptionScreen>
-  if (!resource.data) return <ReceptionScreen className="reception-page reception-ui25-page home-page reception-bookings-page"><PageHeader title="Booking confirmation" /><Card><EmptyState title="Booking not verified" description="We could not verify this booking as confirmed for the selected member. It may have been cancelled or may no longer be listed. Check member history before confirming with them." /><Link className="btn btn--primary" to={returnTo}>Back to member bookings</Link></Card></ReceptionScreen>
+  if (resource.status === 'error') return <ReceptionScreen className="reception-page reception-ui25-page home-page reception-bookings-page"><PageHeader title="Booking confirmation" /><ErrorState title="We could not load the booking confirmation" error={resource.error} onRetry={reloadConfirmation} /><Link className="btn btn--primary btn--md" to={returnTo}>Back to member bookings</Link></ReceptionScreen>
+  if (!resource.data) return <ReceptionScreen className="reception-page reception-ui25-page home-page reception-bookings-page"><PageHeader title="Booking confirmation" /><Card><EmptyState title="Booking not verified" description="We could not verify this booking as confirmed for the selected member. It may have been cancelled or may no longer be listed. Check member history before confirming with them." /><Link className="btn btn--primary btn--md" to={returnTo}>Back to member bookings</Link></Card></ReceptionScreen>
 
   const booking = resource.data
   return <ReceptionScreen className="reception-page reception-ui25-page home-page reception-bookings-page">
@@ -387,7 +387,7 @@ export function ReceptionBookingConfirmedPage() {
       <p className="booking-code">Booking {booking.bookingCode}</p><SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
       <dl className="browse-facts booking-confirmation__facts"><div><dt>Member</dt><dd>{booking.memberFullName || 'Member'}</dd></div><div><dt>Date</dt><dd>{bookingDate(booking.sessionDate)}</dd></div><div><dt>Time</dt><dd>{bookingTime(booking.startTime)} - {bookingTime(booking.endTime)} Vietnam time</dd></div><div><dt>Sport</dt><dd>{booking.sportName || 'Not provided'}</dd></div><div><dt>Coach</dt><dd>{booking.trainingType === 'SELF_TRAINING' ? 'Self-training' : booking.coachName || 'Not provided'}</dd></div><div><dt>Facility</dt><dd>{booking.facilityName || 'Not provided'}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Not provided'}</dd></div><div><dt>Status</dt><dd><StatusBadge status={booking.status} /></dd></div></dl>
       <p className="browse-muted">No notification delivery is reported by the booking response. Share these booking details with the member.</p>
-      <div className="browse-actions booking-actions"><Link className="btn btn--primary" to={returnTo}>Back to member bookings</Link><Link className="btn btn--secondary" to="/reception/bookings">Search another member</Link></div>
+      <div className="browse-actions booking-actions"><Link className="btn btn--primary btn--md" to={returnTo}>Back to member bookings</Link><Link className="btn btn--secondary btn--md" to="/reception/bookings">Search another member</Link></div>
     </Card>
   </ReceptionScreen>
 }

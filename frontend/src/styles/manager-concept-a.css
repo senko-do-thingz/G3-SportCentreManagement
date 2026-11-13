@@ -28,26 +28,6 @@
   min-width: 0;
 }
 
-.concept-eyebrow {
-  color: var(--color-primary);
-  letter-spacing: var(--tracking-eyebrow);
-  font-weight: var(--weight-bold);
-  font-size: var(--text-xs);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-1);
-  text-transform: uppercase;
-}
-
-.concept-eyebrow::before {
-  content: '';
-  display: block;
-  width: 24px;
-  height: 3px;
-  background: var(--color-primary);
-}
-
 .concept-title {
   font-family: var(--font-display);
   color: var(--color-navy);
@@ -257,19 +237,7 @@
   border-radius: 0;
 }
 
-.concept-stat__icon {
-  width: 40px;
-  height: 40px;
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  border-radius: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 900;
-  font-size: var(--text-md);
-  flex: none;
-}
+/* KPI icons: components/ui/StatIcon, styled in components.css like the Coach metrics. */
 
 .concept-stat strong {
   font-size: var(--text-2xl);

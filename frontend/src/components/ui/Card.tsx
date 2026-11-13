@@ -1,4 +1,5 @@
 import type { HTMLAttributes, ReactNode } from 'react'
+import { StatIcon, type StatIconName } from './StatIcon'
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> {
   title?: ReactNode
@@ -25,15 +26,24 @@ export interface StatCardProps {
   label: ReactNode
   value: ReactNode
   hint?: ReactNode
+  /** Optional line icon beside the figures, as on the Coach and Manager KPI cards. */
+  icon?: StatIconName
 }
 
 /** Small metric card, for example "Active packages 0" on the member dashboard. */
-export function StatCard({ label, value, hint }: StatCardProps) {
-  return (
-    <div className="card stat-card">
+export function StatCard({ label, value, hint, icon }: StatCardProps) {
+  const body = (
+    <>
       <p className="stat-card__label">{label}</p>
       <p className="stat-card__value">{value}</p>
       {hint && <p className="stat-card__hint">{hint}</p>}
+    </>
+  )
+  if (!icon) return <div className="card stat-card">{body}</div>
+  return (
+    <div className="card stat-card stat-card--icon">
+      <StatIcon name={icon} />
+      <div className="stat-card__body">{body}</div>
     </div>
   )
 }

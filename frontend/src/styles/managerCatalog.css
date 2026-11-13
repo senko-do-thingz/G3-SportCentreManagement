@@ -2,29 +2,26 @@
 .manager-catalog { gap: var(--space-5); }
 .manager-catalog > .page-header { align-items: center; margin-bottom: 0; }
 .manager-catalog .page-header__text { gap: var(--space-1); }
-.manager-catalog .page-header__title { font-family: var(--font-display); font-size: var(--text-2xl); letter-spacing: -0.035em; }
 .manager-catalog .page-header__description { max-width: 58ch; font-size: var(--text-sm); }
 .manager-catalog__panel.card { padding: 0; overflow: hidden; border-radius: var(--radius-lg); box-shadow: none; }
 .manager-catalog__panel > .card__header {
   min-height: 68px; margin: 0; padding: var(--space-4) var(--space-6);
   border-bottom: 1px solid var(--color-border);
 }
-.manager-catalog__panel .card__title { font-size: var(--text-lg); letter-spacing: -0.02em; }
 .manager-catalog__count { color: var(--color-text-muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
 .manager-catalog__filters.manager-filters {
-  grid-template-columns: minmax(210px, 1.65fr) repeat(3, minmax(135px, 1fr)) auto;
-  align-items: end; gap: var(--space-3); margin: 0; padding: var(--space-4) var(--space-6);
+  margin: 0; padding: var(--space-4) var(--space-6);
   background: var(--color-surface); border-bottom: 1px solid var(--color-border);
 }
 .manager-catalog__filters .field { min-width: 0; }
 .manager-catalog__filters .field__hint { margin-top: var(--space-1); font-size: 0.6875rem; }
-.manager-catalog__filters > .btn { min-height: 42px; white-space: nowrap; }
 .manager-catalog__inline-error { padding: var(--space-4) var(--space-6); }
 .manager-catalog__table { padding: var(--space-3) var(--space-5) 0; }
 .manager-catalog__scroll-hint { display: none; margin: var(--space-3) var(--space-5) 0; color: var(--color-text-muted); font-size: var(--text-xs); }
 .manager-catalog__table .table { min-width: 0; table-layout: fixed; }
 .manager-catalog__table .table-scroll:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.manager-catalog__table .table th { padding: var(--space-3); background: transparent; color: var(--color-text-muted); font-size: var(--text-xs); font-weight: var(--weight-medium); letter-spacing: 0; text-transform: none; border-bottom: 1px solid var(--color-border); }
+/* Column labels use the shared workspace table header (Home band, small uppercase; styles/workspaceUi.css). */
+.manager-catalog__table .table th { padding: var(--space-3); background: var(--ui-band); color: var(--ui-muted); font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: 0.06em; text-transform: uppercase; border-bottom: 1px solid var(--ui-border); }
 .manager-catalog__table .table td { padding: var(--space-3); font-size: var(--text-sm); }
 .manager-catalog__table .table tbody tr:hover td { background: transparent; }
 .manager-catalog__table .table tbody tr:hover td:not([colspan]) { background: var(--color-table-hover); }

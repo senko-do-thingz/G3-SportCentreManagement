@@ -525,11 +525,6 @@
   gap: var(--space-3);
 }
 
-.payment-receipt .card__title {
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
 @media (max-width: 960px) {
   .payment-stats,
   .payment-filters {
@@ -540,13 +535,11 @@
 .reception-page { gap: var(--space-6); }
 .reception-page .page-header { align-items: center; padding: var(--space-8); border: 0; border-radius: var(--radius-xl); background: linear-gradient(120deg, var(--color-hero-deep) 0%, var(--color-navy) 45%, var(--color-primary) 100%); box-shadow: var(--shadow-md); }
 .reception-page .page-header .eyebrow { color: var(--color-hero-highlight); }
-.reception-page .page-header__title { font-family: var(--font-display); font-size: var(--text-3xl); letter-spacing: -0.03em; color: var(--color-on-hero); }
 .reception-page .page-header__description { font-size: var(--text-base); line-height: 1.6; color: var(--color-on-hero-muted); }
 .reception-page .page-header__actions .btn { height: 48px; padding: 0 var(--space-6); font-size: var(--text-base); box-shadow: var(--shadow-sm); }
 .reception-page .page-header__actions .btn--primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); }
 .reception-page .page-header__actions .btn--primary:hover:not(:disabled) { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
 .reception-page .card { padding: var(--space-8); border-radius: var(--radius-xl); border-top: 4px solid var(--color-primary); box-shadow: var(--shadow-md); }
-.reception-page .card__title { font-size: var(--text-xl); letter-spacing: -0.02em; color: var(--color-primary); }
 .reception-page .field__label { font-size: var(--text-md); }
 .reception-page .input, .reception-page .select { height: 48px; font-size: var(--text-base); }
 .reception-page .table-scroll { border: 1px solid var(--color-primary-soft-hover); border-radius: var(--radius-lg); }
@@ -640,27 +633,9 @@
   max-width: 720px;
 }
 
-.reception-page.reception-ui18-page .page-header .eyebrow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  color: var(--h-primary-text);
-}
-
-.reception-page.reception-ui18-page .page-header .eyebrow::before {
-  width: var(--space-8);
-  height: 3px;
-  background: var(--h-accent);
-  content: '';
-}
-
 .reception-page.reception-ui18-page .page-header__title {
   margin: 0;
-  color: var(--h-ink);
-  font-size: clamp(1.75rem, 3.2vw, 2.625rem);
   line-height: 1.1;
-  letter-spacing: 0;
-  text-wrap: balance;
 }
 
 .reception-page.reception-ui18-page .page-header__description {
@@ -726,10 +701,7 @@
 }
 
 .reception-page.reception-ui18-page .card__title {
-  color: var(--h-ink);
-  font-size: var(--text-lg);
   line-height: 1.25;
-  letter-spacing: 0;
 }
 
 .reception-page.reception-ui18-page .reception-sale {
@@ -810,8 +782,9 @@
 
 .reception-page.reception-ui18-page .input,
 .reception-page.reception-ui18-page .select {
-  min-height: 42px;
-  height: 42px;
+  /* Shared workspace control height (styles/workspaceUi.css). */
+  min-height: var(--ui-control-height);
+  height: var(--ui-control-height);
   border-radius: 0;
   font-size: var(--text-sm);
 }

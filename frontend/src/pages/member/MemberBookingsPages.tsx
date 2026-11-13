@@ -210,7 +210,7 @@ export function BookingCancellationPage() {
     return (
       <div className="page browse-page member-commerce">
         <MemberScheduleNav />
-        <PageHeader title="Booking unavailable" />
+        <PageHeader eyebrow="Member workspace" title="Booking unavailable" />
         <Card>
           <p role="alert">Choose a valid booking to cancel.</p>
           <Link className={buttonClassName()} to="/member/bookings">
@@ -347,7 +347,7 @@ function BookingCancellationContent({ id, memberId }: { id: number; memberId: nu
     return (
       <div className="page browse-page member-commerce">
         <MemberScheduleNav />
-        <PageHeader title="Cancel booking" />
+        <PageHeader eyebrow="Member workspace" title="Cancel booking" />
         <BrowseError error={resource.error} onRetry={reload} />
       </div>
     )
@@ -355,7 +355,7 @@ function BookingCancellationContent({ id, memberId }: { id: number; memberId: nu
     return (
       <div className="page browse-page member-commerce">
         <MemberScheduleNav />
-        <PageHeader title="Booking not found" />
+        <PageHeader eyebrow="Member workspace" title="Booking not found" />
         <Card>
           <p>This booking could not be found in your upcoming or past bookings.</p>
           <Link className={buttonClassName()} to="/member/bookings">
@@ -372,7 +372,7 @@ function BookingCancellationContent({ id, memberId }: { id: number; memberId: nu
     return (
       <div className="page browse-page member-commerce">
         <MemberScheduleNav />
-        <PageHeader title="Booking cannot be cancelled" />
+        <PageHeader eyebrow="Member workspace" title="Booking cannot be cancelled" />
         <Card>
           <Badge>Cancelled</Badge>
           <p>This booking has already been cancelled.</p>
@@ -514,7 +514,7 @@ export function BookingCancelledPage() {
     return (
       <div className="page browse-page member-commerce">
         <MemberScheduleNav />
-        <PageHeader title="Cancellation unavailable" />
+        <PageHeader eyebrow="Member workspace" title="Cancellation unavailable" />
         <Card>
           <p role="alert">Choose a valid booking.</p>
           <Link className={buttonClassName()} to="/member/bookings">
@@ -562,7 +562,7 @@ function BookingCancelledContent({ id, memberId }: { id: number; memberId: numbe
     return (
       <div className="page browse-page member-commerce">
         <MemberScheduleNav />
-        <PageHeader title="Cancellation result" />
+        <PageHeader eyebrow="Member workspace" title="Cancellation result" />
         <BrowseError error={resource.error} onRetry={reload} />
       </div>
     )
@@ -570,7 +570,7 @@ function BookingCancelledContent({ id, memberId }: { id: number; memberId: numbe
     return (
       <div className="page browse-page member-commerce">
         <MemberScheduleNav />
-        <PageHeader title="Cancellation not confirmed" />
+        <PageHeader eyebrow="Member workspace" title="Cancellation not confirmed" />
         <Card>
           <div className="booking-error" role="alert">
             <p>This booking is not listed as cancelled. Refresh My Bookings to confirm its current status.</p>

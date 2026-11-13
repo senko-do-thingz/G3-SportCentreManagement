@@ -145,7 +145,7 @@ function CenterConsultationWorkspace() {
                   <Link
                     to="/member/support"
                     state={{ question: asked, excerpt: assistantExcerpt(asked, result) }}
-                    className="btn btn--secondary"
+                    className="btn btn--secondary btn--md"
                   >
                     {text.contactReceptionist}
                   </Link>
