@@ -19,12 +19,14 @@ export interface Recommendations {
   page: number; size: number; totalMatches: number; items: ClassRecommendation[]
 }
 export interface Consultation {
-  mode: 'KNOWLEDGE_BASED' | 'AI_ASSISTED'; status: 'ANSWERED' | 'NO_ANSWER' | 'CONSENT_REQUIRED' | 'UNAVAILABLE'
+  mode: 'KNOWLEDGE_BASED' | 'AI_ASSISTED' | 'AI_GENERATED'; status: 'ANSWERED' | 'NO_ANSWER' | 'CONSENT_REQUIRED' | 'UNAVAILABLE'
   answer: string; historyStored: false
   sources: { kind: string; id: number; title: string; detail: string; path: string }[]
   /** 'vi' when the question was Vietnamese and the answer text is Vietnamese. */
   language?: 'vi' | 'en'
 }
+/** One earlier message of the open chat, sent back so follow-up questions make sense. Never stored. */
+export interface ChatTurn { role: 'user' | 'assistant'; text: string }
 /** F5-01: the Member's level for one sport; null means the general profile level is used. */
 export interface SportLevel { sportId: number; sportName: string; level: string | null }
 /** F5-05: a bookmarked class. It is not a booking; the next session is recomputed on every read. */
@@ -62,5 +64,5 @@ export const trainingGuidanceApi = {
   savedRecommendations: (signal: AbortSignal) => api.get<SavedRecommendation[]>(`${training}/saved-recommendations`, { signal }),
   saveRecommendation: (classId: number, reason: string | null) => api.post<SavedRecommendation>(`${training}/saved-recommendations`, { classId, reason }),
   removeSavedRecommendation: (id: number) => api.delete<void>(`${training}/saved-recommendations/${id}`),
-  consult: (question: string) => api.post<Consultation>('/member/training/consultation', { question, optIn: true }),
+  consult: (question: string, history: ChatTurn[] = []) => api.post<Consultation>('/member/training/consultation', history.length ? { question, optIn: true, history } : { question, optIn: true }),
 }

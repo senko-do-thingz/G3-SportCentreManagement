@@ -1,14 +1,11 @@
-import { useContext, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { AuthContext } from '../../auth/authContext'
-import { trainingGuidanceApi, type Consultation } from '../../api/trainingGuidanceApi'
-import { Button, Input, Card } from '../../components/ui'
+import { type Consultation } from '../../api/trainingGuidanceApi'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { PageHeader } from '../../components/ui/PageHeader'
-import { SporiRobotMark } from './SporiRobotMark'
 import { safeMemberReturnTo } from './assistantNavigation'
-import { useTrainingAction } from '../training/trainingFormState'
-import { ActionMessage } from '../training/TrainingFormFields'
+import { SporiAvatar, SporiComposer, SporiSources, SporiText, SporiTyping } from './sporiChat'
+import { formatTime, useSporiChat } from './useSporiChat'
 
 export function MemberAssistantLink({ onNavigate, className, label = 'Open center assistant' }: {
   onNavigate?: () => void
@@ -33,11 +30,11 @@ export function MemberAssistantLink({ onNavigate, className, label = 'Open cente
 
 // One example per supported theme: schedules, center services, general exercise and the Member's own records.
 const ASSISTANT_EXAMPLES = [
-  'Which classes are available in the next two weeks?',
-  'What are the package prices?',
-  'How should I warm up before practice?',
-  'How many sessions do I have left?',
-  'What is my homework?',
+  { icon: '📅', text: 'Which classes are available in the next two weeks?' },
+  { icon: '💳', text: 'What are the package prices?' },
+  { icon: '🔥', text: 'How should I warm up before practice?' },
+  { icon: '🎟️', text: 'How many sessions do I have left?' },
+  { icon: '📝', text: 'What is my homework?' },
 ] as const
 
 const SOURCE_KIND_LABELS: Record<string, string> = {
@@ -56,16 +53,17 @@ const SOURCE_KIND_LABELS: Record<string, string> = {
 const MODE_LABELS: Record<Consultation['mode'], string> = {
   KNOWLEDGE_BASED: 'Keyword rules',
   AI_ASSISTED: 'AI understood your question',
+  AI_GENERATED: 'Written by Gemini AI from Sportify data',
 }
 
-/** Labels of the answer card; Vietnamese when the Member asked in Vietnamese. */
+/** Labels inside an answer bubble; Vietnamese when the Member asked in Vietnamese. */
 const ANSWER_TEXT = {
   en: {
     answered: 'Grounded center answer', unavailable: 'Answer unavailable', found: 'How this answer was found',
     noAnswer: 'This assistant does not answer personal, medical or private questions. Ask your human coach or reception.',
     noAnswerSteps: 'Open Contact Reception, choose a topic, enter the question and submit; replies appear in My support requests.',
     contactReceptionist: 'Contact Receptionist',
-    sourceType: 'Source type', open: 'Open source', contact: 'Contact reception about this answer',
+    contact: 'Contact reception about this answer',
     modes: MODE_LABELS, kinds: SOURCE_KIND_LABELS, otherKind: 'Center information',
   },
   vi: {
@@ -73,8 +71,8 @@ const ANSWER_TEXT = {
     noAnswer: 'Trợ lý không trả lời câu hỏi cá nhân, y tế hay riêng tư. Hãy hỏi Coach hoặc lễ tân.',
     noAnswerSteps: 'Mở mục Liên hệ Lễ tân, chọn chủ đề, nhập câu hỏi và gửi; phản hồi sẽ hiển thị trong Yêu cầu hỗ trợ của tôi.',
     contactReceptionist: 'Liên hệ Lễ tân',
-    sourceType: 'Loại nguồn', open: 'Mở nguồn', contact: 'Liên hệ lễ tân về câu trả lời này',
-    modes: { KNOWLEDGE_BASED: 'Quy tắc từ khoá', AI_ASSISTED: 'AI đã hiểu câu hỏi của bạn' } as Record<Consultation['mode'], string>,
+    contact: 'Liên hệ lễ tân về câu trả lời này',
+    modes: { KNOWLEDGE_BASED: 'Quy tắc từ khoá', AI_ASSISTED: 'AI đã hiểu câu hỏi của bạn', AI_GENERATED: 'Gemini AI viết từ dữ liệu Sportify' } as Record<Consultation['mode'], string>,
     kinds: {
       CLASS_SESSION: 'Lịch học của trung tâm', SPORT_PACKAGE: 'Danh mục gói tập', PRODUCT_GUIDANCE: 'Hướng dẫn đặt chỗ',
       CURATED_FAQ: 'FAQ cố định của trung tâm', HUMAN_COACH: 'Coach (người thật)', MY_PACKAGE: 'Gói tập của bạn',
@@ -100,74 +98,114 @@ function CenterConsultationWorkspace() {
   const [params] = useSearchParams()
   const location = useLocation()
   const returnTo = safeMemberReturnTo(params.get('returnTo'))
-  const [optIn, setOptIn] = useState(false)
-  const [result, setResult] = useState<Consultation | null>(null)
+  const chat = useSporiChat('Spori could not load an answer. Please try again.')
   const [question, setQuestion] = useState(() => {
     const routeQuestion = (location.state as { assistantQuestion?: unknown } | null)?.assistantQuestion
     return typeof routeQuestion === 'string' ? routeQuestion.slice(0, 500) : params.get('question')?.slice(0, 500) ?? ''
   })
-  const [asked, setAsked] = useState('')
-  const action = useTrainingAction()
-  const resultRef = useRef<HTMLDivElement>(null)
+  const logRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const enabled = import.meta.env.VITE_TRAINING_CONSULTATION_ENABLED !== 'false'
-  // Bring a new answer into view on short desktop screens such as 1280x720.
-  useEffect(() => { if (result) resultRef.current?.scrollIntoView?.({ block: 'start' }) }, [result])
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!optIn || !enabled) return
+  const started = chat.messages.length > 0 || chat.pending
+
+  // Keep the newest message in view, like any chat.
+  useEffect(() => {
+    const log = logRef.current
+    if (!log) return
+    if (typeof log.scrollTo === 'function') log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' })
+    else log.scrollTop = log.scrollHeight
+  }, [chat.messages, chat.pending])
+
+  function submit() {
     const text = question.trim()
-    void action.run(async () => { setResult(await trainingGuidanceApi.consult(text)); setAsked(text) }, 'Center information loaded.')
+    if (!enabled || !text || chat.pending) return
+    setQuestion('')
+    void chat.send(text).then(() => inputRef.current?.focus())
   }
+
+  function pickExample(example: string) {
+    setQuestion(example)
+    inputRef.current?.focus()
+  }
+
   return (
-    <div className="training-page assistant-workspace">
-      <Link className="assistant-workspace__back" to={returnTo}>Back to previous page</Link>
-      <div className="assistant-workspace__heading">
-        <span className="assistant-workspace__mark"><SporiRobotMark /></span>
-        <PageHeader eyebrow={<span className="assistant-workspace__desktop-eyebrow">Spori AI / Sportify training guide</span>} title="Center assistant" description="Ask in English or Vietnamese about schedules, package prices, general exercise, or your own packages, bookings and coach feedback. Answers come only from center data and your own records." />
+    <div className="training-page spori-page">
+      <div className="spori-page__top">
+        <Link className="spori-page__back" to={returnTo}>
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          Back to previous page
+        </Link>
+        {chat.messages.length > 0 && <button type="button" className="spori-page__new" onClick={() => { chat.reset(); inputRef.current?.focus() }} disabled={chat.pending}>
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
+          New chat
+        </button>}
       </div>
-      <div className="assistant-workspace__privacy">
-        <p>Answers use Sportify's own center records. No conversation history is stored: your question and answer stay on this page until you leave or turn consultation off. General exercise answers are fixed curated text, not personal or medical advice.</p>
-        <p aria-label="External AI disclosure"><strong>External AI:</strong> turning on consultation does not share your question with any outside company. External AI is off unless the center approves it. Even then your question text is never sent: only fixed service words found in it (for example &quot;price&quot;, &quot;tomorrow&quot; or a sport name) and the list of sports. Names, contact details, numbers and health details are never sent, private and health questions are answered without AI, and the AI never writes the answer.</p>
-      </div>
-      {!enabled ? <EmptyState title="Automated consultation is disabled" /> : <Card title="Ask about the center">
-        <label><input type="checkbox" checked={optIn} disabled={action.pending} onChange={event => { setOptIn(event.target.checked); setResult(null); setQuestion('') }} /> Enable automated center consultation</label>
-        <div role="group" aria-label="Example questions"><p>Example questions (select one to fill the question field):</p>
-          <div className="training-actions">{ASSISTANT_EXAMPLES.map(example => <Button key={example} type="button" variant="secondary" disabled={!optIn || action.pending} onClick={() => setQuestion(example)}>{example}</Button>)}</div>
-        </div>
-        <form className="training-form" onSubmit={submit}><Input label="Center question" name="question" value={question} onChange={event => setQuestion(event.target.value)} maxLength={500} required disabled={!optIn || action.pending} />
-          <Button type="submit" disabled={!optIn} loading={action.pending}>Ask center assistant</Button></form><ActionMessage {...action} />
-      </Card>}
-      {result && (() => {
-        const text = ANSWER_TEXT[result.language === 'vi' ? 'vi' : 'en']
-        return <div ref={resultRef}><Card title={result.status === 'ANSWERED' ? text.answered : text.unavailable}>
-          <div role="status" className="assistant-workspace__answer">
-            <p>{result.mode} - {result.answer}</p>
-            {result.status === 'NO_ANSWER' && (
-              <div className="assistant-workspace__no-answer">
-                <p>{text.noAnswer}</p>
-                <p className="assistant-workspace__steps">{text.noAnswerSteps}</p>
-                <div className="training-actions" style={{ marginTop: '12px', marginBottom: '12px' }}>
-                  <Link
-                    to="/member/support"
-                    state={{ question: asked, excerpt: assistantExcerpt(asked, result) }}
-                    className="btn btn--secondary"
-                  >
-                    {text.contactReceptionist}
-                  </Link>
-                </div>
-              </div>
-            )}
+
+      <section className="spori-page__window" aria-labelledby="assistant-chat-title">
+        <header className="spori-page__head">
+          <SporiAvatar size="md" />
+          <div className="spori-page__identity">
+            <h1 id="assistant-chat-title">Center assistant</h1>
+            <p><span className="spori-online" aria-hidden="true" />Spori AI · Online</p>
           </div>
-          <p>{text.found}: {text.modes[result.mode] ?? result.mode}.</p>
-          {result.sources.length > 0 && <ul className="training-list">{result.sources.map(source => <li key={`${source.kind}-${source.id}`}><h2>{source.title}</h2><p>{text.sourceType}: {text.kinds[source.kind] ?? text.otherKind}</p><p>{source.detail}</p><Link to={source.path}>{text.open}: {source.title}</Link></li>)}</ul>}
-          {result.status !== 'NO_ANSWER' && <Link to="/member/support" state={{ excerpt: assistantExcerpt(asked, result) }}>{text.contact}</Link>}
-        </Card></div>
-      })()}
-      <div role="group" aria-label="Need help from a person?" className="training-actions">
+        </header>
+
+        {!enabled ? <div className="spori-page__disabled"><EmptyState title="Automated consultation is disabled" /></div> : <>
+          <div ref={logRef} className={'spori-log spori-page__log' + (started ? '' : ' is-empty')} role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation">
+            {!started && <div className="spori-hero">
+              <SporiAvatar size="lg" />
+              <h2>Hi, I'm Spori 👋</h2>
+              <p>Ask about classes, prices, or your own packages, bookings and homework — in English or Vietnamese.</p>
+              <div className="spori-hero__grid" role="group" aria-label="Example questions">
+                {ASSISTANT_EXAMPLES.map(example => <button key={example.text} type="button" onClick={() => pickExample(example.text)}>
+                  <span aria-hidden="true">{example.icon}</span>{example.text}
+                </button>)}
+              </div>
+            </div>}
+            {chat.messages.map(message => message.role === 'user'
+              ? <div key={message.id} className="spori-row spori-row--user"><div className="spori-bubble"><SporiText text={message.text} /></div><time className="spori-time">{formatTime(message.at)}</time></div>
+              : message.role === 'error'
+                ? <div key={message.id} className="spori-row spori-row--bot"><SporiAvatar /><div className="spori-bubble is-error" role="alert"><SporiText text={message.text} /></div></div>
+                : <AnswerBubble key={message.id} question={message.question} result={message.result} at={message.at} />)}
+            {chat.pending && <SporiTyping label="Spori is typing…" />}
+          </div>
+
+          <div className="spori-page__composer">
+            <SporiComposer id="assistant-question" label="Your question" buttonLabel="Ask" placeholder="Message Spori…" value={question}
+              pending={chat.pending} onChange={setQuestion} onSubmit={submit} inputRef={inputRef} />
+            <p className="spori-page__hint" aria-label="Privacy note">Answers come from Sportify data only. Personal details are never sent to AI.</p>
+          </div>
+        </>}
+      </section>
+
+      <nav aria-label="Need help from a person?" className="spori-page__handoff">
+        <span>Need a person?</span>
         <Link to="/member/training/questions">Ask your human coach</Link>
         <Link to="/member/support">Contact reception</Link>
         <Link to="/member/support#my-requests">My support requests</Link>
+      </nav>
+    </div>
+  )
+}
+
+function AnswerBubble({ question, result, at }: { question: string; result: Consultation; at: Date }) {
+  const text = ANSWER_TEXT[result.language === 'vi' ? 'vi' : 'en']
+  const noAnswer = result.status === 'NO_ANSWER'
+  return (
+    <div className="spori-row spori-row--bot">
+      <SporiAvatar />
+      <div className={'spori-bubble' + (noAnswer ? ' is-warning' : '')}>
+        <span className={'spori-tag' + (noAnswer ? ' spori-tag--warning' : '')}>{noAnswer ? text.unavailable : text.answered}</span>
+        <SporiText text={result.answer} />
+        {noAnswer && <div className="spori-handoff">
+          {result.mode !== 'AI_GENERATED' && <><p>{text.noAnswer}</p><p>{text.noAnswerSteps}</p></>}
+          <Link className="spori-handoff__button" to="/member/support" state={{ question, excerpt: assistantExcerpt(question, result) }}>{text.contactReceptionist}</Link>
+        </div>}
+        <SporiSources sources={result.sources} kindLabel={kind => text.kinds[kind] ?? text.otherKind} />
+        <p className="spori-meta">{text.found}: {text.modes[result.mode] ?? result.mode}.</p>
+        {!noAnswer && <Link className="spori-meta-link" to="/member/support" state={{ excerpt: assistantExcerpt(question, result) }}>{text.contact}</Link>}
       </div>
+      <time className="spori-time">{formatTime(at)}</time>
     </div>
   )
 }

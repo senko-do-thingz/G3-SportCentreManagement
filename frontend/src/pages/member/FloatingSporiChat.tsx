@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { trainingGuidanceApi, type Consultation } from '../../api/trainingGuidanceApi'
 import { SporiRobotMark } from './SporiRobotMark'
+import { SporiAvatar, SporiComposer, SporiSources, SporiText, SporiTyping } from './sporiChat'
+import { formatTime, useSporiChat, type SporiMessage } from './useSporiChat'
 
 const PROMPTS = [
   'Which classes are available soon?',
@@ -9,26 +10,15 @@ const PROMPTS = [
   'How many sessions do I have left?',
 ] as const
 
-type ChatMessage = {
-  id: number
-  role: 'user' | 'assistant'
-  text: string
-  result?: Consultation
-  error?: boolean
-  questionText?: string
-}
-
 export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
   const location = useLocation()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
-  const [consented, setConsented] = useState(false)
-  const [pending, setPending] = useState(false)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const nextMessageId = useRef(1)
+  const chat = useSporiChat('Spori could not load a grounded answer. Please try again or open the full assistant.')
   const launcher = useRef<HTMLButtonElement>(null)
   const dialog = useRef<HTMLElement>(null)
   const messageLog = useRef<HTMLDivElement>(null)
+  const input = useRef<HTMLTextAreaElement>(null)
   const enabled = import.meta.env.VITE_TRAINING_CONSULTATION_ENABLED !== 'false'
   const returnTo = location.pathname + location.search + location.hash
   const assistantHref = '/member/assistant?returnTo=' + encodeURIComponent(returnTo)
@@ -66,34 +56,15 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
     if (!log) return
     if (typeof log.scrollTo === 'function') log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' })
     else log.scrollTop = log.scrollHeight
-  }, [messages, open, pending])
+  }, [chat.messages, open, chat.pending])
 
   function close() { setOpen(false); launcher.current?.focus() }
 
-  async function send(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  function send() {
     const question = draft.trim()
-    if (!question || !consented || pending || !enabled) return
-    const userMessage: ChatMessage = { id: nextMessageId.current++, role: 'user', text: question }
-    setMessages((current) => [...current, userMessage])
+    if (!question || chat.pending || !enabled) return
     setDraft('')
-    setPending(true)
-    try {
-      const result = await trainingGuidanceApi.consult(question)
-      setMessages((current) => [...current, { id: nextMessageId.current++, role: 'assistant', text: result.answer, result, questionText: question }])
-    } catch (error) {
-      const text = error instanceof Error && error.message ? error.message : 'Spori could not load a grounded answer. Please try again or open the full assistant.'
-      setMessages((current) => [...current, { id: nextMessageId.current++, role: 'assistant', text, error: true }])
-    } finally {
-      setPending(false)
-    }
-  }
-
-  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault()
-      event.currentTarget.form?.requestSubmit()
-    }
+    void chat.send(question).then(() => input.current?.focus())
   }
 
   return <>
@@ -112,67 +83,81 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
       <span className="member-concept__assistant-launcher-copy"><strong>Spori AI</strong><small>Ask about your training</small></span>
     </button>
     {open && <>
-      <button className="member-concept__assistant-scrim" type="button" aria-label="Close Spori AI panel" onClick={close} />
-      <section ref={dialog} id="member-assistant-dialog" className="member-concept__assistant-dialog" role="dialog" aria-modal="true" aria-labelledby="member-assistant-title" tabIndex={-1}>
-        <div className="member-concept__assistant-dialog-head">
-          <div className="member-concept__assistant-identity">
-            {isDesktop && <span className="member-concept__assistant-dialog-mark"><SporiRobotMark /></span>}
-            <span><p className="member-concept__assistant-kicker">Sportify training guide</p><h2 id="member-assistant-title">Spori AI</h2></span>
+      <button className="member-concept__assistant-scrim spori-scrim" type="button" aria-label="Close Spori AI panel" onClick={close} />
+      <section ref={dialog} id="member-assistant-dialog" className="spori-panel" role="dialog" aria-modal="true" aria-labelledby="member-assistant-title" tabIndex={-1}>
+        <header className="spori-panel__head">
+          <button type="button" className="spori-icon-button spori-panel__close" aria-label="Close Spori AI" title="Close" onClick={close}>
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
+          </button>
+          <SporiAvatar size="md" />
+          <div className="spori-panel__identity">
+            <h2 id="member-assistant-title">Spori AI</h2>
+            <p><span className="spori-online" aria-hidden="true" />Online · Sportify assistant</p>
           </div>
-          <button type="button" className="member-concept__assistant-close" aria-label="Close Spori AI" onClick={close}>Close</button>
+          <Link className="spori-icon-button" to={assistantHref} onClick={close} aria-label="Open full assistant" title="Open full assistant">
+            <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </Link>
+        </header>
+
+        <div ref={messageLog} className="spori-log" role="log" aria-live="polite" aria-relevant="additions">
+          <div className="spori-welcome">
+            <SporiAvatar size="lg" />
+            <p className="spori-welcome__title">Hi, I'm Spori 👋</p>
+            <p className="spori-welcome__copy">Ask me about classes, packages, or your records — in English or Vietnamese.</p>
+          </div>
+          {chat.messages.length === 0 && enabled && (
+            <div className="spori-chips" aria-label="Suggested questions">
+              {PROMPTS.map((question) => <button type="button" key={question} onClick={() => { setDraft(question); input.current?.focus() }}>{question}</button>)}
+            </div>
+          )}
+          {chat.messages.map((message) => <FloatingMessage key={message.id} message={message} onNavigate={close} />)}
+          {chat.pending && <SporiTyping label="Spori is typing…" />}
         </div>
 
-        <div ref={messageLog} className="member-concept__assistant-messages" role="log" aria-live="polite" aria-relevant="additions">
-          {messages.length === 0 && <div className="member-concept__assistant-welcome">
-            <p className="member-concept__assistant-copy">Hello! I can help with center sessions, packages, booking guidance, and your own Sportify records. I cannot change bookings or payments.</p>
-            <div className="member-concept__assistant-prompts" aria-label="Suggested questions">{PROMPTS.map((question) => <button type="button" key={question} onClick={() => setDraft(question)}>{question}<span aria-hidden="true">&gt;</span></button>)}</div>
-          </div>}
-          {messages.map((message) => (
-            <article className={`member-concept__assistant-message member-concept__assistant-message--${message.role}${message.error ? ' is-error' : ''}`} key={message.id}>
-              <strong>{message.role === 'user' ? 'You' : 'Spori'}</strong>
-              {message.result?.status === 'NO_ANSWER' ? (
-                <div className="member-concept__assistant-no-answer">
-                  <p>
-                    {message.result.language === 'vi'
-                      ? 'Tôi không tìm thấy câu trả lời chắc chắn cho câu hỏi của bạn. Bạn có thể liên hệ Lễ tân Sportify để được hỗ trợ thêm.'
-                      : "I couldn't find a reliable answer to your question. You can contact Sportify Reception for further assistance."}
-                  </p>
-                  <p className="member-concept__assistant-steps">
-                    {message.result.language === 'vi'
-                      ? 'Mở mục Liên hệ Lễ tân, chọn chủ đề, nhập câu hỏi và gửi; phản hồi sẽ hiển thị trong Yêu cầu hỗ trợ của tôi.'
-                      : 'Open Contact Reception, choose a topic, enter the question and submit; replies appear in My support requests.'}
-                  </p>
-                  <div className="member-concept__assistant-actions" style={{ marginTop: '8px' }}>
-                    <Link
-                      to="/member/support"
-                      state={{ question: message.questionText, excerpt: `Question: ${message.questionText}\nSpori AI: ${message.result.answer}` }}
-                      onClick={close}
-                      className="btn btn--secondary btn--sm"
-                    >
-                      {message.result.language === 'vi' ? 'Liên hệ Lễ tân' : 'Contact Receptionist'}
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <p>{message.text}</p>
-              )}
-              {message.result?.sources.length ? <ul>{message.result.sources.map((source) => <li key={`${message.id}-${source.kind}-${source.id}`}><Link to={source.path} onClick={close}>{source.title}</Link><span>{source.detail}</span></li>)}</ul> : null}
-            </article>
-          ))}
-          {pending && <div className="member-concept__assistant-typing" role="status"><span aria-hidden="true" />Spori is checking Sportify data...</div>}
-        </div>
-
-        {!enabled ? <p className="notice notice--warning" role="status">Automated consultation is currently disabled. The full assistant explains other support options.</p> : <form className="member-concept__assistant-composer" onSubmit={send}>
-          <label className="member-concept__assistant-consent"><input type="checkbox" checked={consented} disabled={pending} onChange={(event) => setConsented(event.target.checked)} /> Enable automated center consultation</label>
-          <label className="member-concept__sr-only" htmlFor="spori-question">Ask Spori a question</label>
-          <div className="member-concept__assistant-compose-row">
-            <textarea id="spori-question" value={draft} maxLength={500} rows={2} placeholder="Ask about training, classes, or your records" disabled={pending} onKeyDown={handleComposerKeyDown} onChange={(event) => setDraft(event.target.value)} />
-            <button type="submit" disabled={!draft.trim() || !consented || pending}>Send</button>
-          </div>
-          <small>Enter sends; Shift+Enter adds a new line. No conversation history is stored.</small>
-        </form>}
-        <Link className="member-concept__assistant-full-link" to={assistantHref} onClick={close}>Expand to full assistant</Link>
+        {!enabled
+          ? <p className="notice notice--warning spori-panel__notice" role="status">Automated consultation is currently disabled. The full assistant explains other support options.</p>
+          : <SporiComposer id="spori-question" label="Ask Spori a question" buttonLabel="Send" placeholder="Type a message…" value={draft}
+              pending={chat.pending} onChange={setDraft} onSubmit={send} inputRef={input} />}
+        <p className="spori-panel__foot">Answers use Sportify data · Spori can make mistakes</p>
       </section>
     </>}
   </>
+}
+
+function FloatingMessage({ message, onNavigate }: { message: SporiMessage; onNavigate: () => void }) {
+  if (message.role === 'user') return (
+    <div className="spori-row spori-row--user">
+      <div className="spori-bubble"><SporiText text={message.text} /></div>
+      <time className="spori-time">{formatTime(message.at)}</time>
+    </div>
+  )
+  if (message.role === 'error') return (
+    <div className="spori-row spori-row--bot">
+      <SporiAvatar />
+      <div className="spori-bubble is-error" role="alert"><SporiText text={message.text} /></div>
+    </div>
+  )
+  const { result, question } = message
+  const vi = result.language === 'vi'
+  // A rule-based "no answer" is replaced by a clear handoff; an AI reply already explains itself.
+  const ruleNoAnswer = result.status === 'NO_ANSWER' && result.mode !== 'AI_GENERATED'
+  return (
+    <div className="spori-row spori-row--bot">
+      <SporiAvatar />
+      <div className={'spori-bubble' + (result.status === 'NO_ANSWER' ? ' is-warning' : '')}>
+        {ruleNoAnswer
+          ? <p>{vi ? 'Tôi không tìm thấy câu trả lời chắc chắn cho câu hỏi của bạn. Bạn có thể liên hệ Lễ tân Sportify để được hỗ trợ thêm.' : "I couldn't find a reliable answer to your question. You can contact Sportify Reception for further assistance."}</p>
+          : <SporiText text={result.answer} />}
+        {result.status === 'NO_ANSWER' && <div className="spori-handoff">
+          {/* An AI reply already explains the handoff in its own words; only the rule answer needs the steps. */}
+          {ruleNoAnswer && <p>{vi ? 'Mở mục Liên hệ Lễ tân, chọn chủ đề, nhập câu hỏi và gửi; phản hồi sẽ hiển thị trong Yêu cầu hỗ trợ của tôi.' : 'Open Contact Reception, choose a topic, enter the question and submit; replies appear in My support requests.'}</p>}
+          <Link to="/member/support" state={{ question, excerpt: `Question: ${question}\nSpori AI: ${result.answer}` }} onClick={onNavigate} className="spori-handoff__button">
+            {vi ? 'Liên hệ Lễ tân' : 'Contact Receptionist'}
+          </Link>
+        </div>}
+        <SporiSources sources={result.sources} onNavigate={onNavigate} />
+      </div>
+      <time className="spori-time">{formatTime(message.at)}{result.mode === 'AI_GENERATED' ? ' · Gemini' : ''}</time>
+    </div>
+  )
 }

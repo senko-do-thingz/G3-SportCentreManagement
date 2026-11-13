@@ -3,6 +3,7 @@ package com.sportify.catalog.controller;
 import com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences;
 import com.sportify.catalog.dto.TrainingGuidanceResponse.Recommendations;
 import com.sportify.catalog.service.TrainingGuidanceService;
+import com.sportify.catalog.service.AssistantReplyWriter;
 import com.sportify.catalog.service.CenterConsultationService;
 import jakarta.validation.Valid;
 import com.sportify.identity.security.CustomUserDetails;
@@ -23,7 +24,9 @@ public class TrainingGuidanceController {
     @PostMapping("/consultation")
     public com.sportify.catalog.dto.TrainingGuidanceResponse.Consultation consult(@AuthenticationPrincipal CustomUserDetails user,
         @Valid @RequestBody com.sportify.catalog.dto.TrainingGuidanceRequest.Consultation request) {
-        return consultation.answer(user.getUserAccount().getId(),request.question(),request.optIn());
+        var history=request.history()==null?java.util.List.<AssistantReplyWriter.Turn>of():request.history().stream()
+            .filter(java.util.Objects::nonNull).map(turn->new AssistantReplyWriter.Turn(turn.role(),turn.text())).toList();
+        return consultation.answer(user.getUserAccount().getId(),request.question(),request.optIn(),history);
     }
     @GetMapping("/recommendations")
     public Recommendations recommendations(@AuthenticationPrincipal CustomUserDetails user,

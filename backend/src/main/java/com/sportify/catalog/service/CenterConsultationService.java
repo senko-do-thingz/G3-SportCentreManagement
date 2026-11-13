@@ -42,12 +42,15 @@ import java.util.stream.Collectors;
 public class CenterConsultationService {
     static final String RULES_MODE="KNOWLEDGE_BASED";
     static final String AI_MODE="AI_ASSISTED";
+    /** The reply text was written by the AI reply writer from the center data shown in the sources. */
+    static final String AI_REPLY_MODE="AI_GENERATED";
     private static final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(CenterConsultationService.class);
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final boolean enabled;
     private final VisibleTrainingSessions visibility;
     private AssistantIntentClassifier classifier;
+    private AssistantReplyWriter replyWriter;
 
     public CenterConsultationService(JdbcTemplate jdbc, Clock clock,
         @Value("${app.training.consultation.enabled:true}") boolean enabled, VisibleTrainingSessions visibility) {
@@ -58,15 +61,22 @@ public class CenterConsultationService {
     @Autowired(required=false)
     void setClassifier(AssistantIntentClassifier classifier) { this.classifier=classifier; }
 
+    /** Optional AI reply writing; absent unless AI and the Gemini reply writer are enabled. */
+    @Autowired(required=false)
+    void setReplyWriter(AssistantReplyWriter replyWriter) { this.replyWriter=replyWriter; }
+
     /** Answer without a signed-in Member: personal questions are not answered. */
     public Consultation answer(String question,boolean optIn) { return answer(null,question,optIn); }
 
+    @Transactional(propagation=Propagation.NOT_SUPPORTED)
+    public Consultation answer(Long memberId,String question,boolean optIn) { return answer(memberId,question,optIn,List.of()); }
+
     /**
-     * Runs without a transaction so that no database connection is held while the optional AI classifier is called;
-     * every query below is a single read.
+     * Runs without a transaction so that no database connection is held while the optional AI calls run; every query
+     * below is a single read. {@code history} holds earlier turns of the same chat (never stored on the server).
      */
     @Transactional(propagation=Propagation.NOT_SUPPORTED)
-    public Consultation answer(Long memberId,String question,boolean optIn) {
+    public Consultation answer(Long memberId,String question,boolean optIn,List<AssistantReplyWriter.Turn> history) {
         boolean early=question!=null && vietnamese(question);
         if(!enabled)return response(early,RULES_MODE,"UNAVAILABLE",t(early,"Automated center consultation is disabled.",
             "T\u01B0 v\u1EA5n t\u1EF1 \u0111\u1ED9ng c\u1EE7a trung t\u00E2m \u0111ang t\u1EAFt."),List.of());
@@ -83,13 +93,14 @@ public class CenterConsultationService {
         String courtesy=courtesy(plain);
         if(courtesy!=null) {
             boolean courtesyVi=vi || plain.startsWith("xin chao") || plain.startsWith("chao") || plain.startsWith("cam on");
-            return courtesy.equals("THANKS")
+            Consultation courtesyAnswer=courtesy.equals("THANKS")
                 ?response(courtesyVi,RULES_MODE,"ANSWERED",t(courtesyVi,
                     "You're welcome! Ask me whenever you need help with Sportify sessions, packages, bookings, or your own training records.",
                     "Kh\u00F4ng c\u00F3 g\u00EC! H\u00E3y h\u1ECFi t\u00F4i khi b\u1EA1n c\u1EA7n h\u1ED7 tr\u1EE3 v\u1EC1 l\u1ECBch Sportify, g\u00F3i t\u1EADp, \u0111\u1EB7t ch\u1ED7 ho\u1EB7c h\u1ED3 s\u01A1 t\u1EADp luy\u1EC7n c\u1EE7a b\u1EA1n."),List.of())
                 :response(courtesyVi,RULES_MODE,"ANSWERED",t(courtesyVi,
                     "Hello! I'm Spori. I can help with center schedules, package prices, booking guidance, and your own Sportify training records. What would you like to know?",
                     "Xin ch\u00E0o! T\u00F4i l\u00E0 Spori. T\u00F4i c\u00F3 th\u1EC3 gi\u00FAp v\u1EC1 l\u1ECBch c\u1EE7a trung t\u00E2m, gi\u00E1 g\u00F3i t\u1EADp, h\u01B0\u1EDBng d\u1EABn \u0111\u1EB7t ch\u1ED7 v\u00E0 h\u1ED3 s\u01A1 t\u1EADp luy\u1EC7n Sportify c\u1EE7a b\u1EA1n. B\u1EA1n mu\u1ED1n bi\u1EBFt g\u00EC?"),List.of());
+            return compose(memberId,question,courtesyVi,courtesy,courtesyAnswer,history);
         }
 
         String mode=RULES_MODE;
@@ -112,7 +123,7 @@ public class CenterConsultationService {
                 log.warn("Assistant AI classification failed, using keyword rules: {}",failure.getClass().getSimpleName());
             }
         }
-        return switch(intent) {
+        Consultation draft=switch(intent) {
             case "PRIVATE","UNKNOWN" -> unknown(vi,mode);
             case "COACH" -> coach(vi,mode);
             case "FAQ" -> faq==null?unknown(vi,mode):faqAnswer(vi,mode,faq);
@@ -131,6 +142,81 @@ public class CenterConsultationService {
             case "PACKAGES" -> packages(vi,mode,sport(raw,plain,aiSport));
             default -> sessions(vi,mode,sport(raw,plain,aiSport),day);
         };
+        return compose(memberId,question,vi,intent,draft,history);
+    }
+
+    /** AI replies one Member may trigger per window; further questions in the window get the fixed rule answer. */
+    static final int AI_REPLIES_PER_WINDOW=30;
+    private final java.util.concurrent.ConcurrentHashMap<Long,java.util.ArrayDeque<java.time.Instant>> aiReplies=new java.util.concurrent.ConcurrentHashMap<>();
+    static final int MAX_HISTORY_TURNS=8;
+    private static final Pattern EMAIL=Pattern.compile("[\\w.+-]+@[\\w-]+(\\.[\\w-]+)+");
+    private static final Pattern PHONE=Pattern.compile("\\+?\\d[\\d .-]{6,}\\d");
+
+    /** Removes e-mail addresses and phone numbers before any text is sent to the AI provider. */
+    static String redact(String text) {
+        if(text==null)return "";
+        return PHONE.matcher(EMAIL.matcher(text).replaceAll("[email]")).replaceAll("[phone]");
+    }
+
+    /**
+     * Lets the optional AI reply writer turn the rule answer and its center data into a natural chat reply. Private
+     * and health questions never get here (the guard answered them), and coach or private intents keep the fixed
+     * human-handoff text. Earlier user turns that the guard would refuse are left out of the history. Any failure,
+     * a missing Member or an exhausted per-Member budget keeps the rule answer unchanged.
+     */
+    private Consultation compose(Long memberId,String question,boolean vi,String intent,Consultation draft,
+                                 List<AssistantReplyWriter.Turn> history) {
+        if(replyWriter==null || memberId==null || intent.equals("COACH") || intent.equals("PRIVATE")) return draft;
+        if(!draft.status().equals("ANSWERED") && !draft.status().equals("NO_ANSWER")) return draft;
+        if(!allowed(aiReplies,AI_REPLIES_PER_WINDOW,memberId)) return draft;
+        try {
+            var turns=safeHistory(history);
+            var facts=new ArrayList<AssistantReplyWriter.Fact>();
+            for(var source:draft.sources())facts.add(new AssistantReplyWriter.Fact(source.title(),source.detail()));
+            // Off-topic or follow-up questions: give the writer the public catalog so it can still answer from data.
+            if(intent.equals("UNKNOWN"))facts.addAll(publicContext(vi));
+            var reply=replyWriter.write(new AssistantReplyWriter.ReplyRequest(vi?"vi":"en",redact(question.strip()),turns,intent,
+                draft.answer(),facts,LocalDate.now(clock).toString()));
+            if(reply==null || reply.text()==null || reply.text().isBlank()) return draft;
+            return new Consultation(AI_REPLY_MODE,reply.answered()?"ANSWERED":"NO_ANSWER",reply.text().strip(),false,draft.sources(),draft.language());
+        } catch(RuntimeException failure) {
+            // Never log the question or the provider output; the exception class is enough to diagnose outages.
+            log.warn("Assistant AI reply failed, using the rule answer: {}",failure.getClass().getSimpleName());
+            return draft;
+        }
+    }
+
+    /** The last few turns, trimmed, redacted, and without user turns the keyword guard refuses. */
+    static List<AssistantReplyWriter.Turn> safeHistory(List<AssistantReplyWriter.Turn> history) {
+        if(history==null || history.isEmpty())return List.of();
+        var kept=new ArrayList<AssistantReplyWriter.Turn>();
+        boolean skipReply=false;
+        for(var turn:history) {
+            if(turn==null || turn.text()==null || turn.text().isBlank())continue;
+            String role="user".equals(turn.role())?"user":"assistant";
+            String text=turn.text().strip();
+            if(text.length()>1000)text=text.substring(0,1000);
+            if(role.equals("user")) {
+                String raw=Normalizer.normalize(text,Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
+                skipReply=guard(raw,plain(raw))!=null;
+                if(skipReply)continue;
+            } else if(skipReply) {
+                skipReply=false;
+                continue;
+            }
+            kept.add(new AssistantReplyWriter.Turn(role,redact(text)));
+        }
+        return kept.size()>MAX_HISTORY_TURNS?List.copyOf(kept.subList(kept.size()-MAX_HISTORY_TURNS,kept.size())):kept;
+    }
+
+    /** Active sports, the cheapest packages and the next sessions: public catalog data any Member can already see. */
+    private List<AssistantReplyWriter.Fact> publicContext(boolean vi) {
+        var facts=new ArrayList<AssistantReplyWriter.Fact>();
+        var sportsAnswer=sportsCatalog(vi,RULES_MODE);
+        facts.add(new AssistantReplyWriter.Fact(t(vi,"Sports offered","Các môn thể thao"),sportsAnswer.answer()));
+        for(var source:packages(vi,RULES_MODE,null).sources())facts.add(new AssistantReplyWriter.Fact(source.title(),source.detail()));
+        for(var source:sessions(vi,RULES_MODE,null,"UPCOMING").sources())facts.add(new AssistantReplyWriter.Fact(source.title(),source.detail()));
+        return facts;
     }
 
     /** Common Vietnamese words written without accents, for questions typed on a keyboard without Vietnamese input. */
@@ -158,13 +244,15 @@ public class CenterConsultationService {
     private final java.util.concurrent.ConcurrentHashMap<Long,java.util.ArrayDeque<java.time.Instant>> aiCalls=new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Bounds provider cost and abuse per Member. Questions without a signed-in Member never use AI. */
-    boolean aiAllowed(Long memberId) {
+    boolean aiAllowed(Long memberId) { return allowed(aiCalls,AI_CALLS_PER_WINDOW,memberId); }
+
+    private boolean allowed(java.util.concurrent.ConcurrentHashMap<Long,java.util.ArrayDeque<java.time.Instant>> budget,int limit,Long memberId) {
         if(memberId==null)return false;
         var now=clock.instant();
-        var calls=aiCalls.computeIfAbsent(memberId,id->new java.util.ArrayDeque<>());
+        var calls=budget.computeIfAbsent(memberId,id->new java.util.ArrayDeque<>());
         synchronized(calls) {
             while(!calls.isEmpty() && !calls.peekFirst().isAfter(now.minus(AI_WINDOW)))calls.pollFirst();
-            if(calls.size()>=AI_CALLS_PER_WINDOW)return false;
+            if(calls.size()>=limit)return false;
             calls.addLast(now);
             return true;
         }

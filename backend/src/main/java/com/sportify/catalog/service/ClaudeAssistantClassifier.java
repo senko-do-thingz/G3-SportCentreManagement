@@ -24,7 +24,7 @@ import java.util.function.Supplier;
  * question and the active sport names are sent; the question text is never sent.
  */
 @Service
-@ConditionalOnExpression("${app.assistant.ai.enabled:false} and '${app.assistant.ai.provider:claude}'.equalsIgnoreCase('claude')")
+@ConditionalOnExpression("${app.assistant.ai.enabled:false} and '${app.assistant.ai.provider:gemini}'.equalsIgnoreCase('claude')")
 class ClaudeAssistantClassifier implements AssistantIntentClassifier {
     private final Supplier<AnthropicClient> clientFactory;
     private volatile AnthropicClient client;

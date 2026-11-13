@@ -109,5 +109,5 @@ it('preserves the safe return path in the real center assistant', () => {
     </MemoryRouter>,
   )
   expect(screen.getByRole('link', { name: 'Back to previous page' })).toHaveAttribute('href', '/member/training/plans?view=week#plan-list')
-  expect(screen.getByRole('button', { name: 'Ask center assistant' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Ask' })).toBeInTheDocument()
 })
