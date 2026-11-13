@@ -92,17 +92,19 @@ function HeaderInboxForRole({ role }: { role: Role }) {
       <div id={panelId} className="header-inbox__panel" role="region" aria-label="Recent notifications" hidden={!open}>
         <p className="header-inbox__title">Inbox</p>
         {failed && !feed ? <p className="header-inbox__empty" role="status">Notifications are unavailable right now.</p>
-          : !feed ? <p className="header-inbox__empty" role="status">Loading notifications…</p>
-          : recent.length === 0 ? <p className="header-inbox__empty" role="status">No notifications yet.</p>
-          : <ul className="header-inbox__list">{recent.map(entry => (
-            <li key={entry.id}>
-              <button type="button" className={'header-inbox__item' + (entry.read ? '' : ' header-inbox__item--unread')} onClick={() => void choose(entry)}>
-                <span className="header-inbox__item-title">{entry.title}</span>
-                <span className="header-inbox__item-text">{entry.content}</span>
-                <span className="header-inbox__item-time">{formatDateTime(entry.createdAt)}{entry.read ? '' : ' · Unread'}</span>
-              </button>
-            </li>
-          ))}</ul>}
+          : !feed ? <p className="header-inbox__empty" role="status">Loading notifications...</p>
+          : <>
+            {unread === 0 && <p className="header-inbox__empty" role="status">No new notifications.</p>}
+            {recent.length > 0 && <ul className="header-inbox__list">{recent.map(entry => (
+              <li key={entry.id}>
+                <button type="button" className={'header-inbox__item' + (entry.read ? '' : ' header-inbox__item--unread')} onClick={() => void choose(entry)}>
+                  <span className="header-inbox__item-title">{entry.title}</span>
+                  <span className="header-inbox__item-text">{entry.content}</span>
+                  <span className="header-inbox__item-time">{formatDateTime(entry.createdAt)}{entry.read ? '' : ' · Unread'}</span>
+                </button>
+              </li>
+            ))}</ul>}
+          </>
         <Link className="header-inbox__all" to={INBOX_PATHS[role]} onClick={() => setOpen(false)}>View all</Link>
       </div>
     </div>
