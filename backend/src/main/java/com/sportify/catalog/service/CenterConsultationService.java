@@ -307,12 +307,12 @@ public class CenterConsultationService {
     private static Consultation classManagement(boolean vi,String mode,String role) {
         if("MANAGER".equals(role))return response(vi,mode,"ANSWERED",t(vi,
             "Yes. As Manager, open My workspace > Classes > Create class. Enter the name, sport, age group, level, qualified coach and maximum members. Save the class, then create its sessions in Schedule and coaches. I can explain the steps but cannot create a class for you.",
-            "Có. Với vai trò Manager, vào My workspace > Classes > Create class. Nhập tên lớp, môn, nhóm tuổi, trình độ, Coach đủ điều kiện và số học viên tối đa. Lưu lớp rồi tạo session tại Schedule and coaches. Spori không tự tạo lớp."),
-            List.of(new ConsultationSource("PRODUCT_GUIDANCE",0,t(vi,"Manager class creation","Tạo lớp cho Manager"),
-                t(vi,"Only a Manager can create or change classes; sessions are scheduled separately.","Chỉ Manager được tạo hoặc sửa lớp; session được xếp lịch riêng."),"")));
+            "C\u00F3. V\u1EDBi vai tr\u00F2 Manager, v\u00E0o My workspace > Classes > Create class. Nh\u1EADp t\u00EAn l\u1EDBp, m\u00F4n, nh\u00F3m tu\u1ED5i, tr\u00ECnh \u0111\u1ED9, Coach \u0111\u1EE7 \u0111i\u1EC1u ki\u1EC7n v\u00E0 s\u1ED1 h\u1ECDc vi\u00EAn t\u1ED1i \u0111a. L\u01B0u l\u1EDBp r\u1ED3i t\u1EA1o session t\u1EA1i Schedule and coaches. Spori kh\u00F4ng t\u1EF1 t\u1EA1o l\u1EDBp."),
+            List.of(new ConsultationSource("PRODUCT_GUIDANCE",0,t(vi,"Manager class creation","T\u1EA1o l\u1EDBp cho Manager"),
+                t(vi,"Only a Manager can create or change classes; sessions are scheduled separately.","Ch\u1EC9 Manager \u0111\u01B0\u1EE3c t\u1EA1o ho\u1EB7c s\u1EEDa l\u1EDBp; session \u0111\u01B0\u1EE3c x\u1EBFp l\u1ECBch ri\u00EAng."),"")));
         return response(vi,mode,"ANSWERED",t(vi,
             "Class creation is a Manager action. Your current role cannot create classes. Ask the Manager to set up the class; I can help you find published sessions instead.",
-            "Việc tạo lớp thuộc quyền Manager. Vai trò hiện tại của bạn không được tạo lớp. Hãy liên hệ Manager để tạo lớp; Spori có thể tìm buổi học đã công bố."),List.of());
+            "Vi\u1EC7c t\u1EA1o l\u1EDBp thu\u1ED9c quy\u1EC1n Manager. Vai tr\u00F2 hi\u1EC7n t\u1EA1i c\u1EE7a b\u1EA1n kh\u00F4ng \u0111\u01B0\u1EE3c t\u1EA1o l\u1EDBp. H\u00E3y li\u00EAn h\u1EC7 Manager \u0111\u1EC3 t\u1EA1o l\u1EDBp; Spori c\u00F3 th\u1EC3 t\u00ECm bu\u1ED5i h\u1ECDc \u0111\u00E3 c\u00F4ng b\u1ED1."),List.of());
     }
 
     /** Up to six published sessions with booked and total places, without any Member detail. */
@@ -455,7 +455,7 @@ public class CenterConsultationService {
     static String rules(String raw,String plain) {
         // Action/permission questions must not be misclassified as schedule lookups just because they say "class".
         if(contains(raw,"create class","create a class","create new class","add a class","add class",
-            "set up a class","make a class","manage classes","tạo lớp","thêm lớp","quản lý lớp")
+            "set up a class","make a class","manage classes","t\u1EA1o l\u1EDBp","th\u00EAm l\u1EDBp","qu\u1EA3n l\u00FD l\u1EDBp")
             || contains(plain,"tao lop","them lop","quan ly lop"))return "CLASS_MANAGEMENT";
         if(faq(raw,plain)!=null)return "FAQ";
         if(contains(raw,"homework","coach feedback","my feedback","my training","my progress","my results","my result",
