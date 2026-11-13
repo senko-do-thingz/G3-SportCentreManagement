@@ -128,6 +128,10 @@
   --ui-title-weight: 800;
   --ui-control-height: 44px;
   --ui-button-weight: 700;
+  --ui-header-height: 80px;
+  --ui-kicker-size: 14px;
+  --ui-section-title-size: 20px;
+  --ui-dropdown-shadow: 0 22px 48px rgba(11, 23, 54, 0.22);
 
   /* Layout */
   --header-height: 64px;

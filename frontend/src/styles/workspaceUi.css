@@ -18,11 +18,21 @@
   font-family: var(--ui-font-body);
 }
 
-/* Header: the solid navy of the Home header after it leaves the hero, instead of a translucent gradient. */
+/* Header: the solid navy of the Home header after it leaves the hero, instead of a translucent gradient.
+   Same geometry for every role: the blue brand block fills the bar height at the left edge, as on Home. */
 :is(.staff-layout, .member-layout) .workspace-header {
+  padding: 0;
   background: var(--ui-header-bg);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+:is(.staff-layout, .member-layout) .workspace-header .home-header__bar {
+  min-height: var(--ui-header-height);
+  padding-block: 0;
+}
+:is(.staff-layout, .member-layout) .workspace-header .brand__mark {
+  width: var(--ui-header-height);
+  height: var(--ui-header-height);
 }
 
 /* Page title: one size, weight and case on every page (Home section headings). */
@@ -35,15 +45,99 @@
   text-transform: uppercase;
   text-wrap: balance;
 }
+:is(.staff-layout, .member-layout) main :is(.page-header__title, .concept-title, .member-commerce__title) {
+  color: var(--ui-ink);
+}
+
+/* Label above the page title: the Home kicker (blue, wide tracking, a 32px rule before it). */
+:is(.staff-layout, .member-layout) main :is(.page-header__text > .eyebrow, .concept-eyebrow, .member-commerce__eyebrow) {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 var(--space-3);
+  color: var(--color-primary);
+  font: 700 var(--ui-kicker-size)/1 var(--ui-font-body);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+:is(.staff-layout, .member-layout) main :is(.page-header__text > .eyebrow, .concept-eyebrow, .member-commerce__eyebrow)::before {
+  content: '';
+  flex: none;
+  width: 32px;
+  height: 2px;
+  background: currentColor;
+}
+
+/* Section and card headings: Home h2/h3 typography (display face, uppercase). Sizes stay with each page, except
+   card titles, which share one size. Headings inside heroes keep their own colour. */
+:is(.staff-layout, .member-layout) main h2 {
+  font-family: var(--ui-font-display);
+  font-weight: var(--ui-title-weight);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+:is(.staff-layout, .member-layout) main .card__title {
+  color: var(--ui-ink);
+  font-size: var(--ui-section-title-size);
+  line-height: 1.15;
+}
+
+/* Field groups: a Home border instead of the browser's grooved frame; the legend reads like a field label. */
+:is(.staff-layout, .member-layout) main fieldset {
+  min-width: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+}
+:is(.staff-layout, .member-layout) main legend {
+  padding: 0 var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+/* Focus: the Home outline (2px, 3px away) on links, buttons, summaries and selects. */
+:is(.staff-layout, .member-layout) main :is(a, button, summary, select, [role='tab']):focus-visible,
+body:has(:is(.staff-layout, .member-layout)) .modal :is(a, button, select):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+:is(.staff-layout, .member-layout) :is(.sidebar__link, .member-concept__nav-link, .member-concept__sidebar-assistant):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+:is(.staff-layout, .member-layout) .workspace-header :is(a, button, select):focus-visible {
+  outline: 2px solid var(--color-hero-highlight);
+  outline-offset: 3px;
+}
 
 /* Buttons: Home body font, bold label, square corners. Heights stay with each size modifier. */
 :is(.staff-layout, .member-layout) main :is(button, .btn, a.btn) {
   font-family: var(--ui-font-body);
   border-radius: var(--ui-radius);
 }
-:is(.staff-layout, .member-layout) main .btn {
+:is(.staff-layout, .member-layout) main .btn,
+body:has(:is(.staff-layout, .member-layout)) .modal .btn {
   font-weight: var(--ui-button-weight);
   letter-spacing: 0.02em;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+/* Secondary buttons: the Home outline button, a 1.5px inset line that turns blue on hover over a soft blue fill.
+   Gold call-to-action buttons on the dark page banners keep their fill. */
+:is(.staff-layout, .member-layout) main .btn.btn--secondary:not(.concept-btn--gold),
+body:has(:is(.staff-layout, .member-layout)) .modal .btn.btn--secondary {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--ui-border);
+  color: var(--color-primary);
+}
+:is(.staff-layout, .member-layout) main .btn.btn--secondary:not(.concept-btn--gold):hover:not(:disabled),
+body:has(:is(.staff-layout, .member-layout)) .modal .btn.btn--secondary:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--color-primary-soft);
+  box-shadow: inset 0 0 0 1.5px var(--color-primary);
+  color: var(--color-primary);
 }
 /* Disabled buttons turn grey instead of a dimmed gold or navy. A filter works whatever fill a page gives the
    button, and the shared opacity from .btn:disabled is kept, so a disabled button never looks clickable. */
@@ -111,4 +205,13 @@ body:has(:is(.staff-layout, .member-layout)) .modal__title {
   font-family: var(--ui-font-display);
   font-weight: var(--ui-title-weight);
   text-transform: uppercase;
+}
+
+/* Dropdown panels (header inbox, training "More tools"): the Home select list, with a blue top rule and the
+   Home dropdown shadow. */
+:is(.staff-layout, .member-layout) :is(.header-inbox__panel, .training-navigation__more-menu) {
+  border: 1px solid var(--ui-border);
+  border-top: 3px solid var(--color-primary);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-dropdown-shadow);
 }

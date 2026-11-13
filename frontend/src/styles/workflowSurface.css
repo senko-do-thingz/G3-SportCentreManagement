@@ -31,7 +31,6 @@
 .workflow-surface .page-header__title { font-size: var(--ui-title-size); }
 .workflow-surface .page-header__description { max-width: 72ch; margin-top: var(--space-2); line-height: 1.65; }
 .workflow-surface .card { border-color: var(--h-border); border-radius: 0; box-shadow: none; }
-.workflow-surface .card__title { font-size: var(--text-lg); }
 .workflow-surface .training-list p { margin-block: var(--space-2); }
 .workflow-surface .training-list h2, .workflow-surface .training-list h3 { margin-bottom: var(--space-2); }
 .workflow-surface .notice { padding: var(--space-4); border-width: 1px; line-height: 1.6; }

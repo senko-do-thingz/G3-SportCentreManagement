@@ -42,29 +42,9 @@
   box-shadow: none;
 }
 .reception-page.reception-ui25-page .page-header__text { max-width: 760px; }
-.reception-page.reception-ui25-page .page-header .eyebrow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  color: var(--h-primary-text);
-  font-weight: var(--weight-bold);
-  letter-spacing: 0.16em;
-}
-.reception-page.reception-ui25-page .page-header .eyebrow::before {
-  width: var(--space-8);
-  height: 3px;
-  background: var(--h-accent);
-  content: '';
-}
 .reception-page.reception-ui25-page .page-header__title {
   margin: 0;
-  color: var(--h-ink);
-  font-family: var(--h-display);
-  font-size: var(--ui-title-size);
-  font-weight: 800;
   line-height: 1.12;
-  letter-spacing: 0;
-  text-wrap: balance;
 }
 .reception-page.reception-ui25-page .page-header__description {
   max-width: 66ch;
@@ -90,13 +70,7 @@
   border-bottom: 1px solid var(--h-border);
 }
 .reception-page.reception-ui25-page .card__title {
-  color: var(--h-ink);
-  font-family: var(--h-display);
-  font-size: var(--text-lg);
-  font-weight: 800;
   line-height: 1.3;
-  letter-spacing: 0.015em;
-  text-transform: uppercase;
 }
 .reception-page.reception-ui25-page .card__actions { flex-wrap: wrap; }
 .reception-page.reception-ui25-page .btn {

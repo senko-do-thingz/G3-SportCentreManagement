@@ -28,26 +28,6 @@
   min-width: 0;
 }
 
-.concept-eyebrow {
-  color: var(--color-primary);
-  letter-spacing: var(--tracking-eyebrow);
-  font-weight: var(--weight-bold);
-  font-size: var(--text-xs);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-1);
-  text-transform: uppercase;
-}
-
-.concept-eyebrow::before {
-  content: '';
-  display: block;
-  width: 24px;
-  height: 3px;
-  background: var(--color-primary);
-}
-
 .concept-title {
   font-family: var(--font-display);
   color: var(--color-navy);

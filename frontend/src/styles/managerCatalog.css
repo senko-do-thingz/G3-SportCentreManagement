@@ -9,7 +9,6 @@
   min-height: 68px; margin: 0; padding: var(--space-4) var(--space-6);
   border-bottom: 1px solid var(--color-border);
 }
-.manager-catalog__panel .card__title { font-size: var(--text-lg); letter-spacing: -0.02em; }
 .manager-catalog__count { color: var(--color-text-muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
 .manager-catalog__filters.manager-filters {
   grid-template-columns: minmax(210px, 1.65fr) repeat(3, minmax(135px, 1fr)) auto;

@@ -185,13 +185,6 @@
   content: '';
 }
 
-.member-schedule-theme .card__title {
-  color: var(--schedule-ink);
-  font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
-  font-size: clamp(1.1rem, 2vw, 1.35rem);
-  font-weight: 800;
-}
-
 .member-schedule-theme .schedule-week-input .field__label {
   color: var(--schedule-ink);
   font-size: 12px;
