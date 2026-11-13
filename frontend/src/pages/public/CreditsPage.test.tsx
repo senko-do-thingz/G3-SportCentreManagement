@@ -16,6 +16,9 @@ describe('Photo credits', () => {
     expect(photos.items).toHaveLength(3 + HOME_SPORTS.length + HOME_FACILITIES.length)
     expect(photos.items.find((item) => item.usedFor.startsWith('Log in and Sign up'))?.link).toBe('https://images.unsplash.com/photo-1608245449230-4ac19066d2d0')
     expect(photos.items.every((item) => /^https:\/\/images\.unsplash\.com\/photo-[\w-]+$/.test(item.link))).toBe(true)
+    for (const tab of ['My Schedule', 'Center Schedule', 'Find Classes', 'My Bookings']) {
+      expect(photos.items.some((item) => item.usedFor.includes(`Member - ${tab} hero`))).toBe(true)
+    }
     expect(groups.find((group) => group.title === 'Demo coach portraits')!.items).toHaveLength(COACH_DEMO_PHOTOS.length)
     expect(groups.find((group) => group.title === 'Background videos')!.items.map((item) => item.link)).toEqual(expect.arrayContaining([expect.stringContaining('-44448/')]))
     expect(groups.map((group) => group.license.url)).toEqual(expect.arrayContaining(['https://unsplash.com/license', 'https://openfontlicense.org']))

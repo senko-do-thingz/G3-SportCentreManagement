@@ -681,7 +681,7 @@
 /* Unified Flow 2 workspace. Existing booking and discovery cards keep their real data behavior. */
 .schedule-workspace { width: 100%; max-width: 1480px; margin-inline: auto; }
 .schedule-workspace__tabs { display: grid !important; grid-template-columns: repeat(4, minmax(150px, 1fr)); width: 100% !important; padding: 0 !important; border-radius: 0 !important; }
-.schedule-workspace__tabs .browse-tab { display: grid; place-items: center; min-height: 46px; border-radius: 0; }
+.schedule-workspace__tabs .browse-tab { display: grid; place-items: center; min-height: 52px; padding: 12px 16px; border-radius: 0; font-family: 'Be Vietnam Pro', 'Segoe UI', sans-serif; font-size: 0.875rem; font-weight: 700; line-height: 1.35; }
 .schedule-workspace__hero { position: relative; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr); align-items: stretch; height: 272px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--schedule-gold) 40%, transparent); border-radius: 0; background: linear-gradient(112deg, var(--schedule-hero) 0%, color-mix(in srgb, var(--schedule-hero) 78%, var(--schedule-primary)) 62%, var(--schedule-primary) 140%); box-shadow: var(--schedule-shadow); color: var(--color-on-hero); }
 .schedule-workspace__hero-copy { position: relative; z-index: 2; display: flex; min-width: 0; max-width: 780px; max-height: 100%; flex-direction: column; justify-content: center; overflow: hidden; padding: 28px clamp(28px, 4vw, 52px); }
 .schedule-workspace__hero-label { margin: 0 0 10px; color: var(--schedule-gold-bright); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
