@@ -1,5 +1,46 @@
 package com.sportify.payment;
 
+import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.hasItem;
+import org.hibernate.Hibernate;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
+
 import com.jayway.jsonpath.JsonPath;
 import com.sportify.AbstractIntegrationTest;
 import com.sportify.catalog.entity.CardStatus;
@@ -22,10 +63,10 @@ import com.sportify.core.exception.ConflictException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
-import com.sportify.identity.security.CustomUserDetails;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.RoleRepository;
 import com.sportify.identity.repository.UserRepository;
+import com.sportify.identity.security.CustomUserDetails;
 import com.sportify.payment.dto.ConfirmPaymentRequest;
 import com.sportify.payment.dto.FailPaymentRequest;
 import com.sportify.payment.dto.StaffPaymentResponse;
@@ -41,74 +82,51 @@ import com.sportify.payment.repository.InvoiceLineRepository;
 import com.sportify.payment.repository.InvoiceRepository;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentVerificationService;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.hibernate.Hibernate;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.DefaultTransactionDefinition;
-import org.springframework.transaction.support.TransactionTemplate;
-
-import java.math.BigDecimal;
-import java.time.Clock;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.hamcrest.Matchers.hasItem;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * BE-18 against a real SQL Server (Testcontainers). Not @Transactional: each step commits, so the tests see
- * what a second request would see (the mismatch note that survives the 409, the row lock on payment).
- * MockMvc drives the card and package activate endpoints that FE-05 still uses.
+ * BE-18 against a real SQL Server (Testcontainers). Not @Transactional: each
+ * step commits, so the tests see what a second request would see (the mismatch
+ * note that survives the 409, the row lock on payment). MockMvc drives the card
+ * and package activate endpoints that FE-05 still uses.
  */
 @AutoConfigureMockMvc
 class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
 
-    @Autowired private MockMvc mockMvc;
+    @Autowired
+    private MockMvc mockMvc;
 
-    @Autowired private PaymentVerificationService verificationService;
-    @Autowired private PaymentRepository paymentRepository;
-    @Autowired private InvoiceRepository invoiceRepository;
-    @Autowired private InvoiceLineRepository invoiceLineRepository;
-    @Autowired private MemberCardRepository memberCardRepository;
-    @Autowired private MembershipCardTierRepository tierRepository;
-    @Autowired private SportRepository sportRepository;
-    @Autowired private SportPackageRepository sportPackageRepository;
-    @Autowired private SportPackageRegistrationRepository registrationRepository;
-    @Autowired private MemberProfileRepository memberProfileRepository;
-    @Autowired private UserRepository userRepository;
-    @Autowired private RoleRepository roleRepository;
-    @Autowired private CodeFormatter codeFormatter;
-    @Autowired private JdbcTemplate jdbcTemplate;
-    @Autowired private PlatformTransactionManager transactionManager;
-    @Autowired private Clock clock;
+    @Autowired
+    private PaymentVerificationService verificationService;
+    @Autowired
+    private PaymentRepository paymentRepository;
+    @Autowired
+    private InvoiceRepository invoiceRepository;
+    @Autowired
+    private InvoiceLineRepository invoiceLineRepository;
+    @Autowired
+    private MemberCardRepository memberCardRepository;
+    @Autowired
+    private MembershipCardTierRepository tierRepository;
+    @Autowired
+    private SportRepository sportRepository;
+    @Autowired
+    private SportPackageRepository sportPackageRepository;
+    @Autowired
+    private SportPackageRegistrationRepository registrationRepository;
+    @Autowired
+    private MemberProfileRepository memberProfileRepository;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private RoleRepository roleRepository;
+    @Autowired
+    private CodeFormatter codeFormatter;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+    @Autowired
+    private Clock clock;
 
     private TransactionTemplate tx() {
         return new TransactionTemplate(transactionManager);
@@ -171,7 +189,10 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         return ids.stream().map(String::valueOf).collect(Collectors.joining(","));
     }
 
-    /** Member codes outside the MEM-0001 sequence range, which other test classes insert literally. */
+    /**
+     * Member codes outside the MEM-0001 sequence range, which other test
+     * classes insert literally.
+     */
     private static final AtomicInteger MEMBER_CODE = new AtomicInteger();
 
     private UserAccount newUser(String roleCode) {
@@ -210,7 +231,10 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         return payment;
     }
 
-    /** A registration requested three days ago, so activation must move its start date to today. */
+    /**
+     * A registration requested three days ago, so activation must move its
+     * start date to today
+     */
     private Long[] pendingRegistration() {
         return tx().execute(status -> {
             MemberProfile member = newMember();
@@ -281,8 +305,9 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
     }
 
     /**
-     * An upgrade request: the member holds an ACTIVE Silver card bought for 500000, and asked for Gold (1200000)
-     * at 1200000 - 500000 = 700000, the way BE-17 prices it. Returns payment id, upgrade card id, Gold tier id.
+     * An upgrade request: the member holds an ACTIVE Silver card bought for
+     * 500000, and asked for Gold (1200000) at 1200000 - 500000 = 700000, the
+     * way BE-17 prices it. Returns payment id, upgrade card id, Gold tier id
      */
     private Long[] pendingUpgrade() {
         return tx().execute(status -> {
@@ -346,14 +371,20 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
                 .build();
     }
 
-    /** Tier ranks must be unique and above 0 (ux_membership_card_tier_rank); start high to stay clear of the seed and other tests. */
+    /**
+     * Tier ranks must be unique and above 0 (ux_membership_card_tier_rank);
+     * start high to stay clear of the seed and other tests
+     */
     private static final AtomicInteger TIER_RANK = new AtomicInteger(5000);
 
     private static int nextTierRank() {
         return TIER_RANK.incrementAndGet();
     }
 
-    /** Number of invoices of a payment, read in its own transaction. Returns int so assertThat is not ambiguous. */
+    /**
+     * Number of invoices of a payment, read in its own transaction. Returns int
+     * so assertThat is not ambiguous.
+     */
     private int invoiceCount(Long paymentId) {
         Integer count = tx().execute(s -> invoiceRepository.findByPaymentId(paymentId).size());
         return count != null ? count : 0;
@@ -588,7 +619,7 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
             int invoices = invoiceRepository.findByPaymentId(ids[0]).size();
             if (cancelWon) {
                 assertThat(card.getStatus()).isEqualTo(CardStatus.CANCELLED);
-                assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.FAILED);
+                assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.CANCELLED);
                 assertThat(invoices).isZero();
             } else {
                 assertThat(card.getStatus()).isEqualTo(CardStatus.ACTIVE);
@@ -605,9 +636,9 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         UserAccount receptionist = tx().execute(s -> newUser("RECEPTIONIST"));
 
         mockMvc.perform(put("/api/v1/membership-cards/" + ids[1] + "/activate")
-                        .with(user(new CustomUserDetails(receptionist)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"paymentMethod\":\"CASH\"}"))
+                .with(user(new CustomUserDetails(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"paymentMethod\":\"CASH\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
 
@@ -621,15 +652,15 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         UserAccount receptionist = tx().execute(s -> newUser("RECEPTIONIST"));
 
         mockMvc.perform(put("/api/v1/packages/registrations/" + ids[1] + "/activate")
-                        .with(user(new CustomUserDetails(receptionist)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"paymentMethod\":\"CASH\"}"))
+                .with(user(new CustomUserDetails(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"paymentMethod\":\"CASH\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
 
         assertReceiptIssued(ids[0], InvoiceItemType.SPORT_PACKAGE, ids[1], "380000");
         mockMvc.perform(get("/api/v1/invoices/by-payment/" + ids[0])
-                        .with(user(new CustomUserDetails(receptionist))))
+                .with(user(new CustomUserDetails(receptionist))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lines.length()").value(1));
     }
@@ -651,14 +682,14 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
 
             // (a) Legacy PENDING unsupported method with missing request body and empty JSON body
             mockMvc.perform(put("/api/v1/membership-cards/" + cashIds[1] + "/activate")
-                            .with(user(new CustomUserDetails(receptionist))))
+                    .with(user(new CustomUserDetails(receptionist))))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not supported")));
 
             mockMvc.perform(put("/api/v1/membership-cards/" + cashIds[1] + "/activate")
-                            .with(user(new CustomUserDetails(receptionist)))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{}"))
+                    .with(user(new CustomUserDetails(receptionist)))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not supported")));
 
@@ -667,9 +698,9 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
             // (b) Explicitly unsupported method in request body against both legacy and supported stored methods
             jdbcTemplate.update("UPDATE payment SET payment_method = 'BANK_TRANSFER' WHERE id = ?", cashIds[0]);
             mockMvc.perform(put("/api/v1/membership-cards/" + cashIds[1] + "/activate")
-                            .with(user(new CustomUserDetails(receptionist)))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"paymentMethod\":\"" + unsupported.name() + "\"}"))
+                    .with(user(new CustomUserDetails(receptionist)))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"paymentMethod\":\"" + unsupported.name() + "\"}"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not supported")));
 
@@ -679,25 +710,25 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         // (c) Supported CASH or BANK_TRANSFER replacement method succeeds
         jdbcTemplate.update("UPDATE payment SET payment_method = 'MOMO' WHERE id = ?", cashIds[0]);
         mockMvc.perform(put("/api/v1/membership-cards/" + cashIds[1] + "/activate")
-                        .with(user(new CustomUserDetails(receptionist)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"paymentMethod\":\"CASH\"}"))
+                .with(user(new CustomUserDetails(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"paymentMethod\":\"CASH\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
         assertReceiptIssued(cashIds[0], InvoiceItemType.MEMBERSHIP_CARD, cashIds[1], "1200000");
 
         jdbcTemplate.update("UPDATE payment SET payment_method = 'VNPAY' WHERE id = ?", transferIds[0]);
         mockMvc.perform(put("/api/v1/membership-cards/" + transferIds[1] + "/activate")
-                        .with(user(new CustomUserDetails(receptionist)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"paymentMethod\":\"BANK_TRANSFER\"}"))
+                .with(user(new CustomUserDetails(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"paymentMethod\":\"BANK_TRANSFER\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
         assertReceiptIssuedWithMethod(transferIds[0], InvoiceItemType.MEMBERSHIP_CARD, transferIds[1], "1200000", PaymentMethod.BANK_TRANSFER);
 
         Long[] defaultTransferIds = pendingCard();
         mockMvc.perform(put("/api/v1/membership-cards/" + defaultTransferIds[1] + "/activate")
-                        .with(user(new CustomUserDetails(receptionist))))
+                .with(user(new CustomUserDetails(receptionist))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
         assertReceiptIssuedWithMethod(defaultTransferIds[0], InvoiceItemType.MEMBERSHIP_CARD, defaultTransferIds[1], "1200000", PaymentMethod.BANK_TRANSFER);
@@ -720,14 +751,14 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
 
             // (a) Legacy PENDING unsupported method with missing request body and empty JSON body
             mockMvc.perform(put("/api/v1/packages/registrations/" + cashIds[1] + "/activate")
-                            .with(user(new CustomUserDetails(receptionist))))
+                    .with(user(new CustomUserDetails(receptionist))))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not supported")));
 
             mockMvc.perform(put("/api/v1/packages/registrations/" + cashIds[1] + "/activate")
-                            .with(user(new CustomUserDetails(receptionist)))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{}"))
+                    .with(user(new CustomUserDetails(receptionist)))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not supported")));
 
@@ -736,9 +767,9 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
             // (b) Explicitly unsupported method in request body against both legacy and supported stored methods
             jdbcTemplate.update("UPDATE payment SET payment_method = 'BANK_TRANSFER' WHERE id = ?", cashIds[0]);
             mockMvc.perform(put("/api/v1/packages/registrations/" + cashIds[1] + "/activate")
-                            .with(user(new CustomUserDetails(receptionist)))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"paymentMethod\":\"" + unsupported.name() + "\"}"))
+                    .with(user(new CustomUserDetails(receptionist)))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"paymentMethod\":\"" + unsupported.name() + "\"}"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not supported")));
 
@@ -748,25 +779,25 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         // (c) Supported CASH or BANK_TRANSFER replacement method succeeds
         jdbcTemplate.update("UPDATE payment SET payment_method = 'ZALOPAY' WHERE id = ?", cashIds[0]);
         mockMvc.perform(put("/api/v1/packages/registrations/" + cashIds[1] + "/activate")
-                        .with(user(new CustomUserDetails(receptionist)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"paymentMethod\":\"CASH\"}"))
+                .with(user(new CustomUserDetails(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"paymentMethod\":\"CASH\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
         assertReceiptIssued(cashIds[0], InvoiceItemType.SPORT_PACKAGE, cashIds[1], "380000");
 
         jdbcTemplate.update("UPDATE payment SET payment_method = 'CREDIT_CARD' WHERE id = ?", transferIds[0]);
         mockMvc.perform(put("/api/v1/packages/registrations/" + transferIds[1] + "/activate")
-                        .with(user(new CustomUserDetails(receptionist)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"paymentMethod\":\"BANK_TRANSFER\"}"))
+                .with(user(new CustomUserDetails(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"paymentMethod\":\"BANK_TRANSFER\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
         assertReceiptIssuedWithMethod(transferIds[0], InvoiceItemType.SPORT_PACKAGE, transferIds[1], "380000", PaymentMethod.BANK_TRANSFER);
 
         Long[] defaultTransferIds = pendingRegistration();
         mockMvc.perform(put("/api/v1/packages/registrations/" + defaultTransferIds[1] + "/activate")
-                        .with(user(new CustomUserDetails(receptionist))))
+                .with(user(new CustomUserDetails(receptionist))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
         assertReceiptIssuedWithMethod(defaultTransferIds[0], InvoiceItemType.SPORT_PACKAGE, defaultTransferIds[1], "380000", PaymentMethod.BANK_TRANSFER);
@@ -897,7 +928,10 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         });
     }
 
-    /** The member who owns a card, with the role loaded so it can be used outside a transaction. */
+    /**
+     * The member who owns a card, with the role loaded so it can be used
+     * outside a transaction.
+     */
     private UserAccount cardOwner(Long cardId) {
         return tx().execute(s -> {
             Long memberId = memberCardRepository.findById(cardId).orElseThrow().getMember().getId();
@@ -907,7 +941,10 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         });
     }
 
-    /** Sends every request at the same moment and returns the results in the same order. */
+    /**
+     * Sends every request at the same moment and returns the results in the
+     * same order.
+     */
     private List<MvcResult> performTogether(List<MockHttpServletRequestBuilder> requests) throws Exception {
         List<Callable<MvcResult>> calls = new ArrayList<>();
         for (MockHttpServletRequestBuilder request : requests) {
@@ -934,7 +971,10 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         }
     }
 
-    /** Exactly one 200; the other is 400 or 409 with a business message. A 500 (for example a deadlock victim) fails. */
+    /**
+     * Exactly one 200; the other is 400 or 409 with a business message. A 500
+     * (for example a deadlock victim) fails.
+     */
     private static void assertOneOkOneBusinessError(List<MvcResult> results) throws Exception {
         List<Integer> statuses = results.stream().<Integer>map(r -> r.getResponse().getStatus()).toList();
         assertThat(statuses).filteredOn(code -> code == 200).hasSize(1);
@@ -944,7 +984,10 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         assertThat(loser.getResponse().getContentAsString()).doesNotContain("Internal server error");
     }
 
-    /** Starts every call at the same moment; the result holds null for a call that returned, else its exception. */
+    /**
+     * Starts every call at the same moment; the result holds null for a call
+     * that returned, else its exception.
+     */
     private List<Throwable> runTogether(List<Callable<?>> calls) throws Exception {
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(calls.size());
@@ -973,10 +1016,12 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
     }
 
     /**
-     * Lock order rule: every path takes the payment row lock before it reads or writes the card or registration.
-     * The only read before that lock is a single-value query for the payment id, whose shared lock is released at
-     * once, so a waiting caller holds no lock the winner needs and the calls cannot deadlock. The second caller
-     * waits for the first to commit and then reads a payment that is no longer PENDING.
+     * Lock order rule: every path takes the payment row lock before it reads or
+     * writes the card or registration. The only read before that lock is a
+     * single-value query for the payment id, whose shared lock is released at
+     * once, so a waiting caller holds no lock the winner needs and the calls
+     * cannot deadlock. The second caller waits for the first to commit and then
+     * reads a payment that is no longer PENDING.
      */
     private static void assertOneWinnerOneNotPending(List<Throwable> outcomes) {
         assertThat(outcomes).hasSize(2);
@@ -1043,17 +1088,18 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         String memberCode = tx().execute(s -> paymentRepository.findById(ids[0]).orElseThrow().getMember().getMemberCode());
 
         mockMvc.perform(get("/api/v1/payments")
-                        .with(user(new CustomUserDetails(receptionist)))
-                        .param("search", memberCode)
-                        .param("from", LocalDate.now(clock).minusDays(1).toString())
-                        .param("to", "9999-12-31"))
+                .with(user(new CustomUserDetails(receptionist)))
+                .param("search", memberCode)
+                .param("from", LocalDate.now(clock).minusDays(1).toString())
+                .param("to", "9999-12-31"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[*].id").value(hasItem(ids[0].intValue())));
     }
 
     // ---------- BE-19: payment at the desk (F1-13, F1-14) ----------
-
-    /** An active 400.000 package of a new sport, tracked for the cleanup. */
+    /**
+     * An active 400.000 package of a new sport, tracked for the cleanup.
+     */
     private Long newPackage() {
         return tx().execute(st -> {
             Sport sport = sportRepository.save(SportTestData.aValidSport().build());
@@ -1074,7 +1120,9 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         });
     }
 
-    /** An active 1.200.000 ranked tier, tracked for the cleanup. */
+    /**
+     * An active 1.200.000 ranked tier, tracked for the cleanup.
+     */
     private Long newTier() {
         return tx().execute(st -> {
             MembershipCardTier tier = tierRepository.save(MembershipCardTier.builder()
@@ -1095,7 +1143,10 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         return ((Number) JsonPath.read(json, path)).longValue();
     }
 
-    /** Invoice totals: the sum of the lines minus the discount plus the tax equals the total. */
+    /**
+     * Invoice totals: the sum of the lines minus the discount plus the tax
+     * equals the total.
+     */
     private void assertInvoiceTotalsAddUp(Long invoiceId, String expectedTotal) {
         tx().executeWithoutResult(st -> {
             Invoice invoice = invoiceRepository.findById(invoiceId).orElseThrow();
@@ -1118,11 +1169,11 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         UserAccount receptionist = tx().execute(st -> newUser("RECEPTIONIST"));
 
         String body = mockMvc.perform(post("/api/v1/packages/registrations")
-                        .with(user(new CustomUserDetails(receptionist)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"memberId\":" + member.getId() + ",\"packageId\":" + packageId
-                                + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"BANK_TRANSFER\""
-                                + ",\"paymentReference\":\"FT-BE19-1\",\"amountReceived\":400000}"))
+                .with(user(new CustomUserDetails(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memberId\":" + member.getId() + ",\"packageId\":" + packageId
+                        + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"BANK_TRANSFER\""
+                        + ",\"paymentReference\":\"FT-BE19-1\",\"amountReceived\":400000}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.channel").value("RECEPTION"))
@@ -1157,10 +1208,10 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         UserAccount receptionist = tx().execute(st -> newUser("RECEPTIONIST"));
 
         String body = mockMvc.perform(post("/api/v1/membership-cards/purchase")
-                        .with(user(new CustomUserDetails(receptionist)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"memberId\":" + member.getId() + ",\"tierId\":" + tierId
-                                + ",\"method\":\"CASH\",\"amountReceived\":1500000}"))
+                .with(user(new CustomUserDetails(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memberId\":" + member.getId() + ",\"tierId\":" + tierId
+                        + ",\"method\":\"CASH\",\"amountReceived\":1500000}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andReturn().getResponse().getContentAsString();
@@ -1187,10 +1238,10 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         UserAccount receptionist = tx().execute(st -> newUser("RECEPTIONIST"));
 
         mockMvc.perform(post("/api/v1/packages/registrations")
-                        .with(user(new CustomUserDetails(receptionist)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"memberId\":" + member.getId() + ",\"packageId\":" + packageId
-                                + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"CASH\",\"amountReceived\":300000}"))
+                .with(user(new CustomUserDetails(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memberId\":" + member.getId() + ",\"packageId\":" + packageId
+                        + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"CASH\",\"amountReceived\":300000}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("PAYMENT_AMOUNT_MISMATCH"));
 
@@ -1211,10 +1262,10 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         UserAccount receptionist = tx().execute(st -> newUser("RECEPTIONIST"));
 
         String body = mockMvc.perform(post("/api/v1/packages/registrations")
-                        .with(user(new CustomUserDetails(receptionist)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"memberId\":" + owner.getId() + ",\"packageId\":" + packageId
-                                + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"CASH\"}"))
+                .with(user(new CustomUserDetails(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memberId\":" + owner.getId() + ",\"packageId\":" + packageId
+                        + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"CASH\"}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         registrationIds.add(longAt(body, "$.id"));
@@ -1235,7 +1286,10 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
-    /** No row of a refused desk sale exists: item, payment, invoice, invoice line or activity log. */
+    /**
+     * No row of a refused desk sale exists: item, payment, invoice, invoice
+     * line or activity log.
+     */
     private void assertNoDeskSaleRows(MemberProfile member, UserAccount receptionist) {
         Long memberId = member.getId();
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sport_package_registration WHERE member_id = ?",
@@ -1260,11 +1314,11 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         UserAccount receptionist = tx().execute(st -> newUser("RECEPTIONIST"));
 
         mockMvc.perform(post("/api/v1/packages/registrations")
-                        .with(user(new CustomUserDetails(receptionist)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"memberId\":" + member.getId() + ",\"packageId\":" + packageId
-                                + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"BANK_TRANSFER\""
-                                + ",\"paymentReference\":\"FT-BE19-MISMATCH\",\"amountReceived\":450000}"))
+                .with(user(new CustomUserDetails(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memberId\":" + member.getId() + ",\"packageId\":" + packageId
+                        + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"BANK_TRANSFER\""
+                        + ",\"paymentReference\":\"FT-BE19-MISMATCH\",\"amountReceived\":450000}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("PAYMENT_AMOUNT_MISMATCH"));
 
@@ -1279,11 +1333,11 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         UserAccount receptionist = tx().execute(st -> newUser("RECEPTIONIST"));
 
         mockMvc.perform(post("/api/v1/membership-cards/purchase")
-                        .with(user(new CustomUserDetails(receptionist)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"memberId\":" + member.getId() + ",\"tierId\":" + tierId
-                                + ",\"paymentMethod\":\"BANK_TRANSFER\",\"referenceCode\":\"FT-BE19-1\""
-                                + ",\"amountReceived\":1100000}"))
+                .with(user(new CustomUserDetails(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"memberId\":" + member.getId() + ",\"tierId\":" + tierId
+                        + ",\"paymentMethod\":\"BANK_TRANSFER\",\"referenceCode\":\"FT-BE19-1\""
+                        + ",\"amountReceived\":1100000}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("PAYMENT_AMOUNT_MISMATCH"));
 
