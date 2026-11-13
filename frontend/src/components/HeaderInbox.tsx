@@ -104,7 +104,7 @@ function HeaderInboxForRole({ role }: { role: Role }) {
                 </button>
               </li>
             ))}</ul>}
-          </>
+          </>}
         <Link className="header-inbox__all" to={INBOX_PATHS[role]} onClick={() => setOpen(false)}>View all</Link>
       </div>
     </div>
