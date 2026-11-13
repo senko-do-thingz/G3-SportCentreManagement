@@ -20,6 +20,11 @@ export interface CreditGroup {
 }
 
 const UNSPLASH_LICENSE = { name: 'Unsplash License', url: 'https://unsplash.com/license' }
+const MEMBER_HERO_SPORTS: Record<string, string> = {
+  Football: 'Center Schedule',
+  Tennis: 'My Schedule',
+  Basketball: 'My Bookings',
+}
 const unsplashItem = (usedFor: string, url: string): CreditItem => {
   const id = unsplashId(url) || url
   return { usedFor, thumb: unsplashThumb(id, 320, 200), link: unsplashOriginal(id), linkLabel: 'View original on Unsplash' }
@@ -69,9 +74,9 @@ export function buildCredits(): CreditGroup[] {
       license: UNSPLASH_LICENSE,
       note: 'Free to use, including commercially; attribution is not required but is given here.',
       items: [
-        unsplashItem('Home - hero background', HOME_PHOTOS.hero),
+        unsplashItem('Home - hero background; Member - Find Classes hero', HOME_PHOTOS.hero),
         unsplashItem('Log in and Sign up - background (photo by August Phlieger)', HOME_PHOTOS.auth),
-        ...HOME_SPORTS.map((sport) => unsplashItem(`Sports - ${sport.name}`, sport.photo)),
+        ...HOME_SPORTS.map((sport) => unsplashItem(`Sports - ${sport.name}${MEMBER_HERO_SPORTS[sport.name] ? `; Member - ${MEMBER_HERO_SPORTS[sport.name]} hero` : ''}`, sport.photo)),
         ...HOME_FACILITIES.map((venue) => unsplashItem(`Where you play - ${venue.name}`, venue.photo)),
         unsplashItem('Home - Ready to play banner', HOME_PHOTOS.cta),
       ],

@@ -40,7 +40,7 @@ describe('My Schedule shows only the member own CONFIRMED bookings', () => {
       'My Schedule',
       'Center Schedule',
       'Find Classes',
-      'My bookings',
+      'My Bookings',
     ])
     const table = await screen.findByRole('table', { name: 'Weekly schedule' })
     expect(within(table).getByText('Basketball Foundations')).toBeInTheDocument()

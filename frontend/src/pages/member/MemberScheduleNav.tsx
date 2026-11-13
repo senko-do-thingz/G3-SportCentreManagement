@@ -8,7 +8,7 @@ const TABS: { value: MemberScheduleTab; label: string }[] = [
   { value: 'my-schedule', label: 'My Schedule' },
   { value: 'center', label: 'Center Schedule' },
   { value: 'find-classes', label: 'Find Classes' },
-  { value: 'bookings', label: 'My bookings' },
+  { value: 'bookings', label: 'My Bookings' },
 ]
 
 export function MemberScheduleNav({ activeTab }: { activeTab?: MemberScheduleTab }) {

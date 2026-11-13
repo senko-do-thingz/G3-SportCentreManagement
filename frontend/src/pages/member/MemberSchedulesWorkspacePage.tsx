@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { memberSessionsApi, type BrowseFormat, type BrowseSession } from '../../api/memberSessionsApi'
 import { packagesApi } from '../../api/packagesApi'
+import { HOME_PHOTOS } from '../public/homeContent'
 import trainingGroundImage from '../../assets/home/hero.jpg'
 import { Button, CalendarDateField, Card, EmptyState, PageLoader, Select } from '../../components/ui'
 import { BrowseError } from './BrowseError'
@@ -12,35 +13,45 @@ import { MemberSchedulePage } from './MemberSchedulePage'
 import { ScheduleWorkspaceHero } from './ScheduleWorkspaceHero'
 import { SessionCard } from './SessionCard'
 import { browseAddDays, browseDate, browseMonday, browseToday, validBrowseDate } from './memberScheduleDates'
-import { sportImageFor } from './sportImages'
+import { sportPhotoFor } from './sportImages'
 import { useMemberResource } from './useMemberResource'
 
-const TAB_DETAILS: Record<MemberScheduleTab, { title: string; description: string; imageSrc: string; imageAlt: string; fadeImage?: boolean }> = {
+const HERO_PHOTOS = {
+  center: sportPhotoFor('football', 2200),
+  schedule: sportPhotoFor('tennis', 2200),
+  bookings: sportPhotoFor('basketball', 2200),
+}
+
+const TAB_DETAILS: Record<MemberScheduleTab, { title: string; description: string; imageSrc: string; imageFallback: string; imageAlt: string; fadeImage?: boolean }> = {
   center: {
     title: 'Center Schedule',
     description: 'Explore the center-wide timetable, compare availability, and open a session before booking.',
-    imageSrc: sportImageFor('football'),
+    imageSrc: HERO_PHOTOS.center.src,
+    imageFallback: HERO_PHOTOS.center.fallback,
     imageAlt: 'Football training on the center field',
     fadeImage: true,
   },
   'my-schedule': {
     title: 'My Schedule',
     description: 'Your confirmed bookings only, organized week by week in Vietnam time (UTC+7).',
-    imageSrc: sportImageFor('tennis'),
+    imageSrc: HERO_PHOTOS.schedule.src,
+    imageFallback: HERO_PHOTOS.schedule.fallback,
     imageAlt: 'Tennis practice on a clay court',
     fadeImage: true,
   },
   'find-classes': {
     title: 'Find Classes',
     description: 'Filter live Sportify sessions by sport, level, format, coach, and date.',
-    imageSrc: trainingGroundImage,
+    imageSrc: HOME_PHOTOS.hero,
+    imageFallback: trainingGroundImage,
     imageAlt: 'Badminton practice on an indoor training court',
     fadeImage: true,
   },
   bookings: {
     title: 'My Bookings',
     description: 'Review your upcoming reservations and booking history using the existing cancellation rules.',
-    imageSrc: sportImageFor('basketball'),
+    imageSrc: HERO_PHOTOS.bookings.src,
+    imageFallback: HERO_PHOTOS.bookings.fallback,
     imageAlt: 'Basketball training at the sports center',
     fadeImage: true,
   },
@@ -66,6 +77,7 @@ export function MemberSchedulesWorkspacePage({ tab: forcedTab }: { tab?: MemberS
         title={details.title}
         description={details.description}
         imageSrc={details.imageSrc}
+        imageFallback={details.imageFallback}
         imageAlt={details.imageAlt}
         fadeImage={details.fadeImage}
       />
