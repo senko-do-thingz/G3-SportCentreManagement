@@ -35,10 +35,7 @@ import {
 } from './paymentsModel'
 import { sessionsLabel } from './packagesModel'
 import { useMemberResource } from './useMemberResource'
-import { qrPaymentDemoEnabled } from '../../config/env'
 import { CancelPayment } from './PaymentCancellation'
-import { demoQrPath } from '../../components/qr/demoQr'
-import '../../components/qr/demoQr.css'
 
 const INVALID_LINK_MESSAGE = 'The payment link is not valid.'
 const MISMATCH_MESSAGE = 'The payment returned does not match this link. Open it again from My payments.'
@@ -397,14 +394,6 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
           <Link className={buttonClassName('secondary', 'md', true)} to={PAYMENT_PATHS.status(payment.id)}>
             View payment status
           </Link>
-        </div>
-      )}
-      {pending && qrPaymentDemoEnabled() && (
-        <div className="qr-demo-entry">
-          <Link className={buttonClassName('secondary', 'md', true)} to={demoQrPath(payment.id)} aria-describedby="qr-demo-entry-description">
-            Pay with QR (Simulation)
-          </Link>
-          <p id="qr-demo-entry-description" className="payment-methods__hint">Simulated QR confirmation. Completes payment in simulation only with no real bank transfer.</p>
         </div>
       )}
       <Link className={buttonClassName('ghost', 'md', true, 'no-print')} to={MEMBER_PATHS.membership}>
