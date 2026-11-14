@@ -134,6 +134,20 @@ class WalletErasureMigrationIntegrationTest {
                 INSERT INTO dbo.activity_log(action,entity_type,entity_id,summary)
                 VALUES ('WALLET_PAYMENT','PAYMENT',?,'Old Wallet history')
                 """, retiredPayment);
+        // Unrelated Cash/Bank audit rows may describe a retired Wallet option.
+        // Their free-text content is not proof of a Wallet-funded transaction.
+        jdbc.update("""
+                INSERT INTO dbo.activity_log(action,entity_type,entity_id,summary,details)
+                VALUES ('PAYMENT_CONFIRMED','PAYMENT',?,
+                        'Cash payment after Wallet retirement',
+                        '{"note":"Wallet option was retired"}')
+                """, preservedPayment);
+        jdbc.update("""
+                INSERT INTO dbo.activity_log(action,entity_type,entity_id,summary,details)
+                VALUES ('PAYMENT_SUBMITTED','PAYMENT',?,
+                        'Bank transfer instead of Wallet',
+                        '{"previousOption":"wallet"}')
+                """, preservedBankPayment);
         // A normal member notification must survive even when its wording mentions Wallet.
         jdbc.update("""
                 INSERT INTO dbo.notification(user_id,title,content,type,event_key)
@@ -155,6 +169,14 @@ class WalletErasureMigrationIntegrationTest {
                 .isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.payment WHERE id=?", Integer.class, preservedBankPayment))
                 .isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM dbo.activity_log
+                WHERE entity_type='PAYMENT' AND entity_id=? AND action='PAYMENT_CONFIRMED'
+                """, Integer.class, preservedPayment)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM dbo.activity_log
+                WHERE entity_type='PAYMENT' AND entity_id=? AND action='PAYMENT_SUBMITTED'
+                """, Integer.class, preservedBankPayment)).isEqualTo(1);
         assertThat(jdbc.queryForObject("""
                 SELECT COUNT(*) FROM dbo.notification
                 WHERE user_id=? AND event_key='PAYMENT_OPTIONS'
