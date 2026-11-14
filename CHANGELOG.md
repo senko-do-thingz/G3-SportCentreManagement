@@ -1,5 +1,13 @@
 ## 2026-11-09 - TODO rebuilt from the merge history
 
+## 2026-11-14 - Council defense preparation and retired Wallet cleanup
+
+- Removed retired Wallet runtime Java and React pages/tests while retaining old Flyway migrations and database records for compatibility.
+- Preserved Receptionist Inbox by moving it to active payment modules.
+- Updated current architecture, database and API documentation; annotated important business/security code for a Vietnamese council defense.
+- CI conventions still reject Vietnamese in Java code, while allowing explanatory Vietnamese on standalone Java comment lines.
+
+
 - Replace the 2026-10-08 planning snapshot in TODO.md with merged work by flow (with PR numbers), open PRs in review and remaining work checked against the code. Documentation only.
 
 ## 2026-11-07 - Root README aligned with current main
