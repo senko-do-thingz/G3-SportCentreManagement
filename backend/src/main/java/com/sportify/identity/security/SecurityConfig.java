@@ -33,6 +33,7 @@ public class SecurityConfig {
     private final CustomAccessDeniedHandler accessDeniedHandler;
 
     @Bean
+    // Cấu hình ranh giới bảo mật HTTP: endpoint công khai, endpoint cần JWT và filter xác thực.
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -75,6 +76,7 @@ public class SecurityConfig {
      * a bearer token in the Authorization header and no cookies.
      */
     @Bean
+    // CORS chỉ kiểm soát nguồn gọi từ trình duyệt, không thay thế xác thực JWT hay phân quyền role.
     public CorsConfigurationSource corsConfigurationSource(
             @Value("${app.cors.allowed-origins:}") String allowedOrigins) {
         List<String> origins = Arrays.stream(allowedOrigins.split(","))

@@ -412,9 +412,8 @@
   .rcp-refund-steps .refund-steps__step[data-state='current'] { font-weight: var(--weight-bold); }
 }
 
-/* RUI-10 and RUI-11 wallet review panels */
+/* Review panel highlight shared by Receptionist workflows */
 .page.rcp .rcp-review-card { border-left: 4px solid var(--color-highlight); }
-.page.rcp.rcp-wallet .browse-facts { margin-bottom: var(--space-4); }
 
 /*
  * Home alignment: square corners. The real Home renders every rectangular surface square (buttons, selects, brand mark).

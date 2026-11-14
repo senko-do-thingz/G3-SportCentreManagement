@@ -35,7 +35,6 @@ export function isMethodAvailable(method: string): boolean {
 const METHOD_LABELS: Record<string, string> = {
   BANK_TRANSFER: 'Bank transfer',
   CASH: 'Cash',
-  WALLET: 'Sportify Wallet',
 }
 
 const STATUS_LABELS: Record<string, string> = {

@@ -1,4 +1,4 @@
-package com.sportify.payment.wallet;
+package com.sportify.payment.service;
 
 import com.sportify.core.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -11,11 +11,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * MW-07 Receptionist action inbox on the existing notification table. Each open source task (wallet top-up to verify,
- * withdrawal to review or pay, payment with an amount mismatch, open support request) gets one notification per
- * Receptionist, keyed by the existing unique (user_id, event_key) index, so polling never duplicates a notice. Read is
- * presentation state only: whether the task is still open is read live from the source row, never from the notice.
- * Notices carry codes and amounts only, never bank account numbers or health data.
+ * Đồng bộ thông báo công việc của Receptionist từ payment đang cần kiểm tra và support request còn mở.
+ * Khóa duy nhất (user_id, event_key) chống thông báo trùng khi tải lại hoặc có yêu cầu đồng thời.
+ * Trạng thái đọc chỉ phục vụ giao diện; trạng thái công việc lấy trực tiếp từ bảng nghiệp vụ.
  */
 @Service
 @RequiredArgsConstructor
@@ -30,7 +28,7 @@ public class ReceptionInboxService {
 
     private final JdbcTemplate jdbc;
 
-    /** Source queries for currently open tasks: (event key, title, content, created_at). */
+    /** Truy vấn chỉ lấy công việc thực sự còn mở; các nguồn đã ngừng phục vụ không được tạo thông báo mới. */
     private static final String OPEN_TASKS = """
             SELECT 'PAYMENT_EXCEPTION:' + CAST(p.id AS VARCHAR(20)) AS event_key,
                    N'Payment needs review ' + p.payment_code AS title,
@@ -49,6 +47,7 @@ public class ReceptionInboxService {
      * Creates any missing notice for this Receptionist. Inserting by the unique event key makes repeated polling and
      * concurrent calls harmless; a staff member added later still receives every task that is open now.
      */
+    // Ghi thông báo thiếu vào cùng giao dịch để lần refresh tiếp theo không tạo bản ghi lặp.
     @Transactional
     public void sync(long receptionistId) {
         jdbc.update("""
@@ -61,13 +60,14 @@ public class ReceptionInboxService {
                 """, receptionistId, TYPE, receptionistId);
     }
 
+    // Đếm tác vụ chưa đọc và còn mở từ trạng thái thực tế, không đếm theo riêng cờ is_read.
     @Transactional
     public Inbox inbox(long receptionistId, boolean openOnly) {
         sync(receptionistId);
         List<Item> items = jdbc.query("""
                 SELECT TOP 100 n.id, n.title, n.content, n.created_at, n.is_read, n.event_key FROM dbo.notification n
                 WHERE n.user_id = ? AND n.type = ?
-                  AND (n.event_key IS NULL OR n.event_key NOT LIKE 'WALLET_%')
+                  AND (n.event_key LIKE 'PAYMENT_EXCEPTION:%' OR n.event_key LIKE 'SUPPORT_REQUEST:%')
                 ORDER BY n.created_at DESC, n.id DESC""",
                 (rs, row) -> item(rs.getLong("id"), rs.getString("title"), rs.getString("content"),
                         rs.getTimestamp("created_at").toLocalDateTime(), rs.getBoolean("is_read"), rs.getString("event_key")),
@@ -96,8 +96,6 @@ public class ReceptionInboxService {
         String type = parts[0];
         long sourceId = Long.parseLong(parts[1]);
         String status = switch (type) {
-            case "WALLET_TOPUP" -> status("SELECT status FROM dbo.wallet_topup WHERE id = ?", sourceId);
-            case "WALLET_WITHDRAWAL" -> status("SELECT status FROM dbo.wallet_withdrawal WHERE id = ?", sourceId);
             case "PAYMENT_EXCEPTION" -> status("SELECT payment_status FROM dbo.payment WHERE id = ?", sourceId);
             case "SUPPORT_REQUEST" -> status("SELECT status FROM dbo.support_request WHERE id = ?", sourceId);
             default -> "UNKNOWN";
@@ -108,8 +106,6 @@ public class ReceptionInboxService {
             default -> false;
         };
         String link = switch (type) {
-            case "WALLET_TOPUP" -> "/reception/wallet/topups";
-            case "WALLET_WITHDRAWAL" -> "/reception/wallet/withdrawals";
             case "PAYMENT_EXCEPTION" -> "/reception/payments/" + sourceId;
             case "SUPPORT_REQUEST" -> "/reception/support";
             default -> "/reception";

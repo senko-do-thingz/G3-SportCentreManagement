@@ -218,6 +218,7 @@ function areaRoutes(area: RoleArea) {
   return [...itemRoutes, ...subRoutes]
 }
 
+// Router định tuyến từng role; backend vẫn là nơi kiểm tra quyền cuối cùng cho mọi REST API.
 export function AppRoutes() {
   return <ThemeProvider><ApplicationRoutes /></ThemeProvider>
 }

@@ -35,6 +35,7 @@ public class SporiController {
     /** {@code history} holds the earlier turns of the open chat, oldest first; it is never stored. */
     public record ChatRequest(@NotBlank @Size(max = 500) String question, @Valid @Size(max = 12) List<ChatTurn> history) {}
 
+    // Lấy role từ tài khoản đã xác thực, không tin role do người dùng tự gửi trong JSON.
     @PostMapping("/chat")
     public Consultation chat(@AuthenticationPrincipal CustomUserDetails user, @Valid @RequestBody ChatRequest request) {
         // /status/ is an exact command handled by the backend, never a prompt sent to Gemini as user chat.
@@ -44,6 +45,7 @@ public class SporiController {
         var account = user.getUserAccount();
         var history = request.history() == null ? List.<AssistantReplyWriter.Turn>of() : request.history().stream()
                 .filter(Objects::nonNull).map(turn -> new AssistantReplyWriter.Turn(turn.role(), turn.text())).toList();
+        // Service giới hạn câu trả lời trong dữ liệu Sportify và quyền đọc của người đang đăng nhập.
         return consultation.chat(account.getId(), account.getRole().getCode(), request.question(), history);
     }
 }
