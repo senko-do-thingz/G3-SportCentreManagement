@@ -2,8 +2,8 @@
 
 ## 2026-11-14 - Council defense preparation and retired Wallet cleanup
 
-- Removed retired Wallet runtime Java and React pages/tests while retaining old Flyway migrations and database records for compatibility.
-- Preserved Receptionist Inbox by moving it to active payment modules.
+- Removed retired Wallet runtime Java/React source and tests. V63 irreversibly drops all seven Wallet tables and deletes Wallet-funded payments, dependent invoices/refunds and notifications. V50-V53 stay unchanged solely for Flyway checksum compatibility.
+- Preserved Receptionist Inbox by moving it to active payment modules. Added fresh/upgrade migration regression tests and a database backup gate.
 - Updated current architecture, database and API documentation; annotated important business/security code for a Vietnamese council defense.
 - CI conventions still reject Vietnamese in Java code, while allowing explanatory Vietnamese on standalone Java comment lines.
 
