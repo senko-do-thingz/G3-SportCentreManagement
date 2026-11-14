@@ -25,6 +25,7 @@ IF EXISTS (SELECT 1 FROM dbo.simulated_qr_session q JOIN @wallet_payments w ON w
     THROW 51063, 'Wallet removal stopped: a Wallet payment is linked to a QR settlement.', 1;
 
 -- Remove Wallet-only notifications and payment audit history without deleting other users' events.
+-- Audit text can mention Wallet during a valid Cash/Bank/QR transaction; never delete by summary/details.
 DELETE FROM dbo.notification
 WHERE event_key LIKE 'WALLET[_]%'
    OR (type = 'RECEPTION_TASK'
@@ -35,8 +36,7 @@ WHERE (entity_type = 'PAYMENT' AND entity_id IN (SELECT id FROM @wallet_payments
    OR (entity_type = 'INVOICE' AND entity_id IN (SELECT id FROM @wallet_invoices))
    OR (entity_type IN ('REFUND', 'REFUND_REQUEST') AND entity_id IN (SELECT id FROM @wallet_refunds))
    OR entity_type LIKE 'WALLET%'
-   OR action LIKE 'WALLET[_]%'
-   OR summary LIKE N'%wallet%' OR details LIKE N'%wallet%';
+   OR action LIKE 'WALLET[_]%';
 
 -- Financial append-only events, if any, are exclusively removed for Wallet-funded payments
 -- and their refunds. The trigger is restored before the migration can commit.
