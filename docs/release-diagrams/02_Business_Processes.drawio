@@ -1,0 +1,309 @@
+<mxfile host="Electron" agent="Sportify Reviewed 2026" pages="3">
+  <diagram id="02_Business_Processes-p1" name="A - Registration and Payment">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="870" pageHeight="910" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=25;fontStyle=1;fontColor=#000000;" value="D-02A | Registration, Purchase &amp;amp; Entitlement" vertex="1">
+          <mxGeometry height="45" width="790" x="40" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=14;fontColor=#000000;" value="Member self-service + Reception desk payment + VietQR sandbox / callback branches" vertex="1">
+          <mxGeometry height="50" width="790" x="40" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="footer" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=13;fontColor=#000000;" value="QR rendering alone does not mark a payment paid; success is authorized backend confirmation with durable provenance." vertex="1">
+          <mxGeometry height="48" width="790" x="40" y="829" as="geometry" />
+        </mxCell>
+        <mxCell id="register" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Visitor registers&lt;br&gt;or Member signs in" vertex="1">
+          <mxGeometry height="76" width="230" x="272.4" y="142" as="geometry" />
+        </mxCell>
+        <mxCell id="choose" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Select sport package&lt;br&gt;or membership card" vertex="1">
+          <mxGeometry height="60" width="194" x="290.7" y="255" as="geometry" />
+        </mxCell>
+        <mxCell id="validate" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Validate account, product&lt;br&gt;and duplicate pending purchase" vertex="1">
+          <mxGeometry height="60" width="278" x="248.2" y="352" as="geometry" />
+        </mxCell>
+        <mxCell id="pending" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Create PENDING payment&lt;br&gt;and purchase item" vertex="1">
+          <mxGeometry height="60" width="232" x="271.4" y="449" as="geometry" />
+        </mxCell>
+        <mxCell id="desk" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="CASH / bank transfer&lt;br&gt;Receptionist verifies funds" vertex="1">
+          <mxGeometry height="76" width="300" x="40" y="546" as="geometry" />
+        </mxCell>
+        <mxCell id="gateway" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="VietQR checkout&lt;br&gt;Token-verified callback" vertex="1">
+          <mxGeometry height="60" width="208" x="435" y="546" as="geometry" />
+        </mxCell>
+        <mxCell id="NBaY6fuKGAN6nk91VIF5-1" edge="1" parent="1" source="sandbox" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;defaultLabelBackgroundColor=page;" target="pending" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="NBaY6fuKGAN6nk91VIF5-2" edge="1" parent="1" source="sandbox" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;defaultLabelBackgroundColor=page;" target="pending" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sandbox" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Optional local sandbox&lt;br&gt;SIMULATED provenance" vertex="1">
+          <mxGeometry height="60" width="216" x="614" y="449" as="geometry" />
+        </mxCell>
+        <mxCell id="verified" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Validated settlement&lt;br&gt;PENDING → SUCCESS" vertex="1">
+          <mxGeometry height="60" width="198" x="288.4" y="643" as="geometry" />
+        </mxCell>
+        <mxCell id="activate" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Activate eligible card / package&lt;br&gt;Issue invoice &amp;amp; receipt" vertex="1">
+          <mxGeometry height="60" width="272" x="251.7" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" edge="1" parent="1" source="register" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="choose" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="choose" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="validate" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="validate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="pending" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="pending" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="desk" value="desk route">
+          <mxGeometry relative="1" x="-0.3266" as="geometry">
+            <Array as="points">
+              <mxPoint x="190" y="479" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="pending" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="gateway" value="gateway route">
+          <mxGeometry relative="1" x="0.2586" as="geometry">
+            <Array as="points">
+              <mxPoint x="460" y="526" />
+              <mxPoint x="539" y="526" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="pending" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="sandbox" value="opt-in demo">
+          <mxGeometry relative="1" x="0.1596" as="geometry">
+            <Array as="points">
+              <mxPoint x="590" y="500" />
+              <mxPoint x="590" y="500" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="desk" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="verified" value="manual confirm">
+          <mxGeometry relative="1" x="0.0966" as="geometry">
+            <Array as="points">
+              <mxPoint x="190" y="603.7" />
+              <mxPoint x="376.2" y="603.7" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="gateway" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="verified" value="valid callback">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="539" y="660" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="sandbox" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="verified" value="simulated only">
+          <mxGeometry relative="1" x="0.1114" as="geometry">
+            <Array as="points">
+              <mxPoint x="718" y="680" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="verified" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="activate" value="atomic write">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="02_Business_Processes-p2" name="B - Class and Attendance">
+    <mxGraphModel dx="1241" dy="754" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="810" pageHeight="1040" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=25;fontStyle=1;fontColor=#000000;" value="D-02B | Session -&amp;gt; Booking -&amp;gt; Attendance" vertex="1">
+          <mxGeometry height="45" width="730" x="40" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=14;fontColor=#000000;" value="Reception arrival ≠ Coach attendance; manager reschedule creates a fresh public Session ID" vertex="1">
+          <mxGeometry height="50" width="730" x="40" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="footer" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=13;fontColor=#000000;" value="Booking debits eligible package credit once; attendance / feedback / results do not deduct extra credits." vertex="1">
+          <mxGeometry height="48" width="730" x="40" y="958" as="geometry" />
+        </mxCell>
+        <mxCell id="manager" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Manager creates / publishes&lt;br&gt;or reschedules session" vertex="1">
+          <mxGeometry height="76" width="316" x="122.6" y="142" as="geometry" />
+        </mxCell>
+        <mxCell id="id" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Allocate public Session ID&lt;br&gt;ddMMyy + subject code + sequence" vertex="1">
+          <mxGeometry height="60" width="312" x="124.3" y="255" as="geometry" />
+        </mxCell>
+        <mxCell id="discover" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Member searches sessions&lt;br&gt;and package coverage" vertex="1">
+          <mxGeometry height="76" width="302" x="129.3" y="352" as="geometry" />
+        </mxCell>
+        <mxCell id="book" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Validate capacity, overlap,&lt;br&gt;entitlement → CONFIRMED booking" vertex="1">
+          <mxGeometry height="60" width="302" x="129.3" y="465" as="geometry" />
+        </mxCell>
+        <mxCell id="arrival" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Receptionist arrival&lt;br&gt;ALLOWED or DENIED check-in" vertex="1">
+          <mxGeometry height="76" width="332" x="40" y="562" as="geometry" />
+        </mxCell>
+        <mxCell id="roster" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Assigned Coach opens&lt;br&gt;confirmed booking roster" vertex="1">
+          <mxGeometry height="76" width="288" x="403" y="562" as="geometry" />
+        </mxCell>
+        <mxCell id="att" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="First mark: PRESENT / LATE&lt;br&gt;ABSENT / EXCUSED" vertex="1">
+          <mxGeometry height="60" width="242" x="336.9" y="675" as="geometry" />
+        </mxCell>
+        <mxCell id="result" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="After session end: Coach result&lt;br&gt;requires PRESENT or LATE" vertex="1">
+          <mxGeometry height="60" width="270" x="229" y="772" as="geometry" />
+        </mxCell>
+        <mxCell id="correct" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Correction audit + reason&lt;br&gt;With saved result: P/L only" vertex="1">
+          <mxGeometry height="60" width="236" x="530" y="772" as="geometry" />
+        </mxCell>
+        <mxCell id="history" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Member training history&lt;br&gt;progress and feedback" vertex="1">
+          <mxGeometry height="60" width="218" x="349.2" y="869" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" edge="1" parent="1" source="manager" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="id" value="publish / reschedule">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="discover" value="published">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="discover" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="book" value="book session">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="book" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="arrival" value="arrival">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="book" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="roster" value="authorized Coach">
+          <mxGeometry relative="1" x="-0.2892" as="geometry">
+            <Array as="points">
+              <mxPoint x="350" y="545" />
+              <mxPoint x="451.3" y="545" />
+              <mxPoint x="451.3" y="542" />
+              <mxPoint x="547" y="542" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="roster" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="att" value="record">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="att" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="result" value="eligible result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="att" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="correct" value="later correction">
+          <mxGeometry relative="1" x="-0.1903" as="geometry">
+            <Array as="points">
+              <mxPoint x="500" y="755" />
+              <mxPoint x="648" y="755" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="result" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="history" value="read-only">
+          <mxGeometry relative="1" x="0.1681" as="geometry">
+            <Array as="points">
+              <mxPoint x="364" y="850" />
+              <mxPoint x="440" y="850" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="correct" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="history" value="updated record">
+          <mxGeometry relative="1" x="0.2216" as="geometry">
+            <Array as="points">
+              <mxPoint x="648" y="849" />
+              <mxPoint x="500" y="849" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="02_Business_Processes-p3" name="C - Refund Review">
+    <mxGraphModel dx="1839" dy="1118" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="600" pageHeight="1140" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=25;fontStyle=1;fontColor=#000000;" value="D-02C | Refund &amp;amp; Financial Reconciliation" vertex="1">
+          <mxGeometry height="45" width="520" x="40" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=14;fontColor=#000000;" value="Member request; Manager decision; Reception payout; separate actual vs simulated finance" vertex="1">
+          <mxGeometry height="50" width="520" x="40" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="footer" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=13;fontColor=#000000;" value="Refunds follow existing eligibility, payment status and audit rules; simulated settlements are not cash receipts." vertex="1">
+          <mxGeometry height="48" width="520" x="40" y="1055" as="geometry" />
+        </mxCell>
+        <mxCell id="member" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Member submits refund&lt;br&gt;for eligible purchase" vertex="1">
+          <mxGeometry height="76" width="274" x="77.7" y="142" as="geometry" />
+        </mxCell>
+        <mxCell id="guard" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Check source payment,&lt;br&gt;refund policy and amount" vertex="1">
+          <mxGeometry height="60" width="230" x="99.3" y="255" as="geometry" />
+        </mxCell>
+        <mxCell id="pending" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Refund request&lt;br&gt;PENDING" vertex="1">
+          <mxGeometry height="60" width="152" x="138.5" y="352" as="geometry" />
+        </mxCell>
+        <mxCell id="manager" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Manager reviews&lt;br&gt;APPROVE or REJECT" vertex="1">
+          <mxGeometry height="76" width="236" x="96.5" y="449" as="geometry" />
+        </mxCell>
+        <mxCell id="rejected" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="REJECTED&lt;br&gt;No payout" vertex="1">
+          <mxGeometry height="60" width="114" x="125.1" y="659" as="geometry" />
+        </mxCell>
+        <mxCell id="approved" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="APPROVED&lt;br&gt;Await payout" vertex="1">
+          <mxGeometry height="60" width="136" x="206.4" y="562" as="geometry" />
+        </mxCell>
+        <mxCell id="desk" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Receptionist verifies&lt;br&gt;actual refund payout" vertex="1">
+          <mxGeometry height="76" width="246" x="157.8" y="756" as="geometry" />
+        </mxCell>
+        <mxCell id="done" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="COMPLETED + audit&lt;br&gt;No duplicate payout" vertex="1">
+          <mxGeometry height="60" width="190" x="174.2" y="869" as="geometry" />
+        </mxCell>
+        <mxCell id="finance" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Manager reports / cash flow&lt;br&gt;Actual and simulated separated" vertex="1">
+          <mxGeometry height="60" width="276" x="40" y="966" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" edge="1" parent="1" source="member" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="guard" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="guard" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="pending" value="eligible">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="pending" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="manager" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="manager" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="rejected" value="deny">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="182.1" y="536.6" />
+              <mxPoint x="182.1" y="536.6" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="manager" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="approved" value="approve">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="276.7" y="543.5" />
+              <mxPoint x="274.4" y="543.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="approved" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="desk" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="281.3" y="719.1" />
+              <mxPoint x="281.3" y="719.1" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="desk" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="done" value="confirmed payout">
+          <mxGeometry relative="1" x="0.0077" as="geometry">
+            <Array as="points">
+              <mxPoint x="281.3" y="837.3" />
+              <mxPoint x="281.3" y="837.3" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="done" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="finance" value="reconcile">
+          <mxGeometry relative="1" x="0.4194" as="geometry">
+            <Array as="points">
+              <mxPoint x="222.2" y="931.9" />
+              <mxPoint x="222.2" y="931.9" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="rejected" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="finance" value="audit only">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="140" y="840" />
+              <mxPoint x="140" y="840" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

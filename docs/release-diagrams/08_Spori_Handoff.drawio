@@ -1,0 +1,98 @@
+<mxfile host="Electron" agent="Sportify Reviewed 2026">
+  <diagram id="08_Spori_Handoff-p1" name="Spori AI Handoff">
+    <mxGraphModel dx="1030" dy="626" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="660" pageHeight="930" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Arial;fontSize=25;fontStyle=1;fontColor=#000000;" value="D-10 | Spori AI &amp;amp; Human Handoff" vertex="1">
+          <mxGeometry height="45" width="580" x="40" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=14;fontColor=#000000;" value="All four roles; Sportify-only context; Gemini generated replies when configured" vertex="1">
+          <mxGeometry height="50" width="580" x="40" y="65" as="geometry" />
+        </mxCell>
+        <mxCell id="footer" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=13;fontColor=#000000;" value="Spori does not create bookings, payments or attendance. When unable to answer, guide the user to the responsible staff role." vertex="1">
+          <mxGeometry height="48" width="580" x="40" y="845" as="geometry" />
+        </mxCell>
+        <mxCell id="role" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Member / Coach / Receptionist / Manager&lt;br&gt;opens floating Spori" vertex="1">
+          <mxGeometry height="76" width="442" x="174.7" y="142" as="geometry" />
+        </mxCell>
+        <mxCell id="guard" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Server role and scope check&lt;br&gt;Reject off-topic / sensitive actions" vertex="1">
+          <mxGeometry height="60" width="290" x="250.5" y="255" as="geometry" />
+        </mxCell>
+        <mxCell id="data" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Read authorized Sportify data&lt;br&gt;sessions / packages / staff metrics" vertex="1">
+          <mxGeometry height="60" width="294" x="183.3" y="352" as="geometry" />
+        </mxCell>
+        <mxCell id="gemini" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Optional Gemini reply writer&lt;br&gt;using restricted context" vertex="1">
+          <mxGeometry height="60" width="250" x="40" y="449" as="geometry" />
+        </mxCell>
+        <mxCell id="fallback" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Knowledge-based answer&lt;br&gt;when AI is unavailable" vertex="1">
+          <mxGeometry height="60" width="230" x="321" y="449" as="geometry" />
+        </mxCell>
+        <mxCell id="answer" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Return answer + sources&lt;br&gt;No financial mutation" vertex="1">
+          <mxGeometry height="60" width="226" x="229.6" y="546" as="geometry" />
+        </mxCell>
+        <mxCell id="handoff" parent="1" style="whiteSpace=wrap;html=1;rounded=0;arcSize=9;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;" value="Human handoff needed?&lt;br&gt;Support / Coach / Reception" vertex="1">
+          <mxGeometry height="60" width="246" x="279.8" y="643" as="geometry" />
+        </mxCell>
+        <mxCell id="staff" parent="1" style="whiteSpace=wrap;html=1;ellipse;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=Arial;fontSize=15;fontColor=#000000;strokeWidth=1.2;align=center;verticalAlign=middle;spacing=8;rounded=0;" value="Reception / Coach handles&lt;br&gt;relevant case via authorized flow" vertex="1">
+          <mxGeometry height="76" width="362" x="221.6" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" edge="1" parent="1" source="role" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="guard" value="question">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="guard" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="data" value="in-scope">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="332.5" y="333.5" />
+              <mxPoint x="330.3" y="333.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="guard" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="handoff" value="restricted / uncertain">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="580" y="285" />
+              <mxPoint x="580" y="673" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="gemini" value="AI enabled">
+          <mxGeometry relative="1" x="-0.2199" as="geometry">
+            <Array as="points">
+              <mxPoint x="165" y="382" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="fallback" value="AI disabled">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="389.3" y="413.6" />
+              <mxPoint x="389.3" y="413.6" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="gemini" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="answer" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="165" y="576" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="fallback" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="answer" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="answer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="handoff" value="needs support">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="402.9" y="606.2" />
+              <mxPoint x="402.9" y="606.2" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="handoff" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#000000;fontFamily=Arial;fontSize=11;fontColor=#000000;labelBackgroundColor=#FFFFFF;" target="staff" value="create guidance / link">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
