@@ -96,7 +96,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     /**
      * Payment-first locking: the payment row is locked (pessimistic write) before its status, handoff time or linked
-     * card/package is read, the same order the Receptionist, wallet and QR settlement paths use. A cancellation and a
+     * card/package is read, the same order the Receptionist and QR settlement paths use. A cancellation and a
      * concurrent confirmation therefore run one after the other, and the second sees the first one's result.
      */
     /**

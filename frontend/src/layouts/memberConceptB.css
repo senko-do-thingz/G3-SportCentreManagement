@@ -335,7 +335,6 @@
   display: none;
 }
 
-.member-concept .member-ui--dashboard .dashboard-wallet-stat,
 .member-concept .member-ui--dashboard .dashboard-training-card {
   display: none;
 }
@@ -1563,10 +1562,6 @@
     border-color: var(--color-primary);
     background: var(--color-surface);
     color: var(--color-primary);
-  }
-
-  .member-concept .member-ui--dashboard .dashboard-wallet-stat {
-    display: contents;
   }
 
   .member-concept .member-ui--dashboard .dashboard-training-card {

@@ -1,4 +1,6 @@
-package com.sportify.payment.wallet;
+package com.sportify.payment.controller;
+
+import com.sportify.payment.service.ReceptionInboxService;
 
 import com.sportify.identity.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** MW-07: the signed-in Receptionist's own action inbox. Marking read never resolves a task. */
+/** Hộp thư công việc của lễ tân: đánh dấu đã đọc không đồng nghĩa xử lý xong yêu cầu. */
 @RestController
 @RequestMapping("/api/v1/reception/inbox")
 @PreAuthorize("hasRole('RECEPTIONIST') and principal.enabled")

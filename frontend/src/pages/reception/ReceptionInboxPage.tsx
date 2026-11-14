@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
-import { receptionInboxApi, type InboxItem } from '../../api/walletApi'
+import { receptionInboxApi, type InboxItem } from '../../api/receptionInboxApi'
 import { INBOX_CHANGED_EVENT, INBOX_POLL_MS } from '../../components/headerInboxData'
 import { useResource } from '../../hooks/useResource'
 import { Badge, Button, Card, EmptyState, ErrorState, Notice, PageHeader, Select, Spinner, buttonClassName } from '../../components/ui'
@@ -9,15 +9,13 @@ import { formatDateTime } from '../../utils/dateDisplay'
 import { ReceptionCallout, ReceptionHero, ReceptionScreen, ReceptionStat, ReceptionStats } from './ReceptionConcept'
 
 const SOURCE_LABELS: Record<InboxItem['sourceType'], string> = {
-  WALLET_TOPUP: 'Wallet top-up',
-  WALLET_WITHDRAWAL: 'Wallet withdrawal',
   PAYMENT_EXCEPTION: 'Payment exception',
   SUPPORT_REQUEST: 'Support request',
   UNKNOWN: 'Task',
 }
 
 /**
- * MW-07: actionable work for reception. "Mark as read" only changes this list; the task stays open until it is handled
+ * Danh sách công việc cần Receptionist xử lý. "Mark as read" only changes this list; the task stays open until it is handled
  * on its own screen, and its state below is always read live from that task.
  */
 export function ReceptionInboxPage() {
