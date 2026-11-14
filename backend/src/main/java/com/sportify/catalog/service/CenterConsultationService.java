@@ -51,6 +51,48 @@ public class CenterConsultationService {
     private final VisibleTrainingSessions visibility;
     private AssistantIntentClassifier classifier;
     private AssistantReplyWriter replyWriter;
+    @Value("${app.assistant.ai.provider:gemini}")
+    private String aiProvider = "gemini";
+    private volatile GeminiStatusSnapshot geminiStatusSnapshot;
+
+    private record GeminiStatusSnapshot(java.time.Instant checkedAt, boolean connected) {}
+
+    /**
+     * Explicit /status/ diagnostic. Unlike normal Spori chat, this checks whether Gemini actually
+     * accepts a small server-side request; a configured key or an enabled flag alone is not proof.
+     * Cache the result briefly to avoid repeated provider requests. Never expose keys or error bodies.
+     */
+    @Transactional(propagation=Propagation.NOT_SUPPORTED)
+    public synchronized Consultation geminiStatus() {
+        if (replyWriter == null || !"gemini".equalsIgnoreCase(aiProvider)) {
+            return statusReply("Gemini API: DISABLED. Spori is using built-in Sportify guidance.");
+        }
+        java.time.Instant now = java.time.Instant.now(clock);
+        GeminiStatusSnapshot snapshot = geminiStatusSnapshot;
+        if (snapshot == null || now.isBefore(snapshot.checkedAt()) ||
+                !now.isBefore(snapshot.checkedAt().plusSeconds(60))) {
+            boolean connected;
+            try {
+                var probe = new AssistantReplyWriter.ReplyRequest(
+                    "en", "Hello", List.of(), "GREETING", "Hello from Sportify.",
+                    List.of(), LocalDate.now(clock).toString(), "MEMBER", null);
+                var reply = replyWriter.write(probe);
+                connected = reply != null && reply.text() != null && !reply.text().isBlank();
+            } catch (RuntimeException failure) {
+                log.warn("Spori Gemini status probe failed: {}", failure.getClass().getSimpleName());
+                connected = false;
+            }
+            snapshot = new GeminiStatusSnapshot(now, connected);
+            geminiStatusSnapshot = snapshot;
+        }
+        return statusReply(snapshot.connected()
+            ? "Gemini API: CONNECTED. Spori successfully received a live Gemini response."
+            : "Gemini API: NOT CONNECTED. Spori can still use built-in Sportify guidance. Check the backend AI settings, API key, model, quota, and network.");
+    }
+
+    private static Consultation statusReply(String message) {
+        return new Consultation(RULES_MODE, "ANSWERED", message, false, List.of(), "en", null);
+    }
 
     public CenterConsultationService(JdbcTemplate jdbc, Clock clock,
         @Value("${app.training.consultation.enabled:true}") boolean enabled, VisibleTrainingSessions visibility) {
