@@ -37,6 +37,10 @@ public class SporiController {
 
     @PostMapping("/chat")
     public Consultation chat(@AuthenticationPrincipal CustomUserDetails user, @Valid @RequestBody ChatRequest request) {
+        // /status/ is an exact command handled by the backend, never a prompt sent to Gemini as user chat.
+        if ("/status/".equalsIgnoreCase(request.question().strip())) {
+            return consultation.geminiStatus();
+        }
         var account = user.getUserAccount();
         var history = request.history() == null ? List.<AssistantReplyWriter.Turn>of() : request.history().stream()
                 .filter(Objects::nonNull).map(turn -> new AssistantReplyWriter.Turn(turn.role(), turn.text())).toList();
