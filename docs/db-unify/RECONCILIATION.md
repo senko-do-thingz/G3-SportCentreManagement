@@ -1,9 +1,11 @@
 # Read-only reconciliation and recovery
 
+Current migration is V63. Wallet runtime, tables and records are removed by V63. The previous schema fingerprint document was generated for V62 and cannot be used to authorize a V63 target. Generate and independently verify a fresh post-V63 fingerprint before running the protected-target preflight. Flyway V50-V53 must not be edited or deleted.
+
 CODEOWNER fast-track scope update: this release is RUNTIME DATABASE UNIFICATION.
 Historical migration/import/archive/API work is OUT OF SCOPE. Historical data
 unification remains INCOMPLETE and is not a runtime release acceptance criterion.
-Preserve all legacy databases and records. Protected-target access/activation is
+Preserve unrelated legacy databases and records. Historical Wallet data is explicitly retired by V63 in the selected target; protected-target access/activation is
 not authorized. Use [current runtime configuration and checklist](RUNTIME_STARTUP_POWERSHELL.md).
 Earlier-round historical proposals below are context, not current work instructions.
 
