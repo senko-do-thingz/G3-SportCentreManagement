@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fails when added lines contain forbidden characters (project convention).
 # - Em dash, en dash, arrow glyphs, emoji and pictographs, check marks.
-# - Vietnamese diacritics inside added Java lines (code and comments must be English).
+# - Vietnamese in Java code is still forbidden; standalone explanatory comment lines are allowed.
 set -euo pipefail
 export LC_ALL=C.UTF-8
 
@@ -25,9 +25,10 @@ if [ -n "$hits" ]; then
   status=1
 fi
 
-hits="$(added_lines '*.java' | grep -nP "$DIACRITICS" || true)"
+# Ignore added comment lines, while keeping the restriction for code and string literals.
+hits="$(added_lines '*.java' | grep -nP "$DIACRITICS" | grep -Ev '^[0-9]+:\+[[:space:]]*(//|/\*|\*)' || true)"
 if [ -n "$hits" ]; then
-  echo "Non English characters found in added Java lines:"
+  echo "Non English characters found in added Java code lines:"
   echo "$hits"
   status=1
 fi

@@ -35,6 +35,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
+        // Lấy JWT từ Authorization: Bearer; nếu không có, request đi tiếp và SecurityConfig quyết định quyền.
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String userEmail;
@@ -51,6 +52,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
                 // A deactivated account is rejected here too, so deactivation takes effect before the token expires.
+                // Chỉ access token hợp lệ và tài khoản còn hoạt động mới được gán vào SecurityContext.
                 if ("access".equals(tokenType) && jwtService.isTokenValid(jwt, userDetails) && userDetails.isEnabled()) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,

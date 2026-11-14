@@ -183,7 +183,7 @@ try:
                                         serialization.PublicFormat.SubjectPublicKeyInfo)).digest()).decode()
     tls = ssl.create_default_context(cafile=str(args.private / 'tls-cert.pem'))
     first_pid = start_backend()
-    check('Fresh isolated SQL migrated through release V62', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '62')
+    check('Fresh isolated SQL migrated through release V63', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '63')
     check('All five additive release migrations applied', sql('SELECT COUNT(*) FROM flyway_schema_history WHERE TRY_CONVERT(int,version) BETWEEN 42 AND 46 AND success=1;') == '5')
     check('Canonical session identity migration applied once',
           sql("SELECT COUNT(*) FROM flyway_schema_history WHERE version='39' AND success=1;") == '1')
@@ -210,7 +210,8 @@ try:
     before = fingerprints()
     for payment in [payment_ids[0], payment_ids[2]]:
         status, value = request('/payments/simulated-qr/sessions', {'paymentId': payment, 'bankCode': 'BIDV_DEMO', 'requestId': str(uuid.uuid4())}, auth['accessToken'])
-        check('Create durable restart fixture', status == 200)
+        check('Create durable restart fixture', status == 200,
+              httpStatus=status, errorCode=value.get('code') if isinstance(value, dict) else None)
         created.append(value)
     confirm_token = created[1]['confirmationUrl'].split('#token=')[1]
     status, legacy_rejected = request('/payments/simulated-qr/sessions/confirm-intent', {'token': confirm_token}, auth['accessToken'])

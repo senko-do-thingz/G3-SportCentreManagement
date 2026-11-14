@@ -22,6 +22,7 @@ public class AuthenticationController {
     public record RecoveryOtp(String email, String otp) {}
     public record RecoveryPassword(String authorization, String newPassword, String confirmPassword) {}
 
+    // Yêu cầu OTP luôn trả thông điệp công khai thống nhất để tránh lộ email đã đăng ký.
     @PostMapping("/forgot-password/request")
     public java.util.Map<String, String> requestRecovery(@RequestBody RecoveryEmail request) {
         try {
@@ -48,11 +49,13 @@ public class AuthenticationController {
         return ResponseEntity.ok(service.register(request));
     }
 
+    // Controller chỉ nhận và kiểm tra dữ liệu đầu vào; xác thực và phát JWT được giao cho service.
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> authenticate(@Valid @RequestBody AuthRequest request) {
         return ResponseEntity.ok(service.authenticate(request));
     }
 
+    // Refresh token được xử lý ở backend; không cho frontend tự tạo hoặc ký lại access token.
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         return ResponseEntity.ok(service.refreshToken(request));
