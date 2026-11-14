@@ -27,7 +27,8 @@ IF EXISTS (SELECT 1 FROM dbo.simulated_qr_session q JOIN @wallet_payments w ON w
 -- Remove Wallet-only notifications and payment audit history without deleting other users' events.
 DELETE FROM dbo.notification
 WHERE event_key LIKE 'WALLET[_]%'
-   OR title LIKE N'%wallet%' OR content LIKE N'%wallet%';
+   OR (type = 'RECEPTION_TASK'
+       AND (title LIKE N'%wallet%' OR content LIKE N'%wallet%'));
 
 DELETE FROM dbo.activity_log
 WHERE (entity_type = 'PAYMENT' AND entity_id IN (SELECT id FROM @wallet_payments))
@@ -92,7 +93,8 @@ ALTER TABLE dbo.payment WITH CHECK ADD CONSTRAINT ck_payment_method
 IF EXISTS (SELECT 1 FROM dbo.payment WHERE payment_method = 'WALLET')
     THROW 51063, 'Wallet removal left a WALLET payment behind.', 1;
 IF EXISTS (SELECT 1 FROM dbo.notification
-    WHERE event_key LIKE 'WALLET[_]%' OR title LIKE N'%wallet%' OR content LIKE N'%wallet%')
+    WHERE event_key LIKE 'WALLET[_]%'
+       OR (type = 'RECEPTION_TASK' AND (title LIKE N'%wallet%' OR content LIKE N'%wallet%')))
     THROW 51063, 'Wallet removal left Wallet notifications behind.', 1;
 IF EXISTS (SELECT 1 FROM sys.tables WHERE schema_id = SCHEMA_ID('dbo')
     AND name IN ('member_wallet','wallet_ledger_entry','wallet_topup',
