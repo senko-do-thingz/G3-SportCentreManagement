@@ -10,6 +10,14 @@ DECLARE @wallet_payments TABLE (id BIGINT PRIMARY KEY);
 INSERT INTO @wallet_payments (id)
 SELECT id FROM dbo.payment WHERE payment_method = 'WALLET';
 
+DECLARE @wallet_invoices TABLE (id BIGINT PRIMARY KEY);
+INSERT INTO @wallet_invoices (id)
+SELECT id FROM dbo.invoice WHERE payment_id IN (SELECT id FROM @wallet_payments);
+
+DECLARE @wallet_refunds TABLE (id BIGINT PRIMARY KEY);
+INSERT INTO @wallet_refunds (id)
+SELECT id FROM dbo.refund_request WHERE payment_id IN (SELECT id FROM @wallet_payments);
+
 -- A Wallet transaction must not also be a QR transaction. Stop instead of touching QR records.
 IF EXISTS (SELECT 1 FROM dbo.simulated_qr_session q JOIN @wallet_payments w ON w.id = q.payment_id)
    OR EXISTS (SELECT 1 FROM dbo.simulated_payment_transaction t JOIN @wallet_payments w ON w.id = t.payment_id)
@@ -19,12 +27,15 @@ IF EXISTS (SELECT 1 FROM dbo.simulated_qr_session q JOIN @wallet_payments w ON w
 -- Remove Wallet-only notifications and payment audit history without deleting other users' events.
 DELETE FROM dbo.notification
 WHERE event_key LIKE 'WALLET[_]%'
-   OR (type = 'RECEPTION_TASK' AND (title LIKE N'%wallet%' OR content LIKE N'%wallet%'));
+   OR title LIKE N'%wallet%' OR content LIKE N'%wallet%';
 
 DELETE FROM dbo.activity_log
 WHERE (entity_type = 'PAYMENT' AND entity_id IN (SELECT id FROM @wallet_payments))
+   OR (entity_type = 'INVOICE' AND entity_id IN (SELECT id FROM @wallet_invoices))
+   OR (entity_type IN ('REFUND', 'REFUND_REQUEST') AND entity_id IN (SELECT id FROM @wallet_refunds))
    OR entity_type LIKE 'WALLET%'
-   OR action LIKE 'WALLET[_]%';
+   OR action LIKE 'WALLET[_]%'
+   OR summary LIKE N'%wallet%' OR details LIKE N'%wallet%';
 
 -- Financial append-only events, if any, are exclusively removed for Wallet-funded payments
 -- and their refunds. The trigger is restored before the migration can commit.
@@ -80,6 +91,9 @@ ALTER TABLE dbo.payment WITH CHECK ADD CONSTRAINT ck_payment_method
 
 IF EXISTS (SELECT 1 FROM dbo.payment WHERE payment_method = 'WALLET')
     THROW 51063, 'Wallet removal left a WALLET payment behind.', 1;
+IF EXISTS (SELECT 1 FROM dbo.notification
+    WHERE event_key LIKE 'WALLET[_]%' OR title LIKE N'%wallet%' OR content LIKE N'%wallet%')
+    THROW 51063, 'Wallet removal left Wallet notifications behind.', 1;
 IF EXISTS (SELECT 1 FROM sys.tables WHERE schema_id = SCHEMA_ID('dbo')
     AND name IN ('member_wallet','wallet_ledger_entry','wallet_topup',
                  'wallet_pending_operation','payment_wallet_settlement',
