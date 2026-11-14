@@ -85,6 +85,7 @@ class WalletErasureMigrationIntegrationTest {
         long member = member(jdbc);
         long retiredPayment = payment(jdbc, member, "WALLET", "W-REMOVE");
         long preservedPayment = payment(jdbc, member, "CASH", "C-PRESERVE");
+        long preservedBankPayment = payment(jdbc, member, "BANK_TRANSFER", "B-PRESERVE");
         jdbc.update("""
                 INSERT INTO dbo.invoice
                     (invoice_number,payment_id,member_id,subtotal_amount,total_amount,status)
@@ -145,6 +146,8 @@ class WalletErasureMigrationIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.activity_log WHERE entity_type='PAYMENT' AND entity_id=?",
                 Integer.class, retiredPayment)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.payment WHERE id=?", Integer.class, preservedPayment))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.payment WHERE id=?", Integer.class, preservedBankPayment))
                 .isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.member_profile WHERE user_id=?", Integer.class, member))
                 .isEqualTo(1);
