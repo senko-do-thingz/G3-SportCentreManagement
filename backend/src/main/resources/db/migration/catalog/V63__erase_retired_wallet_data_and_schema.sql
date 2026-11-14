@@ -4,7 +4,7 @@
 -- The seven Wallet tables, their ledger, and Wallet-funded payment history are erased.
 -- Member accounts, bookings, cards, registrations and non-Wallet payments are preserved.
 
-SET NOCOUNT ON;
+-- Preserve SQL Server rowcount reporting for JDBC update counts.
 
 DECLARE @wallet_payments TABLE (id BIGINT PRIMARY KEY);
 INSERT INTO @wallet_payments (id)
