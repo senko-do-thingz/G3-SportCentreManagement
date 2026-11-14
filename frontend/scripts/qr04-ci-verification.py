@@ -210,7 +210,7 @@ try:
     before = fingerprints()
     for payment in [payment_ids[0], payment_ids[2]]:
         status, value = request('/payments/simulated-qr/sessions', {'paymentId': payment, 'bankCode': 'BIDV_DEMO', 'requestId': str(uuid.uuid4())}, auth['accessToken'])
-        check('Create durable restart fixture', status == 200)
+        check('Create durable restart fixture', status == 200,\n              httpStatus=status, errorCode=value.get('code') if isinstance(value, dict) else None)
         created.append(value)
     confirm_token = created[1]['confirmationUrl'].split('#token=')[1]
     status, legacy_rejected = request('/payments/simulated-qr/sessions/confirm-intent', {'token': confirm_token}, auth['accessToken'])
