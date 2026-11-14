@@ -41,10 +41,13 @@ class WalletErasureMigrationIntegrationTest {
     }
 
     private static long payment(JdbcTemplate jdbc, long member, String method, String code) {
-        return jdbc.queryForObject("""
+        // payment has enabled triggers; SQL Server rejects OUTPUT without INTO on this table.
+        jdbc.update("""
                 INSERT INTO dbo.payment (payment_code,member_id,amount,payment_method,payment_status)
-                OUTPUT INSERTED.id VALUES (?, ?, 20000, ?, 'PENDING')
-                """, Long.class, code, member, method);
+                VALUES (?, ?, 20000, ?, 'PENDING')
+                """, code, member, method);
+        return jdbc.queryForObject(
+                "SELECT id FROM dbo.payment WHERE payment_code = ?", Long.class, code);
     }
 
     private static void assertNoWallet(JdbcTemplate jdbc) {
