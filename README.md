@@ -19,10 +19,9 @@ The four roles are **MEMBER**, **COACH**, **RECEPTIONIST**, and **MANAGER**. Fro
 | Flow 5 - Recommendations | Member class recommendations and sport levels; Coach rule-based drill suggestions with optional Gemini drafts | Rule fallback remains available |
 | Flow 6 - Spori and support | Sportify-scoped Spori chat for all four roles plus Member support requests and Receptionist replies | Gemini-backed replies require explicit activation; unknown facts must not be invented |
 | Notifications | Member/staff inbox and Receptionist action inbox for payment exceptions and support requests | Mark as read does not complete a business task |
-| Wallet | Retired runtime source and UI removed | Immutable V50-V53 Wallet migrations and already-stored DB records remain for compatibility |
 | Deferred | Waitlist, dynamic role system and standalone mobile app | No production settlement guarantee for sandbox/local QR |
 
-**Database inventory:** Current [source inventory](docs/nx-04/source-inventory.json) records **82 `CREATE TABLE` declarations with 82 unique names**, including **7 historical Wallet tables**. This is a migration-source count, **not a live SQL Server count**. The [older V1-V20 schema reference](docs/database/schema/README.md) states 58 and must not be presented as current. Check a running DB with:
+**Database inventory:** Current [source inventory](docs/nx-04/source-inventory.json) records **82 `CREATE TABLE` declarations with 82 unique names**, including **7 historical Wallet tables**. This is a count of historical migration declarations, **not a live SQL Server count**. **V63 removes the seven retired Wallet tables**, so the expected application-table count from that inventory is 75 after migration (verify the actual count in your database). The [older V1-V20 schema reference](docs/database/schema/README.md) states 58 and must not be presented as current. Check a running DB with:
 
 ```sql
 SELECT DB_NAME() AS current_database;
@@ -333,14 +332,14 @@ npm run build
 ## Known Gaps
 
 - **Historical schema:** The 82 source-declared tables include legacy and retired structures; a deployed SQL Server database must be inspected separately.
-- **Retired Wallet:** Runtime Wallet Java/React code is removed in this PR, while applied Flyway migrations V50-V53 and existing records are preserved to prevent checksum, validation and data-loss problems.
+- **Wallet fully retired:** Runtime Wallet Java/React code and all seven Wallet SQL tables are removed. Migration V63 permanently deletes Wallet ledger/top-up/withdrawal history, Wallet notifications and Wallet-method payments (including their invoice/refund history) while leaving other payment methods and member accounts intact. Previously applied V50-V53 migration files remain immutable only because Flyway validates their checksums. **Back up sportify before starting the backend with V63; this purge is irreversible without a restore.** See [database erasure contract](docs/database/retired-payment-channel-cleanup.md).
 - **Waitlist:** A historical table exists, but an active waitlist workflow is not implemented.
 - **Fixed roles:** MEMBER, COACH, RECEPTIONIST and MANAGER; no generic dynamic role editor.
 - **Desktop course demo:** Not a native mobile app or production release.
 - **Payments:** VietQR provider callbacks are conditional on configuration. Sandbox, simulator and local QR demos are not evidence of real bank settlement; review actual payment status and source.
 - **AI:** Provider/model/feature flags are required for Gemini features; rules are deliberately used as fallback.
 - **Gmail OTP:** Sending requires a valid OAuth client, consent, refresh token and `gmail.send` permission.
-- **Compatibility:** Deprecated membership paths and historical migrations remain in place.
+- **Compatibility:** Deprecated membership paths and historical Flyway migration files remain in place; Wallet tables and records do not.
 
 Before a merge, check the latest GitHub Actions result. This README does not claim that newly opened PR code is already merged into main.
 
