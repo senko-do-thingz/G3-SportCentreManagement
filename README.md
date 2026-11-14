@@ -1,29 +1,35 @@
-# Sportify Center (G3-SportCentreManagement)
+# Sportify - Sport Centre Management (SWP391 / Group 3)
 
 [![CI/CD](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/workflows/ci.yml/badge.svg)](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/workflows/ci.yml)
 
-Web system for **Sportify Center**, a multi-sport facility. It is the G3 university project for Topic 4 (sport centre management), built and demonstrated as a **desktop web application**. It is a course demo, not a production release.
+Sportify is Group 3's SWP391 Topic 4 desktop web application for sport centre management. This is a course demonstration, not a production banking or payment deployment. This README describes code merged into `main`; optional integrations depend on runtime configuration.
 
 The system manages accounts and fixed roles, sport packages, membership cards, classes and sessions, bookings, arrival check-in, attendance, training plans, results, feedback, a member assistant, support requests, payments, invoices, refunds, reports and notifications.
 
 ## Project Status
 
-This README describes the `main` branch. Everything listed under "Implemented" is merged into `main`. Work in open pull requests, including any Flow 5-6 follow-ups, is not part of `main` until a CODEOWNER merges it. Check the GitHub pull request list for work in progress.
+The four roles are **MEMBER**, **COACH**, **RECEPTIONIST**, and **MANAGER**. Frontend guards aid navigation, but real access control happens in the backend.
 
-| Area | Status on `main` |
-|---|---|
-| Flow 1 - Accounts, cards, packages | Implemented. Register -> Registration Successful screen with a Go to Dashboard button (no auto-redirect, never shown on failure, reload or direct visit), login with single-use refresh token rotation, membership cards, sport packages, Reception sales and activation |
-| Flow 2 - Classes, sessions, booking | Implemented. Manager class/session administration, public Session IDs, session rescheduling with history, booking and cancellation, Reception arrival and check-in pass, Coach teaching schedule and rosters. Member **My Schedule** (`/member/schedule`) shows only the member's own CONFIRMED bookings; **Find Classes** (`/member/classes`) lists every bookable session in the centre |
-| Flow 3 - Payments and reports | Implemented. Staff-confirmed payments, optional VietQR bank-transfer instructions for pending real payments, a separate opt-in non-payable QR simulation, invoices and receipts, refunds, revenue report and CSV, operations counters |
-| Flow 4 - Training and progress | Implemented. Personal and class plans, Coach and Reception attendance recording and correction, results, feedback, member progress, Manager attendance overview, class notices and questions |
-| Flow 5 - Recommendations and drills | Implemented. Member class recommendations, sport levels and saved recommendations. Coach drill suggestions from a rule-based catalog, with optional Gemini drafts (off by default) |
-| Flow 6 - Assistant and support | Implemented. Member center assistant that answers only from center data (KNOWLEDGE_BASED keyword rules by default; an optional AI step, off by default, only classifies the question). Member support requests and Reception support intake and replies |
-| Notifications | Backend member inbox API (schedule change notices and expiry reminders). No member notification screen yet, and no e-mail, SMS or push delivery |
-| Deferred | Waitlist, dynamic roles, mobile app, external payment gateway callbacks. See [Known Gaps](#known-gaps) |
+| Area | Current implementation | Limits / important details |
+|---|---|---|
+| Flow 1 - Identity, cards, packages | Registration, login, profiles, membership cards, sport packages, staff sales and activation, password management and OTP recovery | Gmail OAuth must be configured privately for email delivery |
+| Flow 2 - Classes, sessions, booking | Manager class/session administration and rescheduling, Member schedule and booking, Receptionist-assisted booking and arrival check-in, Coach roster/schedule | Booking, check-in and Coach attendance are separate operations |
+| Flow 3 - Payments and reports | Pending payments, cash/bank methods, staff verification, invoices, receipts, refunds, finance and operations reports, QR flows | VietQR instructions, gateway callback and local/simulated QR modes are distinct; a QR image itself is not proof of payment |
+| Flow 4 - Training | Plans, attendance, results, progress, feedback, notices and class questions | Coach attendance is separate from Receptionist arrival check-in |
+| Flow 5 - Recommendations | Member class recommendations and sport levels; Coach rule-based drill suggestions with optional Gemini drafts | Rule fallback remains available |
+| Flow 6 - Spori and support | Sportify-scoped Spori chat for all four roles plus Member support requests and Receptionist replies | Gemini-backed replies require explicit activation; unknown facts must not be invented |
+| Notifications | Member/staff inbox and Receptionist action inbox for payment exceptions and support requests | Mark as read does not complete a business task |
+| Wallet | Retired runtime source and UI removed | Immutable V50-V53 Wallet migrations and already-stored DB records remain for compatibility |
+| Deferred | Waitlist, dynamic role system and standalone mobile app | No production settlement guarantee for sandbox/local QR |
 
-Roles are fixed: MEMBER, COACH, RECEPTIONIST, MANAGER.
+**Database inventory:** Current [source inventory](docs/nx-04/source-inventory.json) records **82 `CREATE TABLE` declarations with 82 unique names**, including **7 historical Wallet tables**. This is a migration-source count, **not a live SQL Server count**. The [older V1-V20 schema reference](docs/database/schema/README.md) states 58 and must not be presented as current. Check a running DB with:
 
-**AI features.** Both AI integrations are optional, server-side only and disabled unless an operator sets the matching environment variables. With AI off, the assistant and drill suggestions still work from rules and center data. No AI key is ever sent to the frontend. See [member assistant](docs/training/member-assistant-ai.md) and [AI drill suggestions](docs/training/ai-drill-suggestions.md).
+```sql
+SELECT DB_NAME() AS current_database;
+SELECT COUNT(*) AS actual_user_tables FROM sys.tables WHERE is_ms_shipped = 0;
+```
+
+**Secrets:** `GEMINI_API_KEY`, Gmail OAuth credentials, `JWT_SECRET`, and SQL credentials must live in the git-ignored `backend/.env` or server environment. The browser never needs Gemini or Gmail secret keys. See the [integration notes](#api-overview).
 
 ## Repository Layout
 
@@ -60,7 +66,7 @@ The normal setup uses **one** operational database named `sportify`.
 ### Prerequisites
 
 - JDK 25 and Maven 3.9+
-- Node.js `^22.13.0 || ^24.0.0 || >=26.0.0` and npm (see `frontend/package.json`)
+- Node.js `^22.22.2 || ^24.15.0 || >=26.0.0` and npm (see `frontend/package.json`)
 - SQL Server 2022 reachable on port 1433 (local install, or Docker as an alternative)
 
 ### 1. Configure the backend
@@ -72,6 +78,11 @@ Copy `backend/.env.example` to `backend/.env` and fill it in. `.env` is git-igno
 | `DB_URL` | For example `jdbc:sqlserver://localhost:1433;databaseName=sportify;encrypt=true;trustServerCertificate=true` |
 | `DB_USERNAME`, `DB_PASSWORD` | SQL Server login |
 | `JWT_SECRET` | Base64 signing key, for example from `openssl rand -base64 32` |
+| `GEMINI_API_KEY` | Optional backend-only key for Spori / AI drills |
+| `AI_ASSISTANT_ENABLED`, `AI_ASSISTANT_REPLY_ENABLED`, `AI_DRILLS_ENABLED` | Toggles; provider/model and credentials also determine activation |
+| `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, `GMAIL_OAUTH_REFRESH_TOKEN` | Gmail API OAuth 2.0 for password reset OTP, with `gmail.send` scope |
+| `PASSWORD_RESET_OTP_SECRET` | Secret for OTP hashing |
+| `VIETQR_*`, `SPORTIFY_PAYMENT_*`, `PAYMENT_LOCAL_DEMO_ENABLED` | Optional gateway, transfer instruction and guarded demo configuration |
 | `CORS_ALLOWED_ORIGINS` | Optional in `dev` (defaults to `http://localhost:5173,http://localhost:3000`), required in `prod` |
 
 ### 2. Prepare local SQL Server
@@ -112,7 +123,7 @@ There are two different kinds of demo setup. Do not confuse them.
 | Option | What it does | Where to read more |
 |---|---|---|
 | `dev,demo` profiles | Adds `db/demo` seed migrations (V28 accounts, V29 classes and sessions, V41 coach photos) to a **fresh, isolated** database. A guard rejects `prod` and `demo` together, but it cannot detect that a connection points at shared data | [BE-07 test cases](docs/tests/BE-07_test_cases.md), [BE-15 test cases](docs/tests/BE-15_test_cases.md) |
-| `qr-demo` profile | Separate standalone non-payable QR demo, opt-in only, not used with `sportify` | [QR local demo](docs/qr-local-demo.md) |
+| QR simulator / local demo | Optional guarded modes; simulated settlement is distinct from bank-confirmed payment | [QR local demo](docs/qr-local-demo.md) |
 | `scripts/demo-data` | Manual SQL that adds demo coaches and receptionists | [demo data README](scripts/demo-data/README.md) |
 | Integration tests | Run in Testcontainers or a new throwaway test database, never `sportify` | [Testing](#testing) |
 
@@ -234,7 +245,7 @@ integration execution is required in GitHub CI and is not claimed from local com
 
 ## Documentation
 
-- **Database:** [design index](docs/database/README.md), [schema reference](docs/database/schema/README.md), [business rules and state machines](docs/database/09-business-rules-and-state-machines.md)
+- **Database:** [design index](docs/database/README.md), [historical V1-V20 schema reference](docs/database/schema/README.md), [current source table inventory](docs/nx-04/source-inventory.json), [business rules](docs/database/09-business-rules-and-state-machines.md)
 - **API contracts:** [session identity](docs/api/session-identity.md), [attendance session date](docs/api/attendance-session-date.md), [attendance backfill](docs/api/attendance-administrative-backfill.md), [front desk](docs/api/BE-05-front-desk.md), [facility lookup](docs/api/BE-10-facility-lookup.md)
 - **Training and support:** [plans](docs/training/class-plans.md), [progress](docs/training/progress.md), [Manager attendance overview](docs/training/manager-attendance-overview.md), [class notices](docs/training/class-notices.md), [check-in pass](docs/training/member-check-in-pass.md), [notifications](docs/training/operational-notifications.md), [Reception support](docs/training/reception-support.md), [member assistant](docs/training/member-assistant-ai.md), [AI drill suggestions](docs/training/ai-drill-suggestions.md)
 - **Payments:** [VietQR transfer instructions](docs/payment/VietQR-transfer-instructions.md), [operations report](docs/payment/Operations-report.md), [QR local demo](docs/qr-local-demo.md)
@@ -263,27 +274,32 @@ Version numbers are shared across both migration folders and have gaps. List the
 
 ## API Overview
 
-All paths start with `/api/v1`. Send the access token as `Authorization: Bearer <token>`. Every endpoint checks roles on the server. This is a map, not a full contract; follow the links for details.
+Backend defaults to `http://localhost:8080` with REST prefix `/api/v1`. Access tokens use `Authorization: Bearer <token>`. Access expiry is 15 minutes and refresh expiry is 7 days in `application.yml`. Role checks are enforced in Spring Security and `@PreAuthorize` annotations, not only in React.
 
-| Area | Main paths | Roles |
+| Area | Representative paths | Access |
 |---|---|---|
-| Auth | `POST /auth/register`, `/auth/login`, `/auth/refresh` (single-use refresh token) | Public |
-| Catalog | `GET /sports`, `/packages`, `/membership-cards/tiers`, `/facilities/public`, `/coaches/public` | Public |
-| Profile | `GET/PUT /users/me`, `PUT /users/me/password` | Any signed-in user |
-| Cards and packages | `/membership-cards/...`, `/packages/registrations/...` | MEMBER, RECEPTIONIST, MANAGER |
-| Sessions | `GET /sessions`, `/sessions/{id}`, `/sessions/by-code/{sessionId}`, `/sessions/{id}/eligibility` | MEMBER, RECEPTIONIST, MANAGER |
-| Session admin and rescheduling | `/manager/classes/...`, `/manager/sessions/...` including `PUT /manager/sessions/by-code/{sessionId}` | MANAGER |
-| Bookings | `POST /bookings`, `DELETE /bookings/{id}`, `GET /bookings/my` (My Schedule), `/bookings/member/{memberId}` | MEMBER, RECEPTIONIST, MANAGER |
-| Coach schedule | `GET /coach/sessions`, `/coach/sessions/{id}/roster` | COACH, MANAGER |
-| Attendance | `POST /coach/training/attendance`, `PUT /coach/training/attendance/{id}`, same under `/reception/training/attendance`, Manager overview at `/manager/training/attendance/...` | COACH, RECEPTIONIST, MANAGER |
-| Training and progress | `/member/training/...`, `/coach/training/...` (plans, results, feedback, progress, notices, questions) | MEMBER, COACH |
-| Recommendations | `/member/training/recommendations`, `/member/training/sport-levels`, `/member/training/saved-recommendations` | MEMBER |
-| Assistant | `POST /member/training/consultation` | MEMBER |
-| Support | `/member/support-requests/...`, `/reception/support-requests/...` | MEMBER, RECEPTIONIST |
-| Payments | `/payments/{id}`, `/payments/my`, `/payments/{id}/confirm`, `/payments/{id}/vietqr-instructions`, `/invoices/...`, `/refunds/...` | Role-scoped |
-| Reports | `/manager/finance/...`, `/manager/reports/operations`, `/manager/activity-logs` | MANAGER |
-| Notifications | `GET /member/notifications`, `PUT /member/notifications/{id}/read` | MEMBER |
-| Legacy (deprecated) | `/memberships/...` plan-based membership | Kept for compatibility |
+| Authentication | `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/forgot-password/request`, `/verify`, `/reset` | Public entry points with authentication / OTP checks |
+| Catalogue | `GET /sports`, `/packages`, `/membership-cards/tiers`, `/facilities/public`, `/coaches/public` | Public GET |
+| Profiles | `GET/PUT /users/me`, password operations | Authenticated / role-scoped |
+| Session and class administration | `/sessions`, `/sessions/by-code/{sessionId}`, `/manager/classes`, `/manager/sessions` | Member / Receptionist / Manager read, Manager writes |
+| Booking | `/bookings`, `/bookings/my`, staff-assisted booking | Role-scoped; validated server-side |
+| Coaching | `/coach/sessions`, `/coach/training/attendance`, `/manager/training/attendance` | Coach / Manager with relevant permissions |
+| Training | `/member/training/...`, `/coach/training/...` | Role-scoped |
+| Spori | `POST /assistant/chat` | All four roles; role is derived from signed-in user |
+| Support | `/member/support-requests`, `/reception/support-requests` | Member and Receptionist |
+| Payment / invoices / refunds | `/payments/...`, `/invoices/...`, `/refunds/...` | Role-scoped |
+| VietQR server callbacks | `POST /api/token_generate`, `/bank/api/transaction-sync` | Provider-specific Basic / callback JWT authentication |
+| Reports / inbox | `/manager/finance/...`, `/manager/reports/operations`, `/member/notifications`, `/reception/inbox` | Role-scoped |
+
+Paths above are a quick reference, not exhaustive contracts. Read the controller annotations and [API documentation](docs/api/) for exact request/response shapes.
+
+### Where the API credentials are kept
+
+- `backend/src/main/resources/application.yml` imports optional local `.env` and maps variables to Spring configuration.
+- **Gemini:** backend `catalog/service/GeminiReplyWriter.java`, `GeminiAssistantClassifier.java`, and `GeminiDrillGenerator.java` read `GEMINI_API_KEY`. With the matching toggles, Spori may write an AI response using center-grounded data; without it the rule-based path is used.
+- **Gmail:** `identity/service/GmailOtpSender.java` reads `GMAIL_OAUTH_*` and exchanges refresh credentials for short-lived access tokens to call `users.messages.send`. Required OAuth scope: `https://www.googleapis.com/auth/gmail.send`.
+- **VietQR:** `payment/controller/VietQrCallbackController.java` and related payment services validate callback credentials/tokens. A local demo or sandbox callback is not proof that a bank transfer occurred.
+- Never put API secrets into `frontend/src`, `frontend/.env` variables prefixed `VITE_`, README examples, commits, screenshots, or diagnostic logs.
 
 ## Testing
 
@@ -310,20 +326,23 @@ npm run build
 - **Migrations:** never edit a merged migration. Add a new `V<next>__description.sql`. Hibernate only validates the schema.
 - **Data rules:** no physical delete for business data, enums stored as strings, money is `DECIMAL(14,2)` VND.
 - Commit `package-lock.json`, never `node_modules/` or `dist/`.
-- Code, comments, commits and docs are in English. Use `-` and `->`, no emoji or decorative symbols.
+- Code identifiers, runtime messages, commits and docs remain in English. As an explicit defense-preparation exception, standalone explanatory Java comments may be written in Vietnamese; the CI checker still rejects Vietnamese diacritics in added Java code lines. Use ASCII `-` and `->`, without emoji or decorative symbols.
 - One branch per task, Conventional Commits, and every change to `main` goes through a PR reviewed by the code owner (@senko-do-thingz). Update `CHANGELOG.md` in the same PR.
 - AI Audit Log documents are private local files and stay out of Git (see `.gitignore`).
 
 ## Known Gaps
 
-- Waitlist is not implemented (the table exists from an early migration, no API or screen).
-- Roles are fixed; there is no dynamic role or permission management.
-- Desktop only; no mobile app or mobile-specific layout work.
-- No external payment gateway: there is no automatic bank callback or reconciliation, and staff confirm real payments. Two QR features are separate. VietQR transfer instructions show bank-transfer details for a pending real payment (when configured); the payment still waits for staff confirmation. The QR Local Demo shows a non-payable synthetic QR whose SIMULATED settlement is never real revenue or a bank receipt. Scanning a QR code never confirms a real payment by itself.
-- Member notifications exist only as a backend API; there is no member notification screen, and no e-mail, SMS or push delivery.
-- AI features are off by default and need an operator-provided key; provider and model choices need CODEOWNER approval.
-- Cash-flow endpoints (`/manager/finance/cash-flow/...`) exist, but no frontend screen uses them yet.
-- The deprecated plan-based membership flow (`/memberships`) still computes `end = start + duration`.
+- **Historical schema:** The 82 source-declared tables include legacy and retired structures; a deployed SQL Server database must be inspected separately.
+- **Retired Wallet:** Runtime Wallet Java/React code is removed in this PR, while applied Flyway migrations V50-V53 and existing records are preserved to prevent checksum, validation and data-loss problems.
+- **Waitlist:** A historical table exists, but an active waitlist workflow is not implemented.
+- **Fixed roles:** MEMBER, COACH, RECEPTIONIST and MANAGER; no generic dynamic role editor.
+- **Desktop course demo:** Not a native mobile app or production release.
+- **Payments:** VietQR provider callbacks are conditional on configuration. Sandbox, simulator and local QR demos are not evidence of real bank settlement; review actual payment status and source.
+- **AI:** Provider/model/feature flags are required for Gemini features; rules are deliberately used as fallback.
+- **Gmail OTP:** Sending requires a valid OAuth client, consent, refresh token and `gmail.send` permission.
+- **Compatibility:** Deprecated membership paths and historical migrations remain in place.
+
+Before a merge, check the latest GitHub Actions result. This README does not claim that newly opened PR code is already merged into main.
 
 ## Team
 
