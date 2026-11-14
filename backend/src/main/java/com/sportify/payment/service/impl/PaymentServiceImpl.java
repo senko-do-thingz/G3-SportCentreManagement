@@ -59,6 +59,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
+    // Hủy thanh toán chỉ được phép trước khi chuyển sang Receptionist xác nhận; trạng thái do backend quyết định.
     public PaymentResponse cancelPayment(Long id, UserAccount actor) {
         Payment payment = ownedPendingPayment(id, actor);
         requireCancellable(payment, "This payment has been submitted or settlement has begun and can no longer be cancelled");
@@ -96,7 +97,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     /**
      * Payment-first locking: the payment row is locked (pessimistic write) before its status, handoff time or linked
-     * card/package is read, the same order the Receptionist, wallet and QR settlement paths use. A cancellation and a
+     * card/package is read, the same order the Receptionist and QR settlement paths use. A cancellation and a
      * concurrent confirmation therefore run one after the other, and the second sees the first one's result.
      */
     /**

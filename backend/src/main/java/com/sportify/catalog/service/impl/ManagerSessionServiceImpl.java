@@ -100,6 +100,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
 
     @Override
     @Transactional
+    // Tạo buổi tập phải đối chiếu lịch Coach, Facility và capacity trước khi ghi DB.
     public List<ManagerSessionResponse> createSessions(Long classId, SessionCreateRequest request, UserAccount actor) {
         return withLockHandling(() -> {
             validateTimes(request.startTime(), request.endTime());
@@ -135,6 +136,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
 
     @Override
     @Transactional
+    // Đổi lịch kiểm tra xung đột đặt chỗ và revision; Session ID mới gắn với ngày mới.
     public ManagerSessionResponse updateSession(Long id, SessionUpdateRequest request, UserAccount actor) {
         return withLockHandling(() -> {
             validateTimes(request.startTime(), request.endTime());

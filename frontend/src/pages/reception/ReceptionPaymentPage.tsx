@@ -345,7 +345,7 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
               value={form.reference}
               disabled={saving}
               error={fieldError('reference')}
-              hint={referenceRequired(form.method) ? 'Bank, card slip or wallet transaction reference.' : 'Optional for cash.'}
+              hint={referenceRequired(form.method) ? 'Bank transfer or card slip transaction reference.' : 'Optional for cash.'}
               onChange={(event) => change('reference', event.target.value)}
               onBlur={() => touch('reference')}
             />

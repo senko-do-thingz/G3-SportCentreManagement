@@ -29,6 +29,7 @@ import java.util.Map;
  */
 @Component
 public class GmailOtpSender {
+    // Endpoint OAuth đổi refresh token thành access token ngắn hạn; không lưu access token vào DB.
     static final URI TOKEN_URI = URI.create("https://oauth2.googleapis.com/token");
     static final URI SEND_URI = URI.create("https://gmail.googleapis.com/gmail/v1/users/me/messages/send");
     private static final Duration TIMEOUT = Duration.ofSeconds(15);
@@ -49,6 +50,7 @@ public class GmailOtpSender {
     private String accessToken;
     private Instant accessTokenExpiry = Instant.EPOCH;
 
+    // Các giá trị OAuth đọc qua cấu hình server; không đưa Client Secret hoặc Refresh Token vào mã nguồn.
     @Autowired
     public GmailOtpSender(ObjectMapper json,
                           @Value("${GMAIL_SENDER_EMAIL:}") String sender,

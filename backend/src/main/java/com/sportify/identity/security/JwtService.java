@@ -36,6 +36,7 @@ public class JwtService {
      */
     static final String CREDENTIAL_CLAIM = "cred";
 
+    // Khóa ký JWT lấy từ biến môi trường backend, tuyệt đối không chuyển xuống frontend.
     @Value("${application.security.jwt.secret-key}")
     private String secretKey;
 
@@ -80,6 +81,7 @@ public class JwtService {
         return buildToken(extraClaims, userDetails, jwtExpiration);
     }
 
+    // Refresh token có định danh riêng để hỗ trợ xoay vòng và từ chối dùng lại phiên cũ.
     public String generateRefreshToken(UserDetails userDetails) {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("type", "refresh");

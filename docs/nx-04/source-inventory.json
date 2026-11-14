@@ -507,6 +507,21 @@
       "creates": [],
       "drops": [],
       "sha256_lf": "cffe10722395212a28ad6eaa6cdbfd84c8c2ba361fdb7a0be3ae4948863f2167"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V63__erase_retired_wallet_data_and_schema.sql",
+      "version": 63,
+      "creates": [],
+      "drops": [
+        "dbo.wallet_withdrawal",
+        "dbo.wallet_topup",
+        "dbo.wallet_pending_operation",
+        "dbo.member_payout_account",
+        "dbo.payment_wallet_settlement",
+        "dbo.wallet_ledger_entry",
+        "dbo.member_wallet"
+      ],
+      "sha256_lf": "be18f1fd878aa172bb1bef06fafb616cd3ff8f9635952f7c58e03bac0a0a9751"
     }
   ],
   "create_occurrences": 82,
@@ -594,7 +609,15 @@
     "session_code_history",
     "user_account"
   ],
-  "drop_occurrences": [],
+  "drop_occurrences": [
+    "dbo.wallet_withdrawal",
+    "dbo.wallet_topup",
+    "dbo.wallet_pending_operation",
+    "dbo.member_payout_account",
+    "dbo.payment_wallet_settlement",
+    "dbo.wallet_ledger_entry",
+    "dbo.member_wallet"
+  ],
   "entities": [
     {
       "path": "backend/src/main/java/com/sportify/catalog/entity/AgeGroup.java",
@@ -775,7 +798,7 @@
     {
       "id": "S01",
       "path": "backend/src/main/resources/application.yml",
-      "line": 28,
+      "line": 29,
       "definition": "ddl-auto:"
     },
     {
@@ -847,13 +870,13 @@
     {
       "id": "S13",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 81,
+      "line": 82,
       "definition": "public BookingResponse createBooking"
     },
     {
       "id": "S14",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 362,
+      "line": 365,
       "definition": "recordSelfTrainingAttendance"
     },
     {

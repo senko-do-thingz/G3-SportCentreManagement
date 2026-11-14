@@ -10,6 +10,7 @@ spring:
   profiles:
     active: dev
 
+  # Chuỗi kết nối DB chỉ được đọc phía server; dùng DB_URL để trỏ đúng database sportify.
   datasource:
     url: ${DB_URL:jdbc:sqlserver://localhost:1433;databaseName=sportify;encrypt=false;trustServerCertificate=true}
     username: ${DB_USERNAME:sa}
@@ -27,6 +28,7 @@ spring:
     hibernate:
       ddl-auto: validate
 
+  # Flyway quản lý lịch sử schema, không xóa migration đã chạy để tránh lỗi checksum.
   flyway:
     enabled: true
     locations: classpath:db/migration/identity,classpath:db/migration/catalog,classpath:db/compat-vietqr

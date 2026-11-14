@@ -1,6 +1,6 @@
 import { memberNotificationApi, staffNotificationApi, type OwnNotice } from '../api/notificationApi'
 import type { Role } from '../api/types'
-import { receptionInboxApi } from '../api/walletApi'
+import { receptionInboxApi } from '../api/receptionInboxApi'
 
 /** Header inbox refresh interval while a page is open. */
 export const INBOX_POLL_MS = 30000
