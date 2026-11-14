@@ -78,6 +78,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
+    // Đặt lịch là giao dịch nghiệp vụ: kiểm tra quyền, gói tập, sức chứa và ghi booking cùng nhau.
     public BookingResponse createBooking(BookingCreateRequest request, UserAccount actor) {
         requireActor(actor, false);
         if (request == null) throw rule("Booking request is required", "INVALID_REQUEST");
@@ -132,6 +133,7 @@ public class BookingServiceImpl implements BookingService {
         if (sessionRepository.findVisibleById(session.getId(), now.toLocalDate(), now.toLocalTime()).isEmpty()) {
             throw rule("Session assignments are not available for booking", "SESSION_UNAVAILABLE");
         }
+        // Kiểm tra ghế đã xác nhận từ DB ngay trong giao dịch, không dùng số ghế hiển thị cũ ở frontend.
         if (bookingRepository.countBySessionIdAndStatus(session.getId(), BookingStatus.CONFIRMED) >= session.getCapacity()) {
             throw new ConflictException("Session is fully booked", "FULL");
         }
@@ -197,6 +199,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
+    // Hủy booking phải kiểm tra chủ sở hữu, trạng thái buổi tập và quy tắc hoàn lượt học.
     public BookingResponse cancelBooking(Long bookingId, UserAccount actor) {
         requireActor(actor, false);
         requirePositiveId(bookingId, "Booking ID");

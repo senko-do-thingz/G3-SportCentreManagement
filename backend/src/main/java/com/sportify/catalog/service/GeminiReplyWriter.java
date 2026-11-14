@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 @ConditionalOnExpression("${app.assistant.ai.enabled:false} and '${app.assistant.ai.provider:gemini}'.equalsIgnoreCase('gemini')"
         + " and ${app.assistant.ai.reply.enabled:true}")
 class GeminiReplyWriter implements AssistantReplyWriter {
+    // Gemini được gọi từ backend; API key nằm trong header server-to-server chứ không nằm ở trình duyệt.
     static final String DEFAULT_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/";
     private static final Pattern MODEL = Pattern.compile("[a-z0-9][a-z0-9.\\-]{0,63}");
     static final int MAX_REPLY_LENGTH = 2000;
@@ -97,6 +98,7 @@ class GeminiReplyWriter implements AssistantReplyWriter {
     private final Transport transport;
     private final String endpoint;
     private final String model;
+    // Khóa tích hợp nhận qua cấu hình môi trường, không được ghi vào log hoặc nội dung phản hồi.
     private final String apiKey;
     private final Duration timeout;
     private final ObjectMapper json;

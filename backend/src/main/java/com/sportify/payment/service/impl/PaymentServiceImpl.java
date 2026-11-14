@@ -59,6 +59,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
+    // Hủy thanh toán chỉ được phép trước khi chuyển sang Receptionist xác nhận; trạng thái do backend quyết định.
     public PaymentResponse cancelPayment(Long id, UserAccount actor) {
         Payment payment = ownedPendingPayment(id, actor);
         requireCancellable(payment, "This payment has been submitted or settlement has begun and can no longer be cancelled");
