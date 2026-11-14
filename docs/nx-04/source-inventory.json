@@ -521,7 +521,7 @@
         "dbo.wallet_ledger_entry",
         "dbo.member_wallet"
       ],
-      "sha256_lf": "1b1e2603f81197b235081cd2dbfac01381313d8b9589c8f54dd5dfbc1607a58b"
+      "sha256_lf": "275bb4bb7a53faad32e30b3ce5ce668d33f676564607db43640312df6cd3d563"
     }
   ],
   "create_occurrences": 82,
