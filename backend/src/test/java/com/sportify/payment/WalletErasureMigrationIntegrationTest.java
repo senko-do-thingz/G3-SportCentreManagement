@@ -94,13 +94,16 @@ class WalletErasureMigrationIntegrationTest {
                 INSERT INTO dbo.member_wallet(member_id,created_at,updated_at)
                 OUTPUT INSERTED.id VALUES (?,SYSDATETIME(),SYSDATETIME())
                 """, Long.class, member);
-        long ledger = jdbc.queryForObject("""
+        // This append-only table also has a trigger; INSERT must not use OUTPUT without INTO.
+        jdbc.update("""
                 INSERT INTO dbo.wallet_ledger_entry
                     (wallet_id,operation_key,entry_type,pool,amount,available_after,reserved_after,
                      source_type,source_id,description,created_at)
-                OUTPUT INSERTED.id VALUES (?,'W-OP-1','TOPUP_CREDIT','SIMULATED',20000,20000,0,
-                                              'TOPUP',1,'Old Wallet event',SYSDATETIME())
-                """, Long.class, wallet);
+                VALUES (?,'W-OP-1','TOPUP_CREDIT','SIMULATED',20000,20000,0,
+                           'TOPUP',1,'Old Wallet event',SYSDATETIME())
+                """, wallet);
+        long ledger = jdbc.queryForObject(
+                "SELECT id FROM dbo.wallet_ledger_entry WHERE operation_key='W-OP-1'", Long.class);
         jdbc.update("""
                 INSERT INTO dbo.payment_wallet_settlement(payment_id,ledger_entry_id,created_at)
                 VALUES (?,?,SYSDATETIME())
