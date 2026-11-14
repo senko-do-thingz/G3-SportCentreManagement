@@ -134,6 +134,12 @@ class WalletErasureMigrationIntegrationTest {
                 INSERT INTO dbo.activity_log(action,entity_type,entity_id,summary)
                 VALUES ('WALLET_PAYMENT','PAYMENT',?,'Old Wallet history')
                 """, retiredPayment);
+        // A normal member notification must survive even when its wording mentions Wallet.
+        jdbc.update("""
+                INSERT INTO dbo.notification(user_id,title,content,type,event_key)
+                VALUES (?,'Payment options','Wallet is no longer available; use bank transfer',
+                        'GENERAL','PAYMENT_OPTIONS')
+                """, member);
 
         var current = migrator(db, null);
         assertThat(current.migrate().migrationsExecuted).isEqualTo(1);
@@ -149,6 +155,10 @@ class WalletErasureMigrationIntegrationTest {
                 .isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.payment WHERE id=?", Integer.class, preservedBankPayment))
                 .isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM dbo.notification
+                WHERE user_id=? AND event_key='PAYMENT_OPTIONS'
+                """, Integer.class, member)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.member_profile WHERE user_id=?", Integer.class, member))
                 .isEqualTo(1);
         assertThat(current.migrate().migrationsExecuted).isZero();
