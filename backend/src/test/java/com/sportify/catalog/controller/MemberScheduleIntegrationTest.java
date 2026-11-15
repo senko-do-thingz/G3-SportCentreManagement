@@ -145,8 +145,8 @@ class MemberScheduleIntegrationTest extends AbstractIntegrationTest {
     private ClassSession session() {
         int idx = sessionCounter++;
         LocalDate date = TODAY.plusDays(1).plusDays(idx / 20);
-        LocalTime start = LocalTime.of(6, 0).plusMinutes((idx % 20) * 45);
-        LocalTime end = start.plusMinutes(40);
+        LocalTime start = LocalTime.of(11, 0).plusMinutes((idx % 20) * 35);
+        LocalTime end = start.plusMinutes(30);
         return save(ClassSession.builder().sport(sport).sportClass(sportClass).facility(facility).coach(coach)
                 .sessionDate(date).startTime(start).endTime(end)
                 .trainingType(TrainingFormat.COACH_LED).status(SessionStatus.PUBLISHED).capacity(10).bookedCount(0).build());
@@ -264,7 +264,7 @@ class MemberScheduleIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test void sameDayFutureSelfTrainingWithNullCoachRemainsVisibleAndEligible() {
-        var s = session(); s.setSessionDate(TODAY); s.setStartTime(NOW.plusSeconds(1));
+        var s = session(); s.setSessionDate(TODAY); s.setStartTime(NOW.plusSeconds(1)); s.setEndTime(NOW.plusHours(2));
         s.setTrainingType(TrainingFormat.SELF_TRAINING); s.setCoach(null); s.setSportClass(null); save(s);
         var registration = registration(member, sport, TrainingFormat.SELF_TRAINING, "ACTIVE", TODAY, TODAY, 1);
         assertThat(ids(query())).containsExactly(s.getId());
