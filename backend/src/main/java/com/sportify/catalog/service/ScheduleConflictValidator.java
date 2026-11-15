@@ -80,12 +80,12 @@ public class ScheduleConflictValidator {
 
                     if (sameCoach || sameFacility) {
                         String conflictReason = sameCoach && sameFacility
-                                ? "Huan luyen vien va San bai"
-                                : sameCoach ? "Huan luyen vien" : "San bai";
+                                ? "Coach and Facility"
+                                : sameCoach ? "Coach" : "Facility";
                         throw new BusinessRuleException(
-                                "Phat hien xung dot lich trong cung mot yeu cau: " + conflictReason
-                                        + " bi trung gio vao ngay " + first.sessionDate()
-                                        + " (" + first.startTime() + " - " + first.endTime() + " va "
+                                "Schedule conflict detected within the same request: " + conflictReason
+                                        + " has overlapping time on " + first.sessionDate()
+                                        + " (" + first.startTime() + " - " + first.endTime() + " and "
                                         + second.startTime() + " - " + second.endTime() + ")."
                         );
                     }

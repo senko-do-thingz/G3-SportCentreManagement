@@ -240,7 +240,7 @@ export function CoachTimeGridSchedule({
                       }}
                       aria-pressed={isSelected}
                       onClick={() => onSelectSession(session)}
-                      title={isConflicted ? 'Xung dot thoi gian: Ca day bi trung gio!' : undefined}
+                      title={isConflicted ? 'Time conflict: Overlapping teaching session!' : undefined}
                     >
                       <span className="coach-timegrid-card__time">
                         {displayTime(session.startTime)} - {displayTime(session.endTime)}
@@ -248,7 +248,7 @@ export function CoachTimeGridSchedule({
                       <span className="coach-timegrid-card__title">{sessionTitle(session)}</span>
                       <span className="coach-timegrid-card__id">{sessionIdText(session.sessionId)}</span>
                       {isConflicted && (
-                        <span className="coach-timegrid-conflict-tag">TRUNG LICH</span>
+                        <span className="coach-timegrid-conflict-tag">CONFLICT</span>
                       )}
                     </button>
                   )

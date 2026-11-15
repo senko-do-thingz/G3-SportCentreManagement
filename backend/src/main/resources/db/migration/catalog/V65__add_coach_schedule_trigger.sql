@@ -38,7 +38,7 @@ BEGIN
           AND s.end_time > i.start_time
     )
     BEGIN
-        THROW 51065, 'Loi: Huan luyen vien da co ca day khac trung gio.', 1;
+        THROW 51065, 'Error: Coach already has an overlapping teaching session.', 1;
     END;
 
     -- 2. Kiem tra xung dot noi bo giua cac ban ghi trong cung mot batch duoc chen/cap nhat (inserted)
@@ -58,7 +58,7 @@ BEGIN
           AND a.end_time > b.start_time
     )
     BEGIN
-        THROW 51065, 'Loi: Phat hien ca day bi trung gio cua cung mot Huan luyen vien trong cung yeu cau.', 1;
+        THROW 51065, 'Error: Overlapping teaching sessions detected for the same coach in the same batch.', 1;
     END;
 END;
 GO

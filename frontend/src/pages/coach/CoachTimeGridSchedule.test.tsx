@@ -111,8 +111,8 @@ describe('CoachTimeGridSchedule component', () => {
     // Ca 2: 08:30 - 10:00 (bat dau sau 06:00 dung 150 phut -> top = 150 * 1.6 = 240px)
     expect(buttons[1]).toHaveStyle({ top: '240px' })
 
-    // Ca hai ca bi trung nhau phai co the canh bao TRUNG LICH
-    const conflictTags = screen.getAllByText('TRUNG LICH')
+    // Ca hai ca bi trung nhau phai co the canh bao CONFLICT
+    const conflictTags = screen.getAllByText('CONFLICT')
     expect(conflictTags).toHaveLength(2)
   })
 
@@ -131,7 +131,7 @@ describe('CoachTimeGridSchedule component', () => {
     expect(button).toBeInTheDocument()
     // 14:00 cach 06:00 la 8 tieng = 480 phut -> top = 480 * 1.6 = 768px
     expect(button).toHaveStyle({ top: '768px' })
-    expect(screen.queryByText('TRUNG LICH')).not.toBeInTheDocument()
+    expect(screen.queryByText('CONFLICT')).not.toBeInTheDocument()
   })
 
   it('triggers onSelectSession callback when clicked', async () => {

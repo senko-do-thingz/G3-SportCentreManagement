@@ -41,7 +41,7 @@ class ScheduleConflictValidatorTest {
     }
 
     @Test
-    @DisplayName("Kiem tra cong thuc toan hoc S1 < E2 va E1 > S2 cho cac ca trung gio")
+    @DisplayName("Verify mathematical overlap formula S1 < E2 and E1 > S2")
     void testHasTimeOverlap() {
         LocalTime t0800 = LocalTime.of(8, 0);
         LocalTime t0930 = LocalTime.of(9, 30);
@@ -68,7 +68,7 @@ class ScheduleConflictValidatorTest {
     }
 
     @Test
-    @DisplayName("Phat hien xung dot noi bo giua cac ca trong cung mot batch tao moi")
+    @DisplayName("Detect intra-batch schedule conflicts within the same creation request")
     void testValidateIntraBatchConflicts() {
         LocalDate date = LocalDate.of(2026, 11, 12);
         ScheduleConflictValidator.SessionScheduleItem item1 = new ScheduleConflictValidator.SessionScheduleItem(
@@ -84,7 +84,7 @@ class ScheduleConflictValidatorTest {
         // Trung HLV trong cung batch phai nem ra ngoai le BusinessRuleException
         assertThatThrownBy(() -> validator.validateIntraBatchConflicts(List.of(item1, item2SameCoach)))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("Phat hien xung dot lich trong cung mot yeu cau");
+                .hasMessageContaining("Schedule conflict detected within the same request");
 
         // Khac HLV va khac san bai thi hop le
         assertThatCode(() -> validator.validateIntraBatchConflicts(List.of(item1, item3DifferentCoach)))
@@ -92,7 +92,7 @@ class ScheduleConflictValidatorTest {
     }
 
     @Test
-    @DisplayName("Phat hien xung dot o tang co so du lieu va nem ra ScheduleConflictException")
+    @DisplayName("Detect database-level conflicts and throw ScheduleConflictException")
     void testValidateDatabaseConflicts() {
         LocalDate date = LocalDate.of(2026, 11, 12);
         LocalTime start = LocalTime.of(8, 0);
