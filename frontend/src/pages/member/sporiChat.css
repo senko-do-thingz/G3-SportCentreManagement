@@ -767,7 +767,7 @@
   background: var(--color-surface);
   color: var(--color-primary);
   font-weight: 700;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .spori-sidebar__list {
@@ -920,7 +920,7 @@
 
 .spori-session-item__edit-save {
   background: var(--color-success);
-  color: #fff;
+  color: var(--color-on-primary);
 }
 
 .spori-session-item__edit-cancel {

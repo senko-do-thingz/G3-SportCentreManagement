@@ -4,6 +4,7 @@ import { type Consultation } from '../../api/trainingGuidanceApi'
 import { sporiApi, type ChatMessageItem, type ChatSession } from '../../api/sporiApi'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { safeMemberReturnTo } from './assistantNavigation'
 import { SporiAiBadge, SporiAvatar, SporiComposer, SporiCopyButton, SporiHandoff, SporiIcon, SporiSources, SporiText, SporiTyping } from './sporiChat'
 import { formatTime, useSporiChat, useSporiScroll } from './useSporiChat'
 import './sporiChat.css'
@@ -98,6 +99,7 @@ export function MemberAssistantPage() {
 function CenterConsultationWorkspace() {
   const [params] = useSearchParams()
   const location = useLocation()
+  const returnTo = safeMemberReturnTo(params.get('returnTo'))
   const chat = useSporiChat('Spori could not load an answer. Please try again.')
   const [question, setQuestion] = useState(() => {
     const routeQuestion = (location.state as { assistantQuestion?: unknown } | null)?.assistantQuestion
@@ -303,6 +305,11 @@ function CenterConsultationWorkspace() {
     <div className="training-page spori-page">
       <div className="spori-page__top">
         <div className="spori-page__top-left">
+          {returnTo && (
+            <Link className="member-concept__sr-only" to={returnTo}>
+              Back to previous page
+            </Link>
+          )}
           <button
             type="button"
             className="spori-page__toggle-sidebar"
