@@ -3,9 +3,9 @@
 .coach-timegrid-wrapper {
   display: flex;
   flex-direction: column;
-  background: var(--coach-surface, #ffffff);
-  border: 1px solid var(--coach-rule, #e2e8f0);
-  border-radius: var(--coach-radius, 8px);
+  background: var(--coach-surface);
+  border: 1px solid var(--coach-rule);
+  border-radius: var(--coach-radius);
   overflow-x: auto;
   min-width: 0;
   width: 100%;
@@ -14,8 +14,8 @@
 /* Header chua thu va ngay cua 7 cot */
 .coach-timegrid-header {
   display: flex;
-  background: var(--coach-surface-muted, #f8fafc);
-  border-bottom: 2px solid var(--coach-rule, #cbd5e1);
+  background: var(--coach-surface-muted);
+  border-bottom: 2px solid var(--coach-rule);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -25,7 +25,7 @@
 .coach-timegrid-time-gutter-header {
   width: 4rem;
   flex-shrink: 0;
-  border-right: 1px solid var(--coach-rule, #e2e8f0);
+  border-right: 1px solid var(--coach-rule);
 }
 
 .coach-timegrid-header-columns {
@@ -35,9 +35,9 @@
 }
 
 .coach-timegrid-col-header {
-  padding: var(--space-2, 0.5rem) var(--space-1, 0.25rem);
+  padding: var(--space-2) var(--space-1);
   text-align: center;
-  border-right: 1px solid var(--coach-rule, #e2e8f0);
+  border-right: 1px solid var(--coach-rule);
 }
 
 .coach-timegrid-col-header:last-child {
@@ -45,22 +45,22 @@
 }
 
 .coach-timegrid-col-header.is-today {
-  background: color-mix(in srgb, var(--coach-blue, #2563eb) 8%, transparent);
+  background: color-mix(in srgb, var(--coach-blue) 8%, transparent);
 }
 
 .coach-timegrid-day-name {
   display: block;
-  font-size: var(--text-xs, 0.75rem);
-  font-weight: var(--weight-bold, 700);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
   text-transform: uppercase;
-  color: var(--coach-ink, #1e293b);
-  letter-spacing: var(--tracking-eyebrow, 0.05em);
+  color: var(--coach-ink);
+  letter-spacing: var(--tracking-eyebrow);
 }
 
 .coach-timegrid-date-text {
   display: block;
   font-size: 0.6875rem;
-  color: var(--coach-muted, #64748b);
+  color: var(--coach-muted);
   margin-top: 2px;
 }
 
@@ -70,25 +70,25 @@
   position: relative;
   min-width: 56rem;
   height: 960px; /* 16 gio tu 06:00 den 22:00, moi gio 60px (1px = 1 phut) */
-  background: var(--coach-surface, #ffffff);
+  background: var(--coach-surface);
 }
 
 /* Cot truc Tung bieu dien moc gio */
 .coach-timegrid-time-gutter {
   width: 4rem;
   flex-shrink: 0;
-  border-right: 1px solid var(--coach-rule, #e2e8f0);
-  background: var(--coach-surface-muted, #f8fafc);
+  border-right: 1px solid var(--coach-rule);
+  background: var(--coach-surface-muted);
   position: relative;
   user-select: none;
 }
 
 .coach-timegrid-hour-marker {
   position: absolute;
-  right: var(--space-2, 0.5rem);
+  right: var(--space-2);
   font-size: 0.6875rem;
-  font-weight: var(--weight-medium, 500);
-  color: var(--coach-muted, #64748b);
+  font-weight: var(--weight-medium);
+  color: var(--coach-muted);
   transform: translateY(-50%);
   line-height: 1;
 }
@@ -113,14 +113,14 @@
   position: absolute;
   left: 0;
   right: 0;
-  border-top: 1px dashed var(--coach-rule, #e2e8f0);
+  border-top: 1px dashed var(--coach-rule);
   width: 100%;
 }
 
 /* Tung cot ngay rieng biet */
 .coach-timegrid-day-column {
   position: relative;
-  border-right: 1px solid var(--coach-rule, #e2e8f0);
+  border-right: 1px solid var(--coach-rule);
   height: 100%;
   z-index: 2;
 }
@@ -130,7 +130,7 @@
 }
 
 .coach-timegrid-day-column.is-today {
-  background: color-mix(in srgb, var(--coach-blue, #2563eb) 3%, transparent);
+  background: color-mix(in srgb, var(--coach-blue) 3%, transparent);
 }
 
 /* The ca day duoc dinh vi toa do tuyet doi theo phut */
@@ -138,11 +138,11 @@
   position: absolute;
   box-sizing: border-box;
   padding: 4px 6px;
-  border: 1px solid color-mix(in srgb, var(--coach-blue, #2563eb) 40%, transparent);
-  border-left: 3px solid var(--coach-blue, #2563eb);
-  border-radius: var(--radius-sm, 4px);
-  background: var(--coach-blue-soft, #eff6ff);
-  color: var(--coach-ink, #1e293b);
+  border: 1px solid color-mix(in srgb, var(--coach-blue) 40%, transparent);
+  border-left: 3px solid var(--coach-blue);
+  border-radius: var(--radius-sm);
+  background: var(--coach-blue-soft);
+  color: var(--coach-ink);
   text-align: left;
   cursor: pointer;
   overflow: hidden;
@@ -156,40 +156,40 @@
 .coach-timegrid-card:hover {
   z-index: 7;
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.12);
-  border-color: var(--coach-blue, #2563eb);
+  box-shadow: var(--shadow-sm);
+  border-color: var(--coach-blue);
 }
 
 .coach-timegrid-card.is-selected {
   z-index: 8;
-  border-color: var(--coach-blue, #2563eb);
+  border-color: var(--coach-blue);
   border-left-width: 4px;
-  background: color-mix(in srgb, var(--coach-blue, #2563eb) 18%, #ffffff);
-  box-shadow: 0 0 0 2px var(--coach-blue, #2563eb);
+  background: color-mix(in srgb, var(--coach-blue) 18%, var(--coach-surface));
+  box-shadow: 0 0 0 2px var(--coach-blue);
 }
 
 /* Trang thai ca day bi Double-booking (Xung dot thoi gian) */
 .coach-timegrid-card.is-conflicted {
-  border-color: #fca5a5;
-  border-left: 3px solid #ef4444;
-  background: #fef2f2;
-  color: #7f1d1d;
+  border-color: var(--color-danger-border);
+  border-left: 3px solid var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
 }
 
 .coach-timegrid-card.is-conflicted.is-selected {
-  border-color: #dc2626;
+  border-color: var(--color-danger);
   border-left-width: 4px;
-  background: #fee2e2;
-  box-shadow: 0 0 0 2px #ef4444;
+  background: color-mix(in srgb, var(--color-danger) 18%, var(--coach-surface));
+  box-shadow: 0 0 0 2px var(--color-danger);
 }
 
 .coach-timegrid-conflict-tag {
   display: inline-block;
   padding: 1px 4px;
   font-size: 0.5625rem;
-  font-weight: var(--weight-bold, 700);
-  background: #ef4444;
-  color: #ffffff;
+  font-weight: var(--weight-bold);
+  background: var(--color-danger);
+  color: var(--color-text-inverse);
   border-radius: 2px;
   letter-spacing: 0.03em;
   line-height: 1.1;
@@ -198,23 +198,23 @@
 
 .coach-timegrid-card__time {
   font-size: 0.6875rem;
-  font-weight: var(--weight-bold, 700);
+  font-weight: var(--weight-bold);
   line-height: 1.2;
-  color: var(--coach-blue, #2563eb);
+  color: var(--coach-blue);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .coach-timegrid-card.is-conflicted .coach-timegrid-card__time {
-  color: #b91c1c;
+  color: var(--color-danger);
 }
 
 .coach-timegrid-card__title {
   font-size: 0.75rem;
-  font-weight: var(--weight-semibold, 600);
+  font-weight: var(--weight-semibold);
   line-height: 1.25;
-  color: var(--coach-ink, #1e293b);
+  color: var(--coach-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -222,7 +222,7 @@
 
 .coach-timegrid-card__id {
   font-size: 0.625rem;
-  color: var(--coach-muted, #64748b);
+  color: var(--coach-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -75,17 +75,6 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
     private final com.sportify.catalog.service.OperationalNotificationService notifications;
     private final com.sportify.catalog.service.ScheduleConflictValidator conflictValidator;
 
-    public ManagerSessionServiceImpl(ClassSessionRepository sessionRepository, SportClassRepository classRepository,
-            CoachProfileRepository coachRepository, CoachSportRepository coachSportRepository,
-            FacilityRepository facilityRepository, BookingRepository bookingRepository,
-            SessionCancellationRepository cancellationRepository, AuditService auditService,
-            Clock clock, SessionCodeAllocator sessionCodeAllocator,
-            com.sportify.catalog.service.OperationalNotificationService notifications) {
-        this(sessionRepository, classRepository, coachRepository, coachSportRepository, facilityRepository,
-                bookingRepository, cancellationRepository, auditService, clock, sessionCodeAllocator,
-                notifications, new com.sportify.catalog.service.ScheduleConflictValidator(sessionRepository));
-    }
-
     @Override
     @Transactional(readOnly = true)
     public ManagerSessionResponse getSessionByCode(String sessionId) {

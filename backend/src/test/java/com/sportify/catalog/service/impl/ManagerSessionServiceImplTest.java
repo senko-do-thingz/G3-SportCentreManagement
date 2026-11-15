@@ -69,7 +69,8 @@ class ManagerSessionServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new ManagerSessionServiceImpl(sessions, classes, coaches, qualifications, facilities,
-                bookings, cancellations, audit, CLOCK, allocator,notifications);
+                bookings, cancellations, audit, CLOCK, allocator, notifications,
+                new com.sportify.catalog.service.ScheduleConflictValidator(sessions));
         Sport sport = Sport.builder().id(1L).code("FOOTBALL").name("Football").isActive(true).build();
         sportClass = SportClass.builder().id(10L).code("CL-1000").name("Football Fundamentals")
                 .sport(sport).isActive(true).maxMembers(20).build();
