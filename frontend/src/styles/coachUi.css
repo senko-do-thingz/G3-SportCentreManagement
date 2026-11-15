@@ -419,21 +419,25 @@
   line-height: 1.35;
 }
 
-/* Bo cuc lich tuan va thong tin tong quan ca day tren cung mot hang: Lich tuan ben trai, Tong quan ben phai */
+/* Bo cuc lich tuan (3 cot) va thong tin tong quan ca day (1 cot) khop voi 4 the chi so phia tren */
 .coach-ui .coach-schedule-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 310px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: start;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-width: 0;
 }
 
-.coach-ui .coach-schedule-weekly,
-.coach-ui .coach-schedule-overview {
+.coach-ui .coach-schedule-weekly {
+  grid-column: span 3;
   min-width: 0;
+  padding: 0;
 }
 
 .coach-ui .coach-schedule-overview {
+  grid-column: span 1;
+  min-width: 0;
+  padding: 0;
   position: sticky;
   top: var(--space-4);
 }
@@ -441,6 +445,7 @@
 .coach-ui .coach-schedule-weekly .card__header,
 .coach-ui .coach-schedule-overview .card__header {
   min-height: 3.75rem;
+  margin-bottom: 0;
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--coach-rule);
 }
@@ -730,6 +735,7 @@
 
   .coach-ui .coach-schedule-weekly,
   .coach-ui .coach-schedule-overview {
+    grid-column: 1 / -1;
     min-height: 0;
   }
 

@@ -6,7 +6,7 @@
   background: var(--coach-surface);
   border: 1px solid var(--coach-rule);
   border-radius: var(--coach-radius);
-  max-height: 620px;
+  max-height: 760px;
   overflow: auto;
   min-width: 0;
   width: 100%;
@@ -72,7 +72,7 @@
   position: relative;
   min-width: 36rem;
   width: 100%;
-  height: 960px; /* 16 gio tu 06:00 den 22:00, moi gio 60px (1px = 1 phut) */
+  height: 1536px; /* 16 gio tu 06:00 den 22:00, moi gio 96px (1.6px = 1 phut) */
   background: var(--coach-surface);
 }
 
@@ -120,11 +120,15 @@
   position: absolute;
   left: 0;
   right: 0;
-  border-top: 1px dashed var(--coach-rule);
+  border-top: 1px solid var(--coach-rule);
   width: 100%;
 }
 
-.coach-timegrid-gridline:first-child {
+.coach-timegrid-gridline--half {
+  border-top: 1px dashed color-mix(in srgb, var(--coach-rule) 55%, transparent);
+}
+
+.coach-timegrid-gridlines > div:first-child > .coach-timegrid-gridline:first-child {
   border-top: none;
 }
 
@@ -148,7 +152,7 @@
 .coach-timegrid-card {
   position: absolute;
   box-sizing: border-box;
-  padding: 4px 6px;
+  padding: 6px 8px;
   border: 1px solid color-mix(in srgb, var(--coach-blue) 40%, transparent);
   border-left: 3px solid var(--coach-blue);
   border-radius: var(--radius-sm);
@@ -159,7 +163,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
   z-index: 3;
 }
@@ -224,10 +228,10 @@
 .coach-timegrid-card__title {
   font-size: 0.75rem;
   font-weight: var(--weight-semibold);
-  line-height: 1.25;
+  line-height: 1.3;
   color: var(--coach-ink);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;

@@ -106,10 +106,10 @@ describe('CoachTimeGridSchedule component', () => {
     const buttons = screen.getAllByRole('button', { name: /Badminton Foundations/ })
     expect(buttons).toHaveLength(2)
 
-    // Ca 1: 08:00 - 09:30 (bat dau sau 06:00 dung 120 phut -> top = 120px)
-    expect(buttons[0]).toHaveStyle({ top: '120px' })
-    // Ca 2: 08:30 - 10:00 (bat dau sau 06:00 dung 150 phut -> top = 150px)
-    expect(buttons[1]).toHaveStyle({ top: '150px' })
+    // Ca 1: 08:00 - 09:30 (bat dau sau 06:00 dung 120 phut -> top = 120 * 1.6 = 192px)
+    expect(buttons[0]).toHaveStyle({ top: '192px' })
+    // Ca 2: 08:30 - 10:00 (bat dau sau 06:00 dung 150 phut -> top = 150 * 1.6 = 240px)
+    expect(buttons[1]).toHaveStyle({ top: '240px' })
 
     // Ca hai ca bi trung nhau phai co the canh bao TRUNG LICH
     const conflictTags = screen.getAllByText('TRUNG LICH')
@@ -129,8 +129,8 @@ describe('CoachTimeGridSchedule component', () => {
 
     const button = screen.getByRole('button', { name: /Tennis Advanced/ })
     expect(button).toBeInTheDocument()
-    // 14:00 cach 06:00 la 8 tieng = 480 phut -> top = 480px
-    expect(button).toHaveStyle({ top: '480px' })
+    // 14:00 cach 06:00 la 8 tieng = 480 phut -> top = 480 * 1.6 = 768px
+    expect(button).toHaveStyle({ top: '768px' })
     expect(screen.queryByText('TRUNG LICH')).not.toBeInTheDocument()
   })
 

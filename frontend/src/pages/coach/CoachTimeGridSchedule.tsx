@@ -14,7 +14,8 @@ interface CoachTimeGridScheduleProps {
 
 const START_HOUR = 6 // 06:00 sang
 const END_HOUR = 22  // 22:00 toi
-const HOUR_HEIGHT = 60 // 60px cho moi gio -> 1px tuong ung 1 phut
+const HOUR_HEIGHT = 96 // 96px cho moi gio -> 1.6px tuong ung 1 phut
+const PIXELS_PER_MINUTE = HOUR_HEIGHT / 60
 const TOTAL_HOURS = END_HOUR - START_HOUR // 16 gio = 960 phut
 const BASE_MINUTES = START_HOUR * 60 // 360 phut
 
@@ -119,8 +120,8 @@ function layoutDaySessions(daySessions: CoachSessionRecord[]): LayoutSessionItem
       const startMin = Math.max(BASE_MINUTES, timeToMinutes(session.startTime))
       const endMin = Math.min(END_HOUR * 60, Math.max(startMin + 15, timeToMinutes(session.endTime)))
 
-      const top = (startMin - BASE_MINUTES) * 1
-      const height = Math.max(28, (endMin - startMin) * 1)
+      const top = Math.round((startMin - BASE_MINUTES) * PIXELS_PER_MINUTE)
+      const height = Math.max(44, Math.round((endMin - startMin) * PIXELS_PER_MINUTE))
       const widthPercent = 100 / totalColumns
       const leftPercent = colIndex * widthPercent
 
@@ -189,14 +190,19 @@ export function CoachTimeGridSchedule({
 
         {/* Luoi 7 cot ngay */}
         <div className="coach-timegrid-days-container">
-          {/* Cac duong ke ngang moc gio */}
+          {/* Cac duong ke ngang moc gio va nua gio */}
           <div className="coach-timegrid-gridlines" aria-hidden="true">
             {hours.map((hour, idx) => (
-              <div
-                key={hour}
-                className="coach-timegrid-gridline"
-                style={{ top: `${idx * HOUR_HEIGHT}px` }}
-              />
+              <div key={hour}>
+                <div
+                  className="coach-timegrid-gridline"
+                  style={{ top: `${idx * HOUR_HEIGHT}px` }}
+                />
+                <div
+                  className="coach-timegrid-gridline coach-timegrid-gridline--half"
+                  style={{ top: `${idx * HOUR_HEIGHT + HOUR_HEIGHT / 2}px` }}
+                />
+              </div>
             ))}
           </div>
 
