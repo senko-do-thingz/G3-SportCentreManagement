@@ -26,9 +26,22 @@ export function SporiText({ text }: { text: string }) {
 }
 
 function inline(text: string): ReactNode {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => part.startsWith('**') && part.endsWith('**') && part.length > 4
-    ? <strong key={index}>{part.slice(2, -2)}</strong>
-    : <Fragment key={index}>{part}</Fragment>)
+  const regex = /(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g
+  return text.split(regex).map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>
+    }
+    const linkMatch = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(part)
+    if (linkMatch) {
+      const [, label, rawUrl] = linkMatch
+      const isInternal = rawUrl.startsWith('/') || rawUrl.includes('localhost:5173')
+      const targetPath = rawUrl.replace(/^https?:\/\/[^/]+/, '') || '/'
+      return isInternal
+        ? <Link key={index} to={targetPath} className="spori-inline-link">{label}</Link>
+        : <a key={index} href={rawUrl} target="_blank" rel="noreferrer noopener" className="spori-inline-link">{label}</a>
+    }
+    return <Fragment key={index}>{part}</Fragment>
+  })
 }
 
 const ICON_PATHS = {
@@ -74,7 +87,14 @@ export function SporiComposer({ id, label, buttonLabel, placeholder, value, pend
       <label className="member-concept__sr-only" htmlFor={id}>{label}</label>
       <textarea ref={inputRef} id={id} name="question" rows={1} maxLength={500} placeholder={placeholder} value={value}
         disabled={pending} onKeyDown={keyDown} onChange={event => onChange(event.target.value)} />
-      <button type="submit" aria-label={buttonLabel} title={buttonLabel} disabled={!value.trim() || pending}>
+      <button
+        type="submit"
+        className="spori-composer__submit"
+        style={{ borderRadius: '50%', width: 40, height: 40, minWidth: 40, minHeight: 40, aspectRatio: '1 / 1', padding: 0 }}
+        aria-label={buttonLabel}
+        title={buttonLabel}
+        disabled={!value.trim() || pending}
+      >
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6l.1 6.5L15 12 3.5 13.9z" fill="currentColor" /></svg>
       </button>
     </form>

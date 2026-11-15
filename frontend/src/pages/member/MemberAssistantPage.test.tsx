@@ -68,7 +68,7 @@ it('does not keep a previous answer after leaving the assistant route', async ()
   await userEvent.type(await screen.findByRole('textbox', { name: /Your question/ }), 'How do I book?')
   await userEvent.click(screen.getByRole('button', { name: 'Ask' }))
   expect(await screen.findByText('Booking guidance answer.')).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('link', { name: 'Back to previous page' }))
+  await userEvent.click(screen.getByRole('link', { name: 'Contact reception' }))
   await userEvent.click((await screen.findAllByRole('link', { name: 'Open center assistant' }))[0])
   expect(await screen.findByRole('textbox', { name: /Your question/ })).toHaveValue('')
   expect(screen.queryByText('Booking guidance answer.')).not.toBeInTheDocument()
@@ -118,4 +118,152 @@ it('keeps a conversation, sends earlier turns as history and shows a Gemini repl
   ] })
   await userEvent.click(screen.getByRole('button', { name: 'New chat' }))
   expect(screen.queryByText('Pro includes 12 sessions.')).not.toBeInTheDocument()
+})
+
+it('does not duplicate "Ask your coach" source when handoff button is already present', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : json(200, {
+    mode: 'AI_GENERATED',
+    status: 'ANSWERED',
+    answer: 'Please speak directly with your coach.',
+    historyStored: false,
+    handoff: 'COACH',
+    sources: [{
+      kind: 'HUMAN_COACH',
+      id: 0,
+      title: 'Ask your coach',
+      detail: 'Private human conversation; no automated coach reply.',
+      path: '/member/training/questions'
+    }],
+  }))
+  renderApp('/member/assistant')
+  const box = await screen.findByRole('textbox', { name: /Your question/ })
+  await userEvent.type(box, 'What is my homework?{Enter}')
+  expect(await screen.findByText('Please speak directly with your coach.')).toBeInTheDocument()
+
+  // Verify handoff button is rendered
+  const links = screen.getAllByRole('link', { name: 'Ask your coach' })
+  // Exactly 1 link for "Ask your coach", not duplicated
+  expect(links).toHaveLength(1)
+  expect(screen.queryByText('Private human conversation; no automated coach reply.')).not.toBeInTheDocument()
+})
+
+it('renders a circular send button with paper airplane icon', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : json(200, []))
+  renderApp('/member/assistant')
+  const askBtn = await screen.findByRole('button', { name: 'Ask' })
+  expect(askBtn).toHaveClass('spori-composer__submit')
+  expect(askBtn.style.borderRadius).toBe('50%')
+})
+
+it('lists past sessions, allows selecting, renaming, and deleting', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  const mockSessions = [
+    { id: 101, title: 'Workout schedule inquiry', archived: false, messageCount: 2, createdAt: '2026-11-15T10:00:00', updatedAt: '2026-11-15T10:05:00' },
+  ]
+  const mockSessionDetail = {
+    id: 101,
+    title: 'Workout schedule inquiry',
+    archived: false,
+    createdAt: '2026-11-15T10:00:00',
+    updatedAt: '2026-11-15T10:05:00',
+    messages: [
+      { id: 1, senderType: 'USER', content: 'What is my schedule this week?', sentAt: '2026-11-15T10:01:00' },
+      { id: 2, senderType: 'ASSISTANT', content: 'Your schedule is on Tuesday and Thursday.', sentAt: '2026-11-15T10:01:30' },
+    ]
+  }
+
+  const { calls } = installFakeFetch(call => {
+    if (call.path === '/users/me') return json(200, MEMBER)
+    if (call.path.includes('/spori-ai/sessions/101/title')) {
+      return json(200, { ...mockSessions[0], title: 'Yoga schedule' })
+    }
+    if (call.path === '/spori-ai/sessions/101' && call.method === 'DELETE') {
+      return new Response(null, { status: 204 })
+    }
+    if (call.path.includes('/spori-ai/sessions/101')) {
+      return json(200, mockSessionDetail)
+    }
+    if (call.path.includes('/spori-ai/sessions')) {
+      return json(200, mockSessions)
+    }
+    return json(200, [])
+  })
+
+  renderApp('/member/assistant')
+
+  // Find the session in the sidebar
+  expect(await screen.findByText('Workout schedule inquiry')).toBeInTheDocument()
+
+  // Select the session
+  await userEvent.click(screen.getByText('Workout schedule inquiry'))
+  expect(await screen.findByText('Your schedule is on Tuesday and Thursday.')).toBeInTheDocument()
+  expect(screen.getByText('What is my schedule this week?')).toBeInTheDocument()
+
+  // Rename session
+  const renameBtn = screen.getByRole('button', { name: 'Rename chat' })
+  await userEvent.click(renameBtn)
+  const editInput = screen.getByDisplayValue('Workout schedule inquiry')
+  await userEvent.clear(editInput)
+  await userEvent.type(editInput, 'Yoga schedule{Enter}')
+  expect(calls.some(c => c.path.includes('/spori-ai/sessions/101/title') && (c.body as { title?: string })?.title === 'Yoga schedule')).toBe(true)
+
+  // Delete session
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  const deleteBtn = screen.getByRole('button', { name: 'Delete chat' })
+  await userEvent.click(deleteBtn)
+  expect(calls.some(c => c.path === '/spori-ai/sessions/101' && c.method === 'DELETE')).toBe(true)
+})
+
+it('prevents spamming new chat sessions when current chat is empty', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  const mockSessions = [
+    { id: 201, title: 'Active Chat', archived: false, messageCount: 1, createdAt: '2026-11-15T10:00:00' },
+  ]
+  const mockDetail = {
+    id: 201,
+    title: 'Active Chat',
+    archived: false,
+    messages: [
+      { id: 1, senderType: 'USER', content: 'Hello', sentAt: '2026-11-15T10:01:00' }
+    ]
+  }
+
+  const { calls } = installFakeFetch(call => {
+    if (call.path === '/users/me') return json(200, MEMBER)
+    if (call.path === '/spori-ai/sessions' && call.method === 'POST') {
+      return json(201, { id: 202, title: 'New conversation', archived: false, messages: [] })
+    }
+    if (call.path.includes('/spori-ai/sessions/201')) {
+      return json(200, mockDetail)
+    }
+    if (call.path.includes('/spori-ai/sessions/202')) {
+      return json(200, { id: 202, title: 'New conversation', archived: false, messages: [] })
+    }
+    if (call.path.includes('/spori-ai/sessions')) {
+      return json(200, mockSessions)
+    }
+    return json(200, [])
+  })
+
+  renderApp('/member/assistant')
+  await screen.findByText('Active Chat')
+
+  // When current chat is empty (activeSessionId is null and no messages), clicking new conversation does not call backend
+  const newConvBtn = screen.getByRole('button', { name: 'New conversation' })
+  await userEvent.click(newConvBtn)
+  expect(calls.filter(c => c.path === '/spori-ai/sessions' && c.method === 'POST')).toHaveLength(0)
+
+  // Select an active session that has messages
+  await userEvent.click(screen.getByText('Active Chat'))
+  expect(await screen.findByText('Hello')).toBeInTheDocument()
+
+  // Now current chat is NOT empty. Clicking new conversation should create a new session
+  await userEvent.click(newConvBtn)
+  expect(calls.filter(c => c.path === '/spori-ai/sessions' && c.method === 'POST')).toHaveLength(1)
+
+  // Now that we are in the newly created empty session (id 202, 0 messages), clicking new conversation again should NOT call POST
+  await userEvent.click(newConvBtn)
+  expect(calls.filter(c => c.path === '/spori-ai/sessions' && c.method === 'POST')).toHaveLength(1)
 })

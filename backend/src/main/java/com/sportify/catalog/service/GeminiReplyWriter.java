@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
 @ConditionalOnExpression("${app.assistant.ai.enabled:false} and '${app.assistant.ai.provider:gemini}'.equalsIgnoreCase('gemini')"
         + " and ${app.assistant.ai.reply.enabled:true}")
 class GeminiReplyWriter implements AssistantReplyWriter {
-    // Gemini được gọi từ backend; API key nằm trong header server-to-server chứ không nằm ở trình duyệt.
+    // Gemini is called from backend; API key resides in server-to-server header, not in browser.
     static final String DEFAULT_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/";
     private static final Pattern MODEL = Pattern.compile("[a-z0-9][a-z0-9.\\-]{0,63}");
     static final int MAX_REPLY_LENGTH = 2000;
@@ -45,9 +45,11 @@ class GeminiReplyWriter implements AssistantReplyWriter {
             or two sentences and offer help (category GREETING).
             2. Anything outside Sportify (personal questions about you such as your age, politics, world news, \
             celebrities, entertainment, jokes and riddles, general trivia, unrelated programming or homework) must be \
-            declined politely in one or two sentences, for example: "I'm Spori, Sportify's AI assistant. I can help \
-            with Sportify-related questions, including classes, training schedules and center services." Do not answer \
-            the off-topic part at all. Use category OFF_TOPIC and set "answered" to true.
+            declined politely in one or two sentences. If asked whether you are Gemini (e.g. "bạn có phải là Gemini không", \
+            "are you Gemini?"), clarify: "Tôi không phải là Gemini, tôi là Spori AI và chỉ được tích hợp API từ Gemini thôi." \
+            (or in English: "I am not Gemini, I am Spori AI and only integrated with Gemini API."). Otherwise, state: \
+            "Tôi là Spori, trợ lý AI của Sportify. Tôi có thể hỗ trợ các câu hỏi liên quan đến lịch tập, đặt sân và dịch vụ trung tâm." \
+            Do not answer the off-topic part at all. Use category OFF_TOPIC and set "answered" to true.
 
             Grounding:
             3. Center facts (sessions, dates, times, free places, package names and prices, sports, counts, the user's \
@@ -118,7 +120,7 @@ class GeminiReplyWriter implements AssistantReplyWriter {
         this.transport = transport;
         this.endpoint = endpoint;
         this.model = name;
-        this.apiKey = apiKey == null ? "" : apiKey.trim();
+        this.apiKey = apiKey == null ? "" : apiKey.replace("\"", "").trim();
         this.timeout = timeout;
         this.json = json;
     }

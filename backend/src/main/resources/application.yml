@@ -76,6 +76,11 @@ app:
         enabled: ${AI_ASSISTANT_REPLY_ENABLED:true}
         gemini-model: ${AI_ASSISTANT_REPLY_GEMINI_MODEL:${AI_ASSISTANT_GEMINI_MODEL:gemini-flash-lite-latest}}
       timeout-seconds: ${AI_ASSISTANT_TIMEOUT_SECONDS:15}
+  spori-ai:
+    # Spori AI chatbot powered by Gemini API
+    gemini-model: ${SPORI_AI_GEMINI_MODEL:gemini-flash-lite-latest}
+    endpoint: ${SPORI_AI_ENDPOINT:https://generativelanguage.googleapis.com/v1beta/models/}
+    timeout-seconds: ${SPORI_AI_TIMEOUT_SECONDS:20}
   cors:
     # Comma separated list of origins allowed to call the API from a browser.
     # Empty means no cross-origin request is accepted. Overridden per profile.
