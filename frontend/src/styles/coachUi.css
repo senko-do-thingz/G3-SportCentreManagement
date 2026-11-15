@@ -419,10 +419,11 @@
   line-height: 1.35;
 }
 
-/* The week grid gets the full content width so seven days stay readable at 1280px; the overview sits below it. */
+/* Bo cuc lich tuan va thong tin tong quan ca day tren cung mot hang: Lich tuan ben trai, Tong quan ben phai */
 .coach-ui .coach-schedule-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: start;
   gap: var(--space-4);
   min-width: 0;
 }
@@ -430,6 +431,11 @@
 .coach-ui .coach-schedule-weekly,
 .coach-ui .coach-schedule-overview {
   min-width: 0;
+}
+
+.coach-ui .coach-schedule-overview {
+  position: sticky;
+  top: var(--space-4);
 }
 
 .coach-ui .coach-schedule-weekly .card__header,
@@ -735,8 +741,12 @@
   }
 
   .coach-ui .coach-schedule-weekly,
-.coach-ui .coach-schedule-overview {
+  .coach-ui .coach-schedule-overview {
     min-height: 0;
+  }
+
+  .coach-ui .coach-schedule-overview {
+    position: static;
   }
 
   .coach-ui .coach-schedule-overview__action {

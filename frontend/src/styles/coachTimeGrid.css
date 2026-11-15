@@ -19,7 +19,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  min-width: 56rem;
+  min-width: 44rem;
 }
 
 .coach-timegrid-time-gutter-header {
@@ -68,7 +68,7 @@
 .coach-timegrid-body {
   display: flex;
   position: relative;
-  min-width: 56rem;
+  min-width: 44rem;
   height: 960px; /* 16 gio tu 06:00 den 22:00, moi gio 60px (1px = 1 phut) */
   background: var(--coach-surface);
 }

@@ -4,7 +4,7 @@ import { CoachTimeGridSchedule } from './CoachTimeGridSchedule'
 import { parseSessionReference, sessionRouteReference } from '../../api/sessionIdentity'
 import { SessionContext } from '../../components/SessionContext'
 import { sessionIdText } from '../../api/sessionIdentity'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { coachScheduleApi, type CoachRosterRecord, type CoachSessionRecord } from '../../api/coachScheduleApi'
 import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, PageLoader, Select, StatusBadge } from '../../components/ui'
@@ -89,7 +89,21 @@ export function CoachTeachingSchedulePage() {
   const weekEnd = browseAddDays(week, 6)
   const loader = useCallback((signal: AbortSignal) => coachScheduleApi.list(week, weekEnd, signal), [week, weekEnd])
   const [resource, reload] = useResource(loader)
-  const sessions = resource.status === 'ready' ? resource.data : []
+  const rawSessions = resource.status === 'ready' ? resource.data : []
+  // Loai bo cac ban ghi ca day bi trung lap ve mat thoi gian va lop hoc
+  const sessions = useMemo(() => {
+    const seen = new Map<string, CoachSessionRecord>()
+    for (const session of rawSessions) {
+      const slotKey = `${session.sessionDate}_${session.startTime}_${session.endTime}_${session.coachId}_${session.classId ?? 'none'}`
+      const existing = seen.get(slotKey)
+      if (!existing) {
+        seen.set(slotKey, session)
+      } else if (session.bookedCount > existing.bookedCount) {
+        seen.set(slotKey, session)
+      }
+    }
+    return Array.from(seen.values())
+  }, [rawSessions])
   const today = browseToday()
   const currentTime = vietnamTime()
   const nextSession = sessions
@@ -225,7 +239,21 @@ export function CoachRosterPage() {
   const selectedSessionId = parseSessionReference(params.get('sessionId'))
   const loadSessions = useCallback((signal: AbortSignal) => coachScheduleApi.list(week, weekEnd, signal), [week, weekEnd])
   const [sessionsResource, reloadSessions] = useResource(loadSessions)
-  const sessions = sessionsResource.status === 'ready' ? sessionsResource.data : []
+  const rawSessions = sessionsResource.status === 'ready' ? sessionsResource.data : []
+  // Loai bo cac ban ghi ca day bi trung lap ve mat thoi gian va lop hoc
+  const sessions = useMemo(() => {
+    const seen = new Map<string, CoachSessionRecord>()
+    for (const session of rawSessions) {
+      const slotKey = `${session.sessionDate}_${session.startTime}_${session.endTime}_${session.coachId}_${session.classId ?? 'none'}`
+      const existing = seen.get(slotKey)
+      if (!existing) {
+        seen.set(slotKey, session)
+      } else if (session.bookedCount > existing.bookedCount) {
+        seen.set(slotKey, session)
+      }
+    }
+    return Array.from(seen.values())
+  }, [rawSessions])
   const selectedSession = sessions.find((session) => (session.id === selectedSessionId || session.sessionId === selectedSessionId)) ?? null
   const isOwnSession = selectedSession !== null
   const rosterLoader = useCallback((signal: AbortSignal) => selectedSessionId && isOwnSession
