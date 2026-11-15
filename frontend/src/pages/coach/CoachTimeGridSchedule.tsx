@@ -174,7 +174,10 @@ export function CoachTimeGridSchedule({
       </div>
 
       {/* Than bang lich gio va cac cot ca hoc */}
-      <div className="coach-timegrid-body" style={{ height: `${TOTAL_HOURS * HOUR_HEIGHT}px` }}>
+      <div
+        className="coach-timegrid-body"
+        style={{ height: `${TOTAL_HOURS * HOUR_HEIGHT}px`, minHeight: `${TOTAL_HOURS * HOUR_HEIGHT}px` }}
+      >
         {/* Truc Y ben trai hien thi cac moc gio 06:00 den 22:00 */}
         <div className="coach-timegrid-time-gutter" aria-hidden="true">
           {hours.map((hour, idx) => (
