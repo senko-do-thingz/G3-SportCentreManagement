@@ -156,7 +156,8 @@ class WalletErasureMigrationIntegrationTest {
                 """, member);
 
         var current = migrator(db, null);
-        assertThat(current.migrate().migrationsExecuted).isEqualTo(1);
+        int pending = current.info().pending().length;
+        assertThat(current.migrate().migrationsExecuted).isEqualTo(pending);
         current.validate();
         assertNoWallet(jdbc);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.payment WHERE id=?", Integer.class, retiredPayment))

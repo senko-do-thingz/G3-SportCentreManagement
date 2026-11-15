@@ -403,28 +403,57 @@
 }
 
 
-.spori-composer button {
-  display: grid;
-  flex: none;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border: 0;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-active) 100%);
-  color: var(--color-on-primary);
-  cursor: pointer;
-  transition: transform 120ms ease;
+.spori-composer button,
+.spori-composer .spori-composer__submit,
+.spori-page__composer .spori-composer button,
+.spori-page__composer .spori-composer .spori-composer__submit {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 40px !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  border-radius: 50% !important;
+  border-radius: 9999px !important;
+  aspect-ratio: 1 / 1 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-active) 100%) !important;
+  color: var(--color-on-primary) !important;
+  cursor: pointer !important;
+  transition: transform 120ms ease, opacity 120ms ease !important;
 }
 
-.spori-composer button:hover:not(:disabled) {
-  transform: scale(1.06);
+.spori-composer button:hover:not(:disabled),
+.spori-composer .spori-composer__submit:hover:not(:disabled) {
+  transform: scale(1.06) !important;
 }
 
-.spori-composer button:disabled {
-  background: var(--color-surface-muted);
-  color: var(--color-text-muted);
-  cursor: not-allowed;
+.spori-composer button:disabled,
+.spori-composer .spori-composer__submit:disabled {
+  background: var(--color-surface-muted) !important;
+  color: var(--color-text-muted) !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}
+
+.spori-inline-link {
+  color: var(--color-primary);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.spori-inline-link:hover {
+  color: var(--color-primary-active);
 }
 
 .spori-icon-button {
@@ -562,7 +591,7 @@
   display: grid;
   gap: 12px;
   width: 100%;
-  max-width: 900px;
+  max-width: 1140px;
   margin-inline: auto;
 }
 
@@ -571,6 +600,332 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.spori-page__top-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.spori-page__toggle-sidebar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.spori-page__toggle-sidebar:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.spori-page__layout {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  transition: gap 260ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.spori-page__layout.is-sidebar-collapsed {
+  gap: 0;
+}
+
+@media (max-width: 860px) {
+  .spori-page__layout {
+    flex-direction: column;
+  }
+}
+
+/* Sidebar for AI chat sessions */
+.spori-sidebar {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 280px;
+  width: 280px;
+  min-width: 280px;
+  max-width: 280px;
+  height: min(780px, calc(100vh - 180px));
+  min-height: 480px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  padding: 14px;
+  overflow: hidden;
+  opacity: 1;
+  transform: translateX(0);
+  transition: flex-basis 260ms cubic-bezier(0.4, 0, 0.2, 1),
+              width 260ms cubic-bezier(0.4, 0, 0.2, 1),
+              min-width 260ms cubic-bezier(0.4, 0, 0.2, 1),
+              max-width 260ms cubic-bezier(0.4, 0, 0.2, 1),
+              padding 260ms cubic-bezier(0.4, 0, 0.2, 1),
+              margin 260ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-width 260ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 220ms ease,
+              transform 260ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: width, transform, opacity;
+}
+
+.spori-sidebar.is-collapsed {
+  flex-basis: 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-width: 0 !important;
+  opacity: 0 !important;
+  transform: translateX(-16px) scale(0.98) !important;
+  pointer-events: none !important;
+  visibility: hidden;
+}
+
+.spori-page__window {
+  flex: 1;
+  min-width: 0;
+  transition: all 260ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.spori-sidebar__head {
+  margin-bottom: 10px;
+}
+
+.spori-sidebar__new-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--color-primary);
+  border-radius: 6px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 180ms ease,
+              box-shadow 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-primary) 25%, transparent);
+}
+
+.spori-sidebar__new-btn:hover:not(:disabled) {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--color-primary) 35%, transparent);
+}
+
+.spori-sidebar__new-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.spori-sidebar__new-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.spori-sidebar__filter {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 4px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+}
+
+.spori-sidebar__tab {
+  flex: 1;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 200ms ease, color 200ms ease, box-shadow 200ms ease;
+  text-align: center;
+}
+
+.spori-sidebar__tab.is-active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+.spori-sidebar__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.spori-sidebar__loading,
+.spori-sidebar__empty {
+  padding: 24px 10px;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.spori-session-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  transition: background-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.spori-session-item:hover {
+  background: var(--color-surface-muted);
+  transform: translateX(2px);
+}
+
+.spori-session-item.is-active {
+  background: var(--color-primary-soft);
+  border-color: color-mix(in srgb, var(--color-primary) 25%, transparent);
+  color: var(--color-primary);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+.spori-session-item__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted);
+  transition: color 200ms ease;
+}
+
+.spori-session-item.is-active .spori-session-item__icon {
+  color: var(--color-primary);
+}
+
+.spori-session-item__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.spori-session-item.is-active .spori-session-item__title {
+  font-weight: 700;
+}
+
+.spori-session-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  opacity: 0;
+  transform: scale(0.9);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.spori-session-item:hover .spori-session-item__actions,
+.spori-session-item.is-active .spori-session-item__actions,
+.spori-session-item:focus-within .spori-session-item__actions {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.spori-session-action-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.spori-session-action-btn:hover {
+  background: color-mix(in srgb, var(--color-text) 12%, transparent);
+  color: var(--color-text);
+  transform: scale(1.12);
+}
+
+.spori-session-action-btn--danger:hover {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  transform: scale(1.12);
+}
+
+.spori-session-item__edit-form {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.spori-session-item__edit-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--color-primary);
+  border-radius: 5px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.75rem;
+}
+
+.spori-session-item__edit-save,
+.spori-session-item__edit-cancel {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.spori-session-item__edit-save {
+  background: var(--color-success);
+  color: var(--color-on-primary);
+}
+
+.spori-session-item__edit-cancel {
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
 }
 
 .spori-page__back {
@@ -588,13 +943,14 @@
   gap: 6px;
   padding: 7px 14px;
   border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
+  border-radius: 6px;
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
   font-size: 0.76rem;
   font-weight: 700;
   cursor: pointer;
+  transition: all 120ms ease;
 }
 
 .spori-page__new:hover:not(:disabled) {

@@ -522,6 +522,13 @@
         "dbo.member_wallet"
       ],
       "sha256_lf": "be18f1fd878aa172bb1bef06fafb616cd3ff8f9635952f7c58e03bac0a0a9751"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V64__spori_ai_chat_session_management.sql",
+      "version": 64,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "bc3a609033cd72bd2d59b6b813c55ec49c5e229ed4a0fda25dc86c06bfb4ec72"
     }
   ],
   "create_occurrences": 82,
@@ -623,6 +630,18 @@
       "path": "backend/src/main/java/com/sportify/catalog/entity/AgeGroup.java",
       "tables": [
         "age_group"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/AiConversation.java",
+      "tables": [
+        "ai_conversation"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/AiMessage.java",
+      "tables": [
+        "ai_message"
       ]
     },
     {

@@ -380,6 +380,8 @@ describe('FE-07 schedule', () => {
   })
 
   it('DEF-311-01 blocks an invalid visible date from updating the stale session date', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-14T08:00:00Z'))
     const reviewedSession = { ...session, date: '2026-11-15' }
     const api = backend(false, false, [reviewedSession], reviewedSession)
     const user = userEvent.setup()
@@ -395,9 +397,12 @@ describe('FE-07 schedule', () => {
     expect(await within(dialog).findByText('Enter a valid date in dd/MM/yyyy format.')).toBeInTheDocument()
     expect(api.calls.some((call) => call.path === '/manager/sessions/7' && call.method === 'PUT')).toBe(false)
     expect(input).toHaveFocus()
+    vi.useRealTimers()
   })
 
   it('DEF-311-01 blocks keyboard submission when the visible session date is invalid', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-14T08:00:00Z'))
     const reviewedSession = { ...session, date: '2026-11-15' }
     const api = backend(false, false, [reviewedSession], reviewedSession)
     const user = userEvent.setup()
@@ -410,6 +415,7 @@ describe('FE-07 schedule', () => {
     await user.type(input, '31/11/2026{Enter}')
     expect(await within(dialog).findByText('Enter a valid date in dd/MM/yyyy format.')).toBeInTheDocument()
     expect(api.calls.some((call) => call.path === '/manager/sessions/7' && call.method === 'PUT')).toBe(false)
+    vi.useRealTimers()
   })
 
   it('shows the regenerated code and follows a move outside the displayed week', async () => {

@@ -184,6 +184,8 @@ function FloatingMessage({ message, member, onNavigate }: { message: SporiMessag
   const vi = result.language === 'vi'
   // Who should help: the server's decision, or reception for a Member's unanswered question.
   const handoff = result.handoff ?? (member && result.status === 'NO_ANSWER' ? 'RECEPTIONIST' : null)
+  // Deduplicate redundant source row if handoff button is already shown
+  const sources = (result.sources ?? []).filter(source => !(handoff === 'COACH' && source.kind === 'HUMAN_COACH'))
   // A plain rule "no answer" without a named owner is replaced by a clear handoff text.
   const ruleNoAnswer = result.status === 'NO_ANSWER' && result.mode !== 'AI_GENERATED' && !result.handoff
   return (
@@ -197,7 +199,7 @@ function FloatingMessage({ message, member, onNavigate }: { message: SporiMessag
           {ruleNoAnswer && member && <p>{vi ? 'Mở mục Liên hệ Lễ tân, chọn chủ đề, nhập câu hỏi và gửi; phản hồi sẽ hiển thị trong Yêu cầu hỗ trợ của tôi.' : 'Open Contact Reception, choose a topic, enter the question and submit; replies appear in My support requests.'}</p>}
           <SporiHandoff role={handoff} member={member} vi={vi} question={question} answer={result.answer} onNavigate={onNavigate} />
         </div>}
-        <SporiSources sources={result.sources} onNavigate={onNavigate} vi={vi} />
+        <SporiSources sources={sources} onNavigate={onNavigate} vi={vi} />
       </div>
       <div className="spori-meta-row">
         <time className="spori-time">{formatTime(message.at)}</time>
