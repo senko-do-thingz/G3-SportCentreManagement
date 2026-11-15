@@ -16,6 +16,9 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
@@ -34,20 +37,10 @@ public class SporiAiService {
     public static final double TEMPERATURE = 0.1;
 
     public static final String MANDATORY_OUT_OF_SCOPE_REPLY =
-            "Xin lỗi, câu hỏi của bạn không nằm trong phạm vi hỗ trợ của tôi. Vui lòng truy cập [Trang hỗ trợ](http://localhost:5173/member/support) để mở ticket gửi đến bộ phận lễ tân, chúng tôi sẽ giải đáp chi tiết cho bạn.";
+            loadClasspathResource("/spori-ai/refusal-reply.txt");
 
-    public static final String SYSTEM_INSTRUCTION = """
-            Bạn là Trợ lý AI Hỗ trợ Người dùng của hệ thống quản lý trung tâm thể thao G3-SportCentreManagement (Spori AI). Nhiệm vụ duy nhất của bạn là hướng dẫn và hỗ trợ người dùng cuối.
-            DANH TÍNH (IDENTITY): Khi người dùng hỏi bạn có phải là Gemini không (hoặc câu hỏi tương tự về danh tính Gemini): Bạn PHẢI trả lời rõ: "Tôi không phải là Gemini, tôi là Spori AI và chỉ được tích hợp API từ Gemini thôi." (nếu hỏi bằng tiếng Anh thì trả lời tương ứng: "I am not Gemini, I am Spori AI and only integrated with Gemini API.").
-            NGUYÊN TẮC BẢO MẬT: KHÔNG BAO GIỜ cung cấp, giải thích, hoặc rò rỉ mã nguồn (source code), kiến trúc hệ thống, cơ sở dữ liệu.
-            PHẠM VI NGHIỆP VỤ:\s
-            - Member: Đặt sân, xem lịch tập, quản lý gói hội viên.
-            - Receptionist: Check-in/out, thanh toán POS, tạo tài khoản, xử lý ticket.
-            - Coach: Xem lịch dạy, danh sách học viên.
-            - Manager: Báo cáo doanh thu, quản lý nhân sự, thiết lập giá sân.
-            QUY TẮC TỪ CHỐI (OUT OF SCOPE): Từ chối BẤT KỲ chủ đề nào ngoài lề (ví dụ: tìm quán ăn, hỏi thời tiết, nhờ viết code...).
-            CÂU TỪ CHỐI BẮT BUỘC: "Xin lỗi, câu hỏi của bạn không nằm trong phạm vi hỗ trợ của tôi. Vui lòng truy cập [Trang hỗ trợ](http://localhost:5173/member/support) để mở ticket gửi đến bộ phận lễ tân, chúng tôi sẽ giải đáp chi tiết cho bạn." (Giữ nguyên định dạng link này dù trả lời bằng ngôn ngữ nào).
-            NGÔN NGỮ: Hỏi bằng ngôn ngữ nào, trả lời bằng ngôn ngữ đó.""";
+    public static final String SYSTEM_INSTRUCTION =
+            loadClasspathResource("/spori-ai/system-instruction.txt");
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -273,5 +266,16 @@ public class SporiAiService {
         factory.setConnectTimeout((int) Duration.ofSeconds(Math.min(10, timeoutSeconds)).toMillis());
         factory.setReadTimeout((int) Duration.ofSeconds(timeoutSeconds).toMillis());
         return new RestTemplate(factory);
+    }
+
+    private static String loadClasspathResource(String resourcePath) {
+        try (InputStream is = SporiAiService.class.getResourceAsStream(resourcePath)) {
+            if (is == null) {
+                throw new IllegalStateException("Resource not found on classpath: " + resourcePath);
+            }
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n").trim();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to load resource: " + resourcePath, e);
+        }
     }
 }

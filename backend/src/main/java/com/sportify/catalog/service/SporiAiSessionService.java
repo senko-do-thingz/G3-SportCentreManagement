@@ -25,7 +25,6 @@ import java.util.List;
 public class SporiAiSessionService {
 
     private static final String DEFAULT_SESSION_TITLE = "New conversation";
-    private static final String LEGACY_SESSION_TITLE = "Cuộc trò chuyện mới";
 
     private final AiConversationRepository conversationRepository;
     private final AiMessageRepository messageRepository;
@@ -157,8 +156,8 @@ public class SporiAiSessionService {
 
         // Automatically update title if session currently has the default placeholder title
         if ((session.getTitle() == null
-                || session.getTitle().equalsIgnoreCase(DEFAULT_SESSION_TITLE)
-                || session.getTitle().equalsIgnoreCase(LEGACY_SESSION_TITLE))
+                || session.getTitle().isBlank()
+                || session.getTitle().equalsIgnoreCase(DEFAULT_SESSION_TITLE))
                 && history.isEmpty()) {
             String autoTitle = userMessage.trim();
             if (autoTitle.length() > 40) {
