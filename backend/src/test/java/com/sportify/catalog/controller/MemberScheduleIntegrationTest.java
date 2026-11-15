@@ -140,9 +140,15 @@ class MemberScheduleIntegrationTest extends AbstractIntegrationTest {
         return classes.saveAndFlush(SportClass.builder().code(code()).name(code()).sport(sport).level(level).maxMembers(30).isActive(true).build());
     }
 
+    private int sessionCounter = 0;
+
     private ClassSession session() {
+        int idx = sessionCounter++;
+        LocalDate date = TODAY.plusDays(1).plusDays(idx / 20);
+        LocalTime start = LocalTime.of(6, 0).plusMinutes((idx % 20) * 45);
+        LocalTime end = start.plusMinutes(40);
         return save(ClassSession.builder().sport(sport).sportClass(sportClass).facility(facility).coach(coach)
-                .sessionDate(TODAY.plusDays(1)).startTime(LocalTime.of(11, 0)).endTime(LocalTime.NOON)
+                .sessionDate(date).startTime(start).endTime(end)
                 .trainingType(TrainingFormat.COACH_LED).status(SessionStatus.PUBLISHED).capacity(10).bookedCount(0).build());
     }
 

@@ -163,6 +163,7 @@ class BookingRulesIntegrationTest extends AbstractIntegrationTest {
                 total, remaining, TODAY.minusDays(2), TODAY.plusDays(40), status, manager.getId());
     }
     private long registration(UserAccount member) { return registration(member, 3, 3, "ACTIVE", TrainingFormat.COACH_LED); }
+    private int sessionCounter = 0;
     // Synthetic sport metadata isolates legacy booking contracts; canonical sport mapping has separate ID integration coverage.
     private long session(LocalDate date, LocalTime start, int capacity, TrainingFormat format) {
         return jdbc.queryForObject("""
@@ -171,9 +172,14 @@ class BookingRulesIntegrationTest extends AbstractIntegrationTest {
                     start_time, end_time, capacity, booked_count, status, session_code) OUTPUT INSERTED.id INTO @created
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'PUBLISHED', ?); SELECT id FROM @created;
                 """, Long.class, format == TrainingFormat.COACH_LED ? sportClass.getId() : null, sport.getId(), facilityId,
-                format == TrainingFormat.COACH_LED ? coachId : null, format.name(), date, start, start.plusMinutes(90), capacity, SessionIdentityFixtures.reserve(jdbc, date, "FOOTBALL"));
+                format == TrainingFormat.COACH_LED ? coachId : null, format.name(), date, start, start.plusMinutes(40), capacity, SessionIdentityFixtures.reserve(jdbc, date, "FOOTBALL"));
     }
-    private long session() { return session(TODAY.plusDays(1), LocalTime.NOON, 10, TrainingFormat.COACH_LED); }
+    private long session() {
+        int idx = sessionCounter++;
+        LocalDate date = TODAY.plusDays(1).plusDays(idx / 20);
+        LocalTime start = LocalTime.of(6, 0).plusMinutes((idx % 20) * 45);
+        return session(date, start, 10, TrainingFormat.COACH_LED);
+    }
     private long legacyBooking(long session, UserAccount member, long registration, String status) {
         return jdbc.queryForObject("""
                 INSERT INTO booking(booking_code, session_id, member_id, package_registration_id, status, booked_at)
