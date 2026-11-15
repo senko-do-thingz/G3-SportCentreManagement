@@ -73,6 +73,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
     private final Clock clock;
     private final SessionCodeAllocator sessionCodeAllocator;
     private final com.sportify.catalog.service.OperationalNotificationService notifications;
+    private final com.sportify.catalog.service.ScheduleConflictValidator conflictValidator;
 
     @Override
     @Transactional(readOnly = true)
@@ -118,6 +119,13 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
                     request.facilityId(), request.trainingType());
             validateFacilityCapacityAndSport(sportClass, assignment.facility(), request.capacity());
             validateFutureDates(dates, request.startTime());
+            List<com.sportify.catalog.service.ScheduleConflictValidator.SessionScheduleItem> batchItems = dates.stream()
+                    .map(d -> new com.sportify.catalog.service.ScheduleConflictValidator.SessionScheduleItem(
+                            d, request.startTime(), request.endTime(),
+                            assignment.coach() == null ? null : assignment.coach().getId(),
+                            assignment.facility().getId()
+                    )).toList();
+            conflictValidator.validateIntraBatchConflicts(batchItems);
             checkConflicts(dates, request.startTime(), request.endTime(), assignment, null);
 
             // Validate the complete batch before the first INSERT. All rows and audits share this transaction.
@@ -356,31 +364,14 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
 
     private void checkConflicts(List<LocalDate> dates, LocalTime start, LocalTime end,
             Assignment assignment, Long excludedId) {
-        Map<Long, ClassSession> conflicts = new LinkedHashMap<>();
-        if (assignment.coach() != null) {
-            sessionRepository.findCoachConflicts(assignment.coach().getId(), dates, start, end,
-                    OCCUPYING_STATUSES, excludedId).forEach(session -> conflicts.put(session.getId(), session));
-        }
-        sessionRepository.findFacilityConflicts(assignment.facility().getId(), dates, start, end,
-                OCCUPYING_STATUSES, excludedId).forEach(session -> conflicts.put(session.getId(), session));
-        if (!conflicts.isEmpty()) {
-            List<SessionConflictResponse> responses = conflicts.values().stream()
-                    .sorted(Comparator.comparing(ClassSession::getSessionDate).thenComparing(ClassSession::getStartTime)
-                            .thenComparing(ClassSession::getId))
-                    .map(session -> {
-                        boolean sameCoach = assignment.coach() != null && session.getCoach() != null
-                                && Objects.equals(assignment.coach().getId(), session.getCoach().getId());
-                        boolean sameFacility = session.getFacility() != null
-                                && Objects.equals(assignment.facility().getId(), session.getFacility().getId());
-                        SessionConflictResponse.ConflictType type = sameCoach && sameFacility
-                                ? SessionConflictResponse.ConflictType.BOTH
-                                : sameCoach ? SessionConflictResponse.ConflictType.COACH : SessionConflictResponse.ConflictType.FACILITY;
-                        return new SessionConflictResponse(session.getId(), session.getSessionDate(), session.getSessionDate(),
-                                session.getStartTime(), session.getEndTime(), classSummary(session.getSportClass()),
-                                coachSummary(session.getCoach()), facilitySummary(session.getFacility()), type, session.getSessionCode());
-                    }).toList();
-            throw new ScheduleConflictException(responses);
-        }
+        conflictValidator.validateDatabaseConflicts(
+                dates,
+                start,
+                end,
+                assignment.coach() == null ? null : assignment.coach().getId(),
+                assignment.facility().getId(),
+                excludedId
+        );
     }
 
     private void validateFacilityCapacityAndSport(SportClass sportClass, Facility facility, int capacity) {

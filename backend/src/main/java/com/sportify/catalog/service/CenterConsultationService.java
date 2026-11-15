@@ -190,7 +190,10 @@ public class CenterConsultationService {
         }
         // Staff never get Member-only answers; their own context replaces "my packages / bookings / training".
         if(staff && (intent.startsWith("MY_") || contains(raw,"overview","summary","dashboard","my day","my work","my class",
-                "my session","my schedule","waiting for me","assigned to me","t\u1ED5ng quan","c\u00F4ng vi\u1EC7c","l\u1EDBp c\u1EE7a t\u00F4i","bu\u1ED5i c\u1EE7a t\u00F4i","l\u1ECBch c\u1EE7a t\u00F4i")
+                "my session","my schedule","waiting for me","assigned to me","t\u1ED5ng quan","c\u00F4ng vi\u1EC7c","l\u1EDBp c\u1EE7a t\u00F4i","bu\u1ED5i c\u1EE7a t\u00F4i","l\u1ECBch c\u1EE7a t\u00F4i",
+                "l\u1ECBch d\u1EA1y","ca d\u1EA1y","bu\u1ED5i d\u1EA1y","l\u1EDBp d\u1EA1y","t\u00F4i d\u1EA1y","t\u00F4i c\u00F3 l\u1ECBch","t\u00F4i c\u00F3 ca","t\u00F4i c\u00F3 bu\u1ED5i","t\u00F4i c\u00F3 l\u1EDBp","teaching","do i teach")
+            || contains(plain,"lich day","ca day","buoi day","lop day","toi day","toi co lich","toi co ca","toi co buoi","toi co lop","lich cua toi","lop cua toi","buoi cua toi")
+            || ("COACH".equals(role) && "SESSIONS".equals(intent))
             || intent.equals("UNKNOWN") && contains(raw,"today","h\u00F4m nay")))intent="STAFF";
         Consultation draft=switch(intent) {
             case "STAFF" -> staffOverview(vi,mode,role,memberId);
@@ -357,12 +360,12 @@ public class CenterConsultationService {
             "Vi\u1EC7c t\u1EA1o l\u1EDBp thu\u1ED9c quy\u1EC1n Manager. Vai tr\u00F2 hi\u1EC7n t\u1EA1i c\u1EE7a b\u1EA1n kh\u00F4ng \u0111\u01B0\u1EE3c t\u1EA1o l\u1EDBp. H\u00E3y li\u00EAn h\u1EC7 Manager \u0111\u1EC3 t\u1EA1o l\u1EDBp; Spori c\u00F3 th\u1EC3 t\u00ECm bu\u1ED5i h\u1ECDc \u0111\u00E3 c\u00F4ng b\u1ED1."),List.of());
     }
 
-    /** Up to six published sessions with booked and total places, without any Member detail. */
+    /** Up to six published or completed sessions with booked and total places, without any Member detail. */
     private List<ConsultationSource> sessionsSummary(boolean vi,String where,Object... args) {
         try {
             var rows=jdbc.query("SELECT TOP 6 s.id,c.name,sp.name sport_name,s.session_date,s.start_time,s.end_time,s.booked_count,s.capacity "
                 +"FROM class_session s JOIN sport sp ON sp.id=s.sport_id LEFT JOIN sport_class c ON c.id=s.class_id "
-                +"WHERE s.status='PUBLISHED' AND "+where+" ORDER BY s.session_date,s.start_time,s.id",
+                +"WHERE s.status IN ('PUBLISHED','COMPLETED') AND "+where+" ORDER BY s.session_date,s.start_time,s.id",
                 (rs,row)->new ConsultationSource("STAFF_SESSION",rs.getLong("id"),
                     rs.getString("name")==null?rs.getString("sport_name"):rs.getString("name"),
                     rs.getString("sport_name")+": "+date(vi,rs.getDate("session_date"))+" "+time(vi,rs.getTime("start_time"))+"-"+time(vi,rs.getTime("end_time"))

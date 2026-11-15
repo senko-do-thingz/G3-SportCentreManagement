@@ -142,6 +142,14 @@ class ReceptionBookingIntegrationTest {
         return insert("sport_package", "INSERT INTO sport_package(code,name,sport_id,training_format,duration_days,session_count,price_amount,session_minutes) "
                 + "OUTPUT INSERTED.id VALUES (?,?,?, ?,60,10,100,60)", code(), "BE-13 " + format, sport, format);
     }
+    private UserAccount newCoach() {
+        var c = account("COACH");
+        jdbc.update("INSERT INTO coach_profile(user_id,primary_sport_id,is_public,display_order) VALUES (?,?,1,0)", c.getId(), sport);
+        remember("coach_profile", c.getId());
+        jdbc.update("INSERT INTO coach_sport(coach_id,sport_id) VALUES (?,?)", c.getId(), sport);
+        remember("coach_sport", c.getId());
+        return c;
+    }
     private long registration(UserAccount member, long pack, int credits) {
         return insert("sport_package_registration", "INSERT INTO sport_package_registration(registration_code,member_id,package_id,channel,original_price,paid_amount,"
                 + "total_sessions,remaining_sessions,start_date,end_date,status,created_by_user_id) OUTPUT INSERTED.id VALUES (?,?,?,'RECEPTION',100,100,10,?,?,?,'ACTIVE',?)",
@@ -151,7 +159,7 @@ class ReceptionBookingIntegrationTest {
     private long session(LocalDate date, int capacity, boolean self) {
         return insert("class_session", "INSERT INTO class_session(class_id,sport_id,facility_id,coach_id,training_type,session_date,start_time,end_time,capacity,booked_count,status,session_code) "
                 + "OUTPUT INSERTED.id VALUES (?,?,?,?,?,?,'12:00','13:00',?,0,'PUBLISHED',?)", self ? null : sportClass, sport, facility,
-                self ? null : coach.getId(), self ? "SELF_TRAINING" : "COACH_LED", date, capacity, SessionIdentityFixtures.reserve(jdbc, date, "FOOTBALL"));
+                self ? null : newCoach().getId(), self ? "SELF_TRAINING" : "COACH_LED", date, capacity, SessionIdentityFixtures.reserve(jdbc, date, "FOOTBALL"));
     }
     private long session() { return session(TODAY.plusDays(1), 10, false); }
     private long legacy(long session, UserAccount member, long registration, String status) {

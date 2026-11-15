@@ -1,0 +1,251 @@
+/* Bang lich thoi gian theo toa do phut cho Huan luyen vien (Coach Teaching Schedule Time Grid) */
+
+.coach-timegrid-wrapper {
+  display: block;
+  background: var(--coach-surface);
+  border: 1px solid var(--coach-rule);
+  border-radius: var(--coach-radius);
+  max-height: 760px;
+  overflow: auto;
+  min-width: 0;
+  width: 100%;
+}
+
+/* Header chua thu va ngay cua 7 cot */
+.coach-timegrid-header {
+  display: flex;
+  background: var(--coach-surface-muted);
+  border-bottom: 2px solid var(--coach-rule);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  min-width: 36rem;
+  width: 100%;
+}
+
+.coach-timegrid-time-gutter-header {
+  width: 3.25rem;
+  flex-shrink: 0;
+  border-right: 1px solid var(--coach-rule);
+}
+
+.coach-timegrid-header-columns {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  flex: 1;
+}
+
+.coach-timegrid-col-header {
+  padding: var(--space-2) var(--space-1);
+  text-align: center;
+  border-right: 1px solid var(--coach-rule);
+}
+
+.coach-timegrid-col-header:last-child {
+  border-right: none;
+}
+
+.coach-timegrid-col-header.is-today {
+  background: color-mix(in srgb, var(--coach-blue) 8%, transparent);
+}
+
+.coach-timegrid-day-name {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  text-transform: uppercase;
+  color: var(--coach-ink);
+  letter-spacing: var(--tracking-eyebrow);
+}
+
+.coach-timegrid-date-text {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--coach-muted);
+  margin-top: 2px;
+}
+
+/* Phan than chua truc Y va 7 cot lich */
+.coach-timegrid-body {
+  display: flex;
+  flex-shrink: 0;
+  position: relative;
+  min-width: 36rem;
+  width: 100%;
+  height: 1536px; /* 16 gio tu 06:00 den 22:00, moi gio 96px (1.6px = 1 phut) */
+  min-height: 1536px;
+  background: var(--coach-surface);
+}
+
+/* Cot truc Tung bieu dien moc gio */
+.coach-timegrid-time-gutter {
+  width: 3.25rem;
+  flex-shrink: 0;
+  height: 100%;
+  min-height: 100%;
+  border-right: 1px solid var(--coach-rule);
+  background: var(--coach-surface-muted);
+  position: relative;
+  user-select: none;
+}
+
+.coach-timegrid-hour-marker {
+  position: absolute;
+  right: var(--space-2);
+  font-size: 0.6875rem;
+  font-weight: var(--weight-medium);
+  color: var(--coach-muted);
+  transform: translateY(-50%);
+  line-height: 1;
+}
+
+.coach-timegrid-hour-marker:first-child {
+  transform: translateY(4px);
+}
+
+/* Khu vuc 7 cot ngay */
+.coach-timegrid-days-container {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  flex: 1;
+  height: 100%;
+  min-height: 100%;
+  position: relative;
+}
+
+/* Cac duong ke ngang moc gio nen */
+.coach-timegrid-gridlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.coach-timegrid-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--coach-rule);
+  width: 100%;
+}
+
+.coach-timegrid-gridline--half {
+  border-top: 1px dashed color-mix(in srgb, var(--coach-rule) 55%, transparent);
+}
+
+.coach-timegrid-gridlines > div:first-child > .coach-timegrid-gridline:first-child {
+  border-top: none;
+}
+
+/* Tung cot ngay rieng biet */
+.coach-timegrid-day-column {
+  position: relative;
+  border-right: 1px solid var(--coach-rule);
+  height: 100%;
+  z-index: 2;
+}
+
+.coach-timegrid-day-column:last-child {
+  border-right: none;
+}
+
+.coach-timegrid-day-column.is-today {
+  background: color-mix(in srgb, var(--coach-blue) 3%, transparent);
+}
+
+/* The ca day duoc dinh vi toa do tuyet doi theo phut */
+.coach-timegrid-card {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--coach-blue) 40%, transparent);
+  border-left: 3px solid var(--coach-blue);
+  border-radius: var(--radius-sm);
+  background: var(--coach-blue-soft);
+  color: var(--coach-ink);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  z-index: 3;
+}
+
+.coach-timegrid-card:hover {
+  z-index: 7;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  border-color: var(--coach-blue);
+}
+
+.coach-timegrid-card.is-selected {
+  z-index: 8;
+  border-color: var(--coach-blue);
+  border-left-width: 4px;
+  background: color-mix(in srgb, var(--coach-blue) 18%, var(--coach-surface));
+  box-shadow: inset 0 0 0 1.5px var(--coach-blue);
+}
+
+/* Trang thai ca day bi Double-booking (Xung dot thoi gian) */
+.coach-timegrid-card.is-conflicted {
+  border-color: var(--color-danger-border);
+  border-left: 3px solid var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.coach-timegrid-card.is-conflicted.is-selected {
+  border-color: var(--color-danger);
+  border-left-width: 4px;
+  background: color-mix(in srgb, var(--color-danger) 18%, var(--coach-surface));
+  box-shadow: inset 0 0 0 1.5px var(--color-danger);
+}
+
+.coach-timegrid-conflict-tag {
+  display: inline-block;
+  padding: 1px 4px;
+  font-size: 0.5625rem;
+  font-weight: var(--weight-bold);
+  background: var(--color-danger);
+  color: var(--color-text-inverse);
+  border-radius: 2px;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+  align-self: flex-start;
+}
+
+.coach-timegrid-card__time {
+  font-size: 0.6875rem;
+  font-weight: var(--weight-bold);
+  line-height: 1.2;
+  color: var(--coach-blue);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.coach-timegrid-card.is-conflicted .coach-timegrid-card__time {
+  color: var(--color-danger);
+}
+
+.coach-timegrid-card__title {
+  font-size: 0.75rem;
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+  color: var(--coach-ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.coach-timegrid-card__id {
+  font-size: 0.625rem;
+  color: var(--coach-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

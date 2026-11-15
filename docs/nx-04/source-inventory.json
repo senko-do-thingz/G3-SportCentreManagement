@@ -529,6 +529,13 @@
       "creates": [],
       "drops": [],
       "sha256_lf": "bc3a609033cd72bd2d59b6b813c55ec49c5e229ed4a0fda25dc86c06bfb4ec72"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V65__add_coach_schedule_trigger.sql",
+      "version": 65,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "c2c86c81f1adbc838737afd627be41ae7b1a914e7e9aed658f2112a0f5371570"
     }
   ],
   "create_occurrences": 82,

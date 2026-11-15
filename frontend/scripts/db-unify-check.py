@@ -141,7 +141,7 @@ try:
         process.terminate()
         raise TimeoutError('Unified backend did not become ready')
     backend = start_unified()
-    check('Fresh schema includes release V64', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '64')
+    check('Fresh schema includes release V65', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '65')
     check('All five additive release migrations applied', sql('SELECT COUNT(*) FROM flyway_schema_history WHERE TRY_CONVERT(int,version) BETWEEN 42 AND 46 AND success=1;') == '5')
     status, auth = request('/auth/login', {'email': 'an.gold@unified-demo.invalid', 'password': 'SportifyDemo2026!'})
     check('Demo Member authenticates', status == 200)

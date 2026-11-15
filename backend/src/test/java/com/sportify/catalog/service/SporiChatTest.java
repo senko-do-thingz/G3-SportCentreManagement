@@ -117,10 +117,13 @@ class SporiChatTest {
             assertThat(answer.mode()).as(role).isEqualTo("AI_GENERATED");
             assertThat(answer.sources()).as(role).allSatisfy(source -> assertThat(source.path()).isEmpty());
         }
+        var coachToday = service(writer).chat(3L, "COACH", "h\u00F4m nay t\u00F4i c\u00F3 l\u1ECBch d\u1EA1y kh\u00F4ng", List.of());
+        assertThat(coachToday.mode()).isEqualTo("AI_GENERATED");
         var request = ArgumentCaptor.forClass(ReplyRequest.class);
-        verify(writer, times(3)).write(request.capture());
+        verify(writer, times(4)).write(request.capture());
         assertThat(request.getAllValues()).extracting(ReplyRequest::intent).containsOnly("STAFF");
-        assertThat(request.getAllValues()).extracting(ReplyRequest::role).containsExactly("MANAGER", "RECEPTIONIST", "COACH");
+        assertThat(request.getAllValues()).extracting(ReplyRequest::role).containsExactly("MANAGER", "RECEPTIONIST", "COACH", "COACH");
+        assertThat(sql).anySatisfy(statement -> assertThat(statement).contains("s.status IN ('PUBLISHED','COMPLETED')"));
         assertThat(sql).isNotEmpty().allSatisfy(statement -> assertThat(statement.toLowerCase(Locale.ROOT))
                 .doesNotContain("full_name").doesNotContain("email").doesNotContain("phone").doesNotContain("member_package")
                 .doesNotContain("payment").doesNotContain("attendance_record"));

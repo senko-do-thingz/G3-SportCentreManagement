@@ -45,11 +45,13 @@
   .attendance-status-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (min-width: 1200px) {
-  .attendance-layout { grid-template-columns: minmax(16rem, .8fr) minmax(0, 2fr); }
+  /* Dao nguoc ti le chieu rong giua Select a session (2fr) va Member roster (0.8fr) */
+  .attendance-layout { grid-template-columns: minmax(0, 2fr) minmax(16rem, .8fr); }
   .attendance-selector { position: sticky; top: 7rem; }
-  .attendance-selector .attendance-session-list { grid-template-columns: minmax(0, 1fr); max-height: 60vh; }
-  .attendance-workspace .attendance-row-fields { grid-template-columns: minmax(0, 1fr) auto; }
+  .attendance-selector .attendance-session-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); max-height: 60vh; }
+  .attendance-workspace .attendance-status-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .attendance-workspace .attendance-row-fields { grid-template-columns: minmax(0, 1fr); }
   .attendance-workspace .attendance-status-choices { grid-column: 1 / -1; }
-  .attendance-workspace .attendance-row-fields > .btn { grid-column: 2; grid-row: 2; }
+  .attendance-workspace .attendance-row-fields > .btn { width: 100%; grid-column: auto; grid-row: auto; }
   .attendance-workspace .attendance-row-fields .attendance-correction-reason { grid-column: 1 / -1; }
 }

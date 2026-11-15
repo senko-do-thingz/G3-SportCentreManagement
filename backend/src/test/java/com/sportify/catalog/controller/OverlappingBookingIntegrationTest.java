@@ -357,6 +357,12 @@ class OverlappingBookingIntegrationTest extends AbstractIntegrationTest {
                 """, Long.class, code(), member.getId(), format == TrainingFormat.COACH_LED ? coachedPackageId : selfPackageId,
                 TODAY.minusDays(2), TODAY.plusDays(40), manager.getId());
     }
+    private long newCoach() {
+        long id = account("COACH").getId();
+        jdbc.update("INSERT INTO coach_profile(user_id, primary_sport_id, is_public, display_order) VALUES (?, ?, 1, 0)", id, sport.getId());
+        jdbc.update("INSERT INTO coach_sport(coach_id, sport_id) VALUES (?, ?)", id, sport.getId());
+        return id;
+    }
     private long coached(LocalDate date, LocalTime start, long facility) { return session(date, start, facility, TrainingFormat.COACH_LED); }
     private long selfTraining(LocalDate date, LocalTime start, long facility) { return session(date, start, facility, TrainingFormat.SELF_TRAINING); }
     /** A published session lasting 90 minutes. */
@@ -367,7 +373,7 @@ class OverlappingBookingIntegrationTest extends AbstractIntegrationTest {
                 INSERT INTO class_session(class_id, sport_id, facility_id, coach_id, training_type, session_date,
                     start_time, end_time, capacity, booked_count, status, session_code) OUTPUT INSERTED.id INTO @created
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10, 0, 'PUBLISHED', ?); SELECT id FROM @created;
-                """, Long.class, coachLed ? sportClass.getId() : null, sport.getId(), facility, coachLed ? coachId : null,
+                """, Long.class, coachLed ? sportClass.getId() : null, sport.getId(), facility, coachLed ? newCoach() : null,
                 format.name(), date, start, start.plusMinutes(90), SessionIdentityFixtures.reserve(jdbc, date, "FOOTBALL"));
     }
     private Outcome book(UserAccount member, long session, long registration) {

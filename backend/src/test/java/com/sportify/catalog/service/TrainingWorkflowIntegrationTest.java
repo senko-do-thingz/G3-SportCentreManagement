@@ -167,7 +167,7 @@ class TrainingWorkflowIntegrationTest {
     }
     @Test void RELEASE12_multipleActualSessionsHaveChronologicalPrivateProgress() throws Exception {
         long metric=insert("INSERT skill_metric(sport_id,name,max_score) VALUES (?,'Release accuracy',10)",sport);fixtureMetrics.add(metric);
-        long second=session("COACH_LED");
+        long second=insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status,session_code) VALUES (?,?,'2026-11-02','07:00','08:00',?,'COACH_LED',10,1,'PUBLISHED',?)",classId,sport,coach,SessionIdentityFixtures.reserve(jdbc,LocalDate.of(2026,11,2),sport));
         jdbc.update("UPDATE class_session SET start_time='07:00',end_time='08:00' WHERE id=?",second);
         long otherBooking=insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')",code(),second,member);
         writer.coachAttendance(coach,new TrainingWriteRequest.Attendance(otherBooking,TrainingWriteRequest.AttendanceStatus.PRESENT,"First session"));
@@ -1059,8 +1059,10 @@ class TrainingWorkflowIntegrationTest {
         assertThat(guidance.recommendations(member,request).items()).noneMatch(item->item.sessionId()==session);
         assertThat(guidance.recommendations(peer,request)).isEqualTo(result);
         assertThat(count("SELECT COUNT(*) FROM booking")).isEqualTo(bookingsBefore);
-        long secondClass=insert("INSERT sport_class(code,name,sport_id,coach_id,max_members) VALUES (?,?,?,?,10)",code(),"Stable tie class",sport,coach);
-        long secondSession=insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status,session_code) VALUES (?,?,'2026-11-03','09:00','10:00',?,'COACH_LED',10,0,'PUBLISHED',?)",secondClass,sport,coach,SessionIdentityFixtures.reserve(jdbc,LocalDate.of(2026,11,3),sport));
+        long secondCoach=account("COACH");
+        jdbc.update("INSERT coach_sport(coach_id,sport_id) VALUES (?,?)",secondCoach,sport);
+        long secondClass=insert("INSERT sport_class(code,name,sport_id,coach_id,max_members) VALUES (?,?,?,?,10)",code(),"Stable tie class",sport,secondCoach);
+        long secondSession=insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status,session_code) VALUES (?,?,'2026-11-03','09:00','10:00',?,'COACH_LED',10,0,'PUBLISHED',?)",secondClass,sport,secondCoach,SessionIdentityFixtures.reserve(jdbc,LocalDate.of(2026,11,3),sport));
         jdbc.update("UPDATE class_session SET facility_id=? WHERE id=?",facility,secondSession);
         var firstPage=guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,null,null,0,1));
         var nextPage=guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,null,null,1,1));
@@ -1077,9 +1079,10 @@ class TrainingWorkflowIntegrationTest {
         jdbc.update("UPDATE class_session SET facility_id=NULL WHERE id=?",session);
         assertThat(guidance.recommendations(peer,request).items()).noneMatch(item->item.sessionId()==session);
         jdbc.update("UPDATE class_session SET facility_id=? WHERE id=?",facility,session);
-        jdbc.update("DELETE FROM coach_sport WHERE coach_id=? AND sport_id=?",coach,sport);
+        jdbc.update("DELETE FROM coach_sport WHERE coach_id IN (?,?) AND sport_id=?",coach,secondCoach,sport);
         assertThat(guidance.recommendations(peer,request).items()).isEmpty();
         jdbc.update("INSERT coach_sport(coach_id,sport_id) VALUES (?,?)",coach,sport);
+        jdbc.update("INSERT coach_sport(coach_id,sport_id) VALUES (?,?)",secondCoach,sport);
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/recommendations?sportId="+sport)
             .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(peer)))))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())

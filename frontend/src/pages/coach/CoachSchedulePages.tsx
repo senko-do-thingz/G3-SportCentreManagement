@@ -1,14 +1,15 @@
 import { formatDateTime } from '../../utils/format'
 import '../../styles/coachUi.css'
+import { CoachTimeGridSchedule } from './CoachTimeGridSchedule'
 import { parseSessionReference, sessionRouteReference } from '../../api/sessionIdentity'
 import { SessionContext } from '../../components/SessionContext'
 import { sessionIdText } from '../../api/sessionIdentity'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { coachScheduleApi, type CoachRosterRecord, type CoachSessionRecord } from '../../api/coachScheduleApi'
 import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, PageLoader, Select, StatusBadge } from '../../components/ui'
 import { useResource } from '../../hooks/useResource'
-import { browseAddDays, browseDate, browseDay, browseMonday, browseToday, validBrowseDate } from '../member/memberScheduleDates'
+import { browseAddDays, browseDate, browseMonday, browseToday, validBrowseDate } from '../member/memberScheduleDates'
 
 function displayTime(value: string): string {
   return value.slice(0, 5)
@@ -88,7 +89,27 @@ export function CoachTeachingSchedulePage() {
   const weekEnd = browseAddDays(week, 6)
   const loader = useCallback((signal: AbortSignal) => coachScheduleApi.list(week, weekEnd, signal), [week, weekEnd])
   const [resource, reload] = useResource(loader)
-  const sessions = resource.status === 'ready' ? resource.data : []
+  const rawSessions = resource.status === 'ready' ? resource.data : []
+  // Loai bo cac ban ghi ca day bi trung lap hoac xung dot gio tren cung mot ngay, chi giu lai ca som nhat
+  const sessions = useMemo(() => {
+    const sorted = [...rawSessions].sort((a, b) =>
+      a.sessionDate.localeCompare(b.sessionDate) ||
+      a.startTime.localeCompare(b.startTime) ||
+      a.endTime.localeCompare(b.endTime) ||
+      b.bookedCount - a.bookedCount ||
+      a.id - b.id
+    )
+    const kept: CoachSessionRecord[] = []
+    for (const session of sorted) {
+      const lastOnSameDay = kept.length > 0 && kept[kept.length - 1].sessionDate === session.sessionDate
+        ? kept[kept.length - 1]
+        : null
+      if (!lastOnSameDay || session.startTime >= lastOnSameDay.endTime) {
+        kept.push(session)
+      }
+    }
+    return kept
+  }, [rawSessions])
   const today = browseToday()
   const currentTime = vietnamTime()
   const nextSession = sessions
@@ -131,23 +152,13 @@ export function CoachTeachingSchedulePage() {
           </div>
           {sessions.length === 0 ? <div className="coach-schedule-empty"><EmptyState title="No assigned sessions this week" description="Your schedule will show sessions assigned to your coach account." /></div> : <>
             <div className="coach-schedule-week-scroll" role="region" aria-label={`Sessions from ${browseDate(week)} to ${browseDate(weekEnd)}`} tabIndex={0}>
-              <div className="coach-schedule-week-grid">
-                {dates.map((date) => {
-                  const dailySessions = sessions.filter((session) => session.sessionDate === date).sort((a, b) => a.startTime.localeCompare(b.startTime) || a.id - b.id)
-                  return <section className="coach-schedule-day" aria-labelledby={`coach-schedule-day-${date}`} key={date}>
-                    <h3 id={`coach-schedule-day-${date}`}><span>{browseDay(date)}</span><time dateTime={date}>{browseDate(date)}</time></h3>
-                    {dailySessions.length === 0 ? <p className="coach-schedule-day__empty">No sessions</p> : <div className="coach-schedule-day__sessions">{dailySessions.map((session) => {
-                      const sessionKey = sessionRouteReference(session)
-                      const isSelected = selectedSession !== null && sessionRouteReference(selectedSession) === sessionKey
-                      return <button className={`coach-schedule-session${isSelected ? ' is-selected' : ''}`} type="button" key={session.id} aria-pressed={isSelected} onClick={() => setSelection({ week, sessionId: sessionKey })}>
-                        <span className="coach-schedule-session__time">{displayTime(session.startTime)} - {displayTime(session.endTime)}</span>
-                        <span className="coach-schedule-session__title">{sessionTitle(session)}</span>
-                        <span className="coach-schedule-session__id">{sessionIdText(session.sessionId)}</span>
-                      </button>
-                    })}</div>}
-                  </section>
-                })}
-              </div>
+              <CoachTimeGridSchedule
+                dates={dates}
+                sessions={sessions}
+                selectedSession={selectedSession}
+                onSelectSession={(session) => setSelection({ week, sessionId: sessionRouteReference(session) })}
+                today={today}
+              />
             </div>
             <p className="coach-schedule-hint">Select a session to see its status, coach, facility and booking details.</p>
           </>}
@@ -234,7 +245,27 @@ export function CoachRosterPage() {
   const selectedSessionId = parseSessionReference(params.get('sessionId'))
   const loadSessions = useCallback((signal: AbortSignal) => coachScheduleApi.list(week, weekEnd, signal), [week, weekEnd])
   const [sessionsResource, reloadSessions] = useResource(loadSessions)
-  const sessions = sessionsResource.status === 'ready' ? sessionsResource.data : []
+  const rawSessions = sessionsResource.status === 'ready' ? sessionsResource.data : []
+  // Loai bo cac ban ghi ca day bi trung lap hoac xung dot gio tren cung mot ngay, chi giu lai ca som nhat
+  const sessions = useMemo(() => {
+    const sorted = [...rawSessions].sort((a, b) =>
+      a.sessionDate.localeCompare(b.sessionDate) ||
+      a.startTime.localeCompare(b.startTime) ||
+      a.endTime.localeCompare(b.endTime) ||
+      b.bookedCount - a.bookedCount ||
+      a.id - b.id
+    )
+    const kept: CoachSessionRecord[] = []
+    for (const session of sorted) {
+      const lastOnSameDay = kept.length > 0 && kept[kept.length - 1].sessionDate === session.sessionDate
+        ? kept[kept.length - 1]
+        : null
+      if (!lastOnSameDay || session.startTime >= lastOnSameDay.endTime) {
+        kept.push(session)
+      }
+    }
+    return kept
+  }, [rawSessions])
   const selectedSession = sessions.find((session) => (session.id === selectedSessionId || session.sessionId === selectedSessionId)) ?? null
   const isOwnSession = selectedSession !== null
   const rosterLoader = useCallback((signal: AbortSignal) => selectedSessionId && isOwnSession

@@ -419,22 +419,33 @@
   line-height: 1.35;
 }
 
-/* The week grid gets the full content width so seven days stay readable at 1280px; the overview sits below it. */
+/* Bo cuc lich tuan (3 cot) va thong tin tong quan ca day (1 cot) khop voi 4 the chi so phia tren */
 .coach-ui .coach-schedule-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-4);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-3);
   min-width: 0;
 }
 
-.coach-ui .coach-schedule-weekly,
-.coach-ui .coach-schedule-overview {
+.coach-ui .coach-schedule-weekly {
+  grid-column: span 3;
   min-width: 0;
+  padding: 0;
+}
+
+.coach-ui .coach-schedule-overview {
+  grid-column: span 1;
+  min-width: 0;
+  padding: 0;
+  position: sticky;
+  top: var(--space-4);
 }
 
 .coach-ui .coach-schedule-weekly .card__header,
 .coach-ui .coach-schedule-overview .card__header {
   min-height: 3.75rem;
+  margin-bottom: 0;
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--coach-rule);
 }
@@ -592,18 +603,10 @@
   line-height: 1.45;
 }
 
-/* Overview below the week: the selected session, its facts and the roster action side by side. */
+/* Khung thong tin tong quan ca day ben phai: xep doc tu tren xuong duoi */
 .coach-ui .coach-schedule-overview {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
-  grid-template-rows: auto 1fr;
-  align-items: start;
-  column-gap: var(--space-5);
-}
-
-.coach-ui .coach-schedule-overview > .card__header,
-.coach-ui .coach-schedule-overview > .coach-schedule-overview__empty {
-  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
 }
 
 .coach-ui .coach-schedule-overview > .coach-schedule-overview__feature,
@@ -612,14 +615,10 @@
   margin-inline: var(--space-4);
 }
 
-.coach-ui .coach-schedule-overview > .coach-schedule-overview__facts {
-  margin-inline: 0;
-}
-
 .coach-ui .coach-schedule-overview > .coach-schedule-overview__action {
-  align-self: start;
-  margin-top: var(--space-4);
-  margin-left: 0;
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-4);
+  text-align: center;
 }
 
 .coach-ui .coach-schedule-overview__feature {
@@ -735,8 +734,13 @@
   }
 
   .coach-ui .coach-schedule-weekly,
-.coach-ui .coach-schedule-overview {
+  .coach-ui .coach-schedule-overview {
+    grid-column: 1 / -1;
     min-height: 0;
+  }
+
+  .coach-ui .coach-schedule-overview {
+    position: static;
   }
 
   .coach-ui .coach-schedule-overview__action {
