@@ -6,7 +6,8 @@
   background: var(--coach-surface);
   border: 1px solid var(--coach-rule);
   border-radius: var(--coach-radius);
-  overflow-x: auto;
+  max-height: 620px;
+  overflow: auto;
   min-width: 0;
   width: 100%;
 }
@@ -19,11 +20,12 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  min-width: 44rem;
+  min-width: 36rem;
+  width: 100%;
 }
 
 .coach-timegrid-time-gutter-header {
-  width: 4rem;
+  width: 3.25rem;
   flex-shrink: 0;
   border-right: 1px solid var(--coach-rule);
 }
@@ -68,14 +70,15 @@
 .coach-timegrid-body {
   display: flex;
   position: relative;
-  min-width: 44rem;
+  min-width: 36rem;
+  width: 100%;
   height: 960px; /* 16 gio tu 06:00 den 22:00, moi gio 60px (1px = 1 phut) */
   background: var(--coach-surface);
 }
 
 /* Cot truc Tung bieu dien moc gio */
 .coach-timegrid-time-gutter {
-  width: 4rem;
+  width: 3.25rem;
   flex-shrink: 0;
   border-right: 1px solid var(--coach-rule);
   background: var(--coach-surface-muted);
@@ -91,6 +94,10 @@
   color: var(--coach-muted);
   transform: translateY(-50%);
   line-height: 1;
+}
+
+.coach-timegrid-hour-marker:first-child {
+  transform: translateY(4px);
 }
 
 /* Khu vuc 7 cot ngay */
@@ -115,6 +122,10 @@
   right: 0;
   border-top: 1px dashed var(--coach-rule);
   width: 100%;
+}
+
+.coach-timegrid-gridline:first-child {
+  border-top: none;
 }
 
 /* Tung cot ngay rieng biet */
@@ -165,7 +176,7 @@
   border-color: var(--coach-blue);
   border-left-width: 4px;
   background: color-mix(in srgb, var(--coach-blue) 18%, var(--coach-surface));
-  box-shadow: 0 0 0 2px var(--coach-blue);
+  box-shadow: inset 0 0 0 1.5px var(--coach-blue);
 }
 
 /* Trang thai ca day bi Double-booking (Xung dot thoi gian) */
@@ -180,7 +191,7 @@
   border-color: var(--color-danger);
   border-left-width: 4px;
   background: color-mix(in srgb, var(--color-danger) 18%, var(--coach-surface));
-  box-shadow: 0 0 0 2px var(--color-danger);
+  box-shadow: inset 0 0 0 1.5px var(--color-danger);
 }
 
 .coach-timegrid-conflict-tag {
@@ -215,9 +226,11 @@
   font-weight: var(--weight-semibold);
   line-height: 1.25;
   color: var(--coach-ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-word;
 }
 
 .coach-timegrid-card__id {
