@@ -111,7 +111,6 @@ function CenterConsultationWorkspace() {
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null)
   const [activeSessionMessages, setActiveSessionMessages] = useState<ChatMessageItem[]>([])
-  const [loadingSessions, setLoadingSessions] = useState(false)
   const [sessionPending, setSessionPending] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -120,21 +119,28 @@ function CenterConsultationWorkspace() {
 
   const fetchSessions = useCallback(async () => {
     try {
-      setLoadingSessions(true)
       const list = await sporiApi.listSessions(showArchived ? true : false)
       if (Array.isArray(list)) {
         setSessions(list)
       }
     } catch {
       // Safe fallback in mock environments
-    } finally {
-      setLoadingSessions(false)
     }
   }, [showArchived])
 
   useEffect(() => {
-    void fetchSessions()
-  }, [fetchSessions])
+    let active = true
+    void sporiApi.listSessions(showArchived ? true : false)
+      .then(list => {
+        if (active && Array.isArray(list)) {
+          setSessions(list)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [showArchived])
 
   const selectSession = useCallback(async (sessionId: number) => {
     if (chat.pending || sessionPending) return
@@ -188,7 +194,7 @@ function CenterConsultationWorkspace() {
     }
 
     startNewChat()
-  }, [isCurrentChatEmpty, startNewChat])
+  }, [chat, isCurrentChatEmpty, startNewChat])
 
   const handleRename = useCallback(async (sessionId: number, newTitle: string) => {
     const trimmed = newTitle.trim()
@@ -357,9 +363,7 @@ function CenterConsultationWorkspace() {
           </div>
 
           <div className="spori-sidebar__list" role="list">
-            {loadingSessions ? (
-              <div className="spori-sidebar__loading">Loading history...</div>
-            ) : sessions.length === 0 ? (
+            {sessions.length === 0 ? (
               <div className="spori-sidebar__empty">
                 {showArchived ? 'No archived chats' : 'No conversations yet'}
               </div>
