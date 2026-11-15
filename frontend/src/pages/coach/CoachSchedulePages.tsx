@@ -90,19 +90,25 @@ export function CoachTeachingSchedulePage() {
   const loader = useCallback((signal: AbortSignal) => coachScheduleApi.list(week, weekEnd, signal), [week, weekEnd])
   const [resource, reload] = useResource(loader)
   const rawSessions = resource.status === 'ready' ? resource.data : []
-  // Loai bo cac ban ghi ca day bi trung lap ve mat thoi gian va lop hoc
+  // Loai bo cac ban ghi ca day bi trung lap hoac xung dot gio tren cung mot ngay, chi giu lai ca som nhat
   const sessions = useMemo(() => {
-    const seen = new Map<string, CoachSessionRecord>()
-    for (const session of rawSessions) {
-      const slotKey = `${session.sessionDate}_${session.startTime}_${session.endTime}_${session.coachId}_${session.classId ?? 'none'}`
-      const existing = seen.get(slotKey)
-      if (!existing) {
-        seen.set(slotKey, session)
-      } else if (session.bookedCount > existing.bookedCount) {
-        seen.set(slotKey, session)
+    const sorted = [...rawSessions].sort((a, b) =>
+      a.sessionDate.localeCompare(b.sessionDate) ||
+      a.startTime.localeCompare(b.startTime) ||
+      a.endTime.localeCompare(b.endTime) ||
+      b.bookedCount - a.bookedCount ||
+      a.id - b.id
+    )
+    const kept: CoachSessionRecord[] = []
+    for (const session of sorted) {
+      const lastOnSameDay = kept.length > 0 && kept[kept.length - 1].sessionDate === session.sessionDate
+        ? kept[kept.length - 1]
+        : null
+      if (!lastOnSameDay || session.startTime >= lastOnSameDay.endTime) {
+        kept.push(session)
       }
     }
-    return Array.from(seen.values())
+    return kept
   }, [rawSessions])
   const today = browseToday()
   const currentTime = vietnamTime()
@@ -240,19 +246,25 @@ export function CoachRosterPage() {
   const loadSessions = useCallback((signal: AbortSignal) => coachScheduleApi.list(week, weekEnd, signal), [week, weekEnd])
   const [sessionsResource, reloadSessions] = useResource(loadSessions)
   const rawSessions = sessionsResource.status === 'ready' ? sessionsResource.data : []
-  // Loai bo cac ban ghi ca day bi trung lap ve mat thoi gian va lop hoc
+  // Loai bo cac ban ghi ca day bi trung lap hoac xung dot gio tren cung mot ngay, chi giu lai ca som nhat
   const sessions = useMemo(() => {
-    const seen = new Map<string, CoachSessionRecord>()
-    for (const session of rawSessions) {
-      const slotKey = `${session.sessionDate}_${session.startTime}_${session.endTime}_${session.coachId}_${session.classId ?? 'none'}`
-      const existing = seen.get(slotKey)
-      if (!existing) {
-        seen.set(slotKey, session)
-      } else if (session.bookedCount > existing.bookedCount) {
-        seen.set(slotKey, session)
+    const sorted = [...rawSessions].sort((a, b) =>
+      a.sessionDate.localeCompare(b.sessionDate) ||
+      a.startTime.localeCompare(b.startTime) ||
+      a.endTime.localeCompare(b.endTime) ||
+      b.bookedCount - a.bookedCount ||
+      a.id - b.id
+    )
+    const kept: CoachSessionRecord[] = []
+    for (const session of sorted) {
+      const lastOnSameDay = kept.length > 0 && kept[kept.length - 1].sessionDate === session.sessionDate
+        ? kept[kept.length - 1]
+        : null
+      if (!lastOnSameDay || session.startTime >= lastOnSameDay.endTime) {
+        kept.push(session)
       }
     }
-    return Array.from(seen.values())
+    return kept
   }, [rawSessions])
   const selectedSession = sessions.find((session) => (session.id === selectedSessionId || session.sessionId === selectedSessionId)) ?? null
   const isOwnSession = selectedSession !== null
