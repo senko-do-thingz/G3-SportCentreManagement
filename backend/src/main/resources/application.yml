@@ -19,9 +19,9 @@ spring:
 
   servlet:
     multipart:
-      # Coach photos are resized in the browser; the service also rejects files above 2 MB.
-      max-file-size: 2MB
-      max-request-size: 3MB
+      # Upload limits (avatars up to 5 MB validated at service layer).
+      max-file-size: 10MB
+      max-request-size: 12MB
 
   jpa:
     open-in-view: false

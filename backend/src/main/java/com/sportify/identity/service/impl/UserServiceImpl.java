@@ -4,6 +4,7 @@ import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.core.audit.AuditAction;
 import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
+import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.FieldValidationException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.dto.ChangePasswordRequest;
@@ -15,6 +16,7 @@ import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.mapper.UserMapper;
 import com.sportify.identity.repository.CoachSportRepository;
 import com.sportify.identity.repository.MemberProfileRepository;
+import com.sportify.identity.repository.UserAvatarStore;
 import com.sportify.identity.repository.UserRepository;
 import com.sportify.identity.security.CustomUserDetails;
 import com.sportify.identity.service.UserService;
@@ -27,11 +29,15 @@ import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.sportify.identity.repository.UserRefreshTokenRepository;
+import java.io.IOException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +53,8 @@ public class UserServiceImpl implements UserService {
     private final EntityManager entityManager;
     private final Clock clock;
     private final UserRefreshTokenRepository userRefreshTokenRepository;
+    private final UserAvatarStore avatarStore;
+    private final UserAvatarProcessor avatarProcessor;
 
     @Override
     @Transactional(readOnly = true)
@@ -110,6 +118,85 @@ public class UserServiceImpl implements UserService {
         userRefreshTokenRepository.revokeAllForUser(user.getId(), LocalDateTime.now(clock));
         auditService.record(AuditEvent.builder().actor(user).action(AuditAction.PASSWORD_CHANGED)
                 .entityType("USER_ACCOUNT").entityId(user.getId()).summary("Password changed").build());
+    }
+
+    @Override
+    @Transactional
+    public UserProfileResponse uploadCurrentUserAvatar(CustomUserDetails userDetails, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessRuleException("Choose a photo to upload");
+        }
+        if (file.getSize() > UserAvatarProcessor.MAX_AVATAR_BYTES) {
+            throw new BusinessRuleException("Photo must be at most 5 MB");
+        }
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException ex) {
+            throw new BusinessRuleException("Choose a photo to upload");
+        }
+        return uploadCurrentUserAvatar(userDetails, bytes);
+    }
+
+    @Override
+    @Transactional
+    public UserProfileResponse uploadCurrentUserAvatar(CustomUserDetails userDetails, byte[] data) {
+        UserAccount user = currentAccount(userDetails);
+        if (data == null || data.length == 0) {
+            throw new BusinessRuleException("Choose a photo to upload");
+        }
+        if (data.length > UserAvatarProcessor.MAX_AVATAR_BYTES) {
+            throw new BusinessRuleException("Photo must be at most 5 MB");
+        }
+
+        byte[] processedWebp = avatarProcessor.process(data);
+        avatarStore.save(user.getId(), UserAvatarProcessor.OUTPUT_CONTENT_TYPE, processedWebp);
+
+        String link = "COACH".equals(user.getRole().getCode())
+                ? "/api/v1/users/" + user.getId() + "/avatar?v=" + clock.millis()
+                : "/api/v1/users/me/avatar?v=" + clock.millis();
+        user.setAvatarUrl(link);
+        users.save(user);
+
+        auditService.record(AuditEvent.builder()
+                .actor(user)
+                .action(AuditAction.USER_UPDATED)
+                .entityType("USER_ACCOUNT")
+                .entityId(user.getId())
+                .summary("Avatar uploaded")
+                .details(Map.of("fields", List.of("avatarUrl"), "contentType", UserAvatarProcessor.OUTPUT_CONTENT_TYPE, "sizeBytes", processedWebp.length))
+                .build());
+
+        return profile(user);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserAvatarStore.StoredAvatar getCurrentUserAvatar(CustomUserDetails userDetails) {
+        UserAccount user = currentAccount(userDetails);
+        return avatarStore.findByUserId(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Photo not found"));
+    }
+
+    @Override
+    @Transactional
+    public void deleteCurrentUserAvatar(CustomUserDetails userDetails) {
+        UserAccount user = currentAccount(userDetails);
+        if (user.getAvatarUrl() == null) {
+            return;
+        }
+        avatarStore.delete(user.getId());
+        user.setAvatarUrl(null);
+        users.save(user);
+
+        auditService.record(AuditEvent.builder()
+                .actor(user)
+                .action(AuditAction.USER_UPDATED)
+                .entityType("USER_ACCOUNT")
+                .entityId(user.getId())
+                .summary("Avatar removed")
+                .details(Map.of("fields", List.of("avatarUrl")))
+                .build());
     }
 
     private UserAccount currentAccount(CustomUserDetails principal) {

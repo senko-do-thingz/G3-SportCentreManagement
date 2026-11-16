@@ -7,6 +7,8 @@ describe('avatarSrc', () => {
     expect(avatarSrc(' https://cdn.example.test/a.jpg ')).toBe('https://cdn.example.test/a.jpg')
     expect(avatarSrc('/api/v1/users/7/avatar?v=123')).toBe(`${env.apiBaseUrl}/users/7/avatar?v=123`)
     expect(avatarSrc('/api/v1/users/7/avatar')).toBe(`${env.apiBaseUrl}/users/7/avatar`)
+    expect(avatarSrc('/api/v1/users/me/avatar?v=123')).toBe(`${env.apiBaseUrl}/users/me/avatar?v=123`)
+    expect(avatarSrc('/api/v1/users/me/avatar')).toBe(`${env.apiBaseUrl}/users/me/avatar`)
     expect(avatarSrc('/images/coaches/khoa-nguyen.jpg')).toBe('/images/coaches/khoa-nguyen.jpg')
   })
 

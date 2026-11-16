@@ -1,6 +1,6 @@
 import { env } from '../config/env'
 
-const UPLOADED = /^\/api\/v1(\/users\/\d+\/avatar(?:\?v=\d+)?)$/
+const UPLOADED = /^\/api\/v1(\/users\/(?:\d+|me)\/avatar(?:\?v=\d+)?)$/
 /** Demo photos shipped with the web app in frontend/public/images/coaches. */
 const BUNDLED = /^\/images\/coaches\/[a-z0-9-]+\.(?:jpe?g|png|webp)$/
 

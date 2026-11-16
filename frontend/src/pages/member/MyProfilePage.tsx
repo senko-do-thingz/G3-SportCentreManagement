@@ -13,6 +13,8 @@ import { initials } from '../../utils/format'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 import { MEMBER_PATHS, toIsoDate } from './dashboardModel'
 import { MemberCommerceHeader, MemberCommerceHero } from './MemberCommerceComponents'
+import { AvatarUploadModal } from '../../components/avatar/AvatarUploadModal'
+import { useAvatarSrc } from '../../components/avatar/useAvatarSrc'
 import {
   ADDRESS_MAX_LENGTH,
   CURRENT_PASSWORD_REJECTED_MESSAGE,
@@ -112,6 +114,8 @@ export function MyProfilePage() {
 
 function ProfileContent({ initial }: { initial: UserProfile }) {
   const [saved, setSaved] = useState<UserProfile>(initial)
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false)
+  const avatarImageSrc = useAvatarSrc(saved.avatarUrl)
   const role = roleOf(saved)
   return (
     <div className="profile-layout">
@@ -123,8 +127,22 @@ function ProfileContent({ initial }: { initial: UserProfile }) {
         <Card title="Profile summary">
           <div className="profile-summary">
             <span className="avatar avatar--lg" aria-hidden="true">
-              {initials(saved.fullName)}
+              {avatarImageSrc ? (
+                <img src={avatarImageSrc} alt="" />
+              ) : (
+                initials(saved.fullName)
+              )}
             </span>
+            <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setAvatarModalOpen(true)}
+              >
+                {saved.avatarUrl ? 'Change avatar' : 'Upload avatar'}
+              </Button>
+            </div>
             <p className="profile-summary__name">{saved.fullName}</p>
             <p className="profile-summary__role">{role ? ROLE_LABELS[role] : saved.role}</p>
             {saved.memberCode && <p className="profile-summary__code">Member code {saved.memberCode}</p>}
@@ -138,6 +156,14 @@ function ProfileContent({ initial }: { initial: UserProfile }) {
           </Link>
         </Card>
       </aside>
+
+      <AvatarUploadModal
+        open={avatarModalOpen}
+        onClose={() => setAvatarModalOpen(false)}
+        currentAvatarUrl={saved.avatarUrl}
+        fullName={saved.fullName}
+        onAvatarUpdated={(newUrl) => setSaved((s) => ({ ...s, avatarUrl: newUrl }))}
+      />
     </div>
   )
 }

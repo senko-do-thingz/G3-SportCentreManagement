@@ -41,6 +41,8 @@ class UserServiceImplTest {
     @Mock AuditService audit;
     @Mock EntityManager entityManager;
     @Mock UserRefreshTokenRepository userRefreshTokenRepository;
+    @Mock UserAvatarStore userAvatarStore;
+    @Mock UserAvatarProcessor userAvatarProcessor;
     final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
     final Clock clock = Clock.fixed(Instant.parse("2026-10-16T00:00:00Z"), ZoneOffset.UTC);
     final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
@@ -51,7 +53,8 @@ class UserServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new UserServiceImpl(Mappers.getMapper(UserMapper.class), users, members, cards,
-                coachSports, encoder, audit, entityManager, clock, userRefreshTokenRepository);
+                coachSports, encoder, audit, entityManager, clock, userRefreshTokenRepository,
+                userAvatarStore, userAvatarProcessor);
         user = UserAccount.builder().id(10L).email("self@example.test").fullName("Original Name")
                 .phone("0901234567").address("Original address").dateOfBirth(LocalDate.of(2000, 1, 1))
                 .role(Role.builder().code("MANAGER").build()).status("ACTIVE")
@@ -300,6 +303,52 @@ class UserServiceImplTest {
         assertThrows(DisabledException.class, () -> service.updateCurrentUserProfile(principal, new UpdateProfileRequest()));
         assertThrows(DisabledException.class, () -> service.changeCurrentUserPassword(principal,
                 password("Original123", "Replacement456", "Replacement456")));
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void uploadCurrentUserAvatar_processesAndSavesAvatar() {
+        byte[] input = new byte[]{1, 2, 3};
+        byte[] webp = new byte[]{4, 5, 6};
+        when(userAvatarProcessor.process(input)).thenReturn(webp);
+
+        UserProfileResponse res = service.uploadCurrentUserAvatar(principal, input);
+
+        verify(userAvatarStore).save(10L, "image/webp", webp);
+        assertNotNull(res);
+        assertTrue(res.getAvatarUrl().startsWith("/api/v1/users/me/avatar?v="));
+        verify(audit).record(argThat(event -> AuditAction.USER_UPDATED.equals(event.getAction())
+                && event.getSummary().contains("Avatar")));
+    }
+
+    @Test
+    void deleteCurrentUserAvatar_clearsAvatar() {
+        user.setAvatarUrl("/api/v1/users/me/avatar?v=123");
+        service.deleteCurrentUserAvatar(principal);
+
+        verify(userAvatarStore).delete(10L);
+        assertNull(user.getAvatarUrl());
+        verify(audit).record(argThat(event -> AuditAction.USER_UPDATED.equals(event.getAction())
+                && event.getSummary().contains("Avatar")));
+    }
+
+    @Test
+    void getCurrentUserAvatar_returnsStoredAvatar() {
+        var stored = new UserAvatarStore.StoredAvatar("image/webp", new byte[]{1, 2, 3});
+        when(userAvatarStore.findByUserId(10L)).thenReturn(Optional.of(stored));
+
+        var result = service.getCurrentUserAvatar(principal);
+        assertNotNull(result);
+        assertEquals("image/webp", result.contentType());
+        assertArrayEquals(new byte[]{1, 2, 3}, result.data());
+    }
+
+    @Test
+    void inactiveAccountCannotUploadOrDeleteAvatar() {
+        user.setStatus("INACTIVE");
+        assertThrows(DisabledException.class, () -> service.uploadCurrentUserAvatar(principal, new byte[]{1}));
+        assertThrows(DisabledException.class, () -> service.deleteCurrentUserAvatar(principal));
+        assertThrows(DisabledException.class, () -> service.getCurrentUserAvatar(principal));
         verifyNoInteractions(audit);
     }
 }

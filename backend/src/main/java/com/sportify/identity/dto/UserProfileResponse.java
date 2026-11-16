@@ -25,6 +25,7 @@ public class UserProfileResponse {
     private String mainGoal;
     private String currentLevel;
     private String memberCode;
+    private String avatarUrl;
     private ProfileCardResponse membershipCard;
     private List<SportSummaryResponse> sports;
 }
