@@ -362,4 +362,48 @@ describe('UI-16 manager activity log', () => {
     expect(await screen.findByText('0 events')).toBeInTheDocument()
     expect(list).toHaveBeenCalledTimes(2)
   })
+
+  it('displays enriched activity details including status, reason, inputs, outputs, and timezone', async () => {
+    authenticateManager()
+    vi.spyOn(managerActivityLogsApi, 'list').mockResolvedValue(page([activity]))
+    const getByIdSpy = vi.spyOn(managerActivityLogsApi, 'getById').mockResolvedValue({
+      id: 501,
+      createdAt: '2026-10-14T09:30:00',
+      formattedCreatedAt: '14/10/2026 09:30:00',
+      timezone: 'Asia/Ho_Chi_Minh (UTC+7)',
+      actorId: 3,
+      actorName: 'Morgan Lee',
+      actorRole: 'MANAGER',
+      actorType: 'USER',
+      action: 'PACKAGE_CREATED',
+      actionName: 'Package Created',
+      category: 'PACKAGE_MANAGEMENT',
+      entityType: 'SPORT_PACKAGE',
+      entityId: 41,
+      entityCode: 'PKG-TENNIS',
+      summary: 'Package created',
+      status: 'SUCCESS',
+      reason: 'Manager successfully created a new sport package.',
+      errorCode: null,
+      errorMessage: null,
+      inputs: { name: 'Tennis Gold', price: 1500000 },
+      outputs: { packageId: 41 },
+      metadata: { ip: '127.0.0.1' },
+      ipAddress: '127.0.0.1',
+    })
+    const user = userEvent.setup()
+
+    renderApp('/manager/activity')
+    const detailsButton = await screen.findByRole('button', { name: 'View details for Package created by Morgan Lee' })
+    await user.click(detailsButton)
+
+    const dialog = within(screen.getByRole('dialog', { name: 'Activity details' }))
+    expect(await dialog.findByText('SUCCESS')).toBeInTheDocument()
+    expect(dialog.getByText('PACKAGE_MANAGEMENT')).toBeInTheDocument()
+    expect(dialog.getByText('Manager successfully created a new sport package.')).toBeInTheDocument()
+    expect(dialog.getByText('14/10/2026 09:30:00 (Asia/Ho_Chi_Minh (UTC+7))')).toBeInTheDocument()
+    expect(dialog.getByText('Tennis Gold')).toBeInTheDocument()
+    expect(dialog.getByText('PKG-TENNIS')).toBeInTheDocument()
+    expect(getByIdSpy).toHaveBeenCalledWith(501)
+  })
 })

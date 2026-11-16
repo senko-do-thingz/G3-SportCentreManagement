@@ -195,27 +195,41 @@ public class CenterConsultationService {
             || contains(plain,"lich day","ca day","buoi day","lop day","toi day","toi co lich","toi co ca","toi co buoi","toi co lop","lich cua toi","lop cua toi","buoi cua toi")
             || ("COACH".equals(role) && "SESSIONS".equals(intent))
             || intent.equals("UNKNOWN") && contains(raw,"today","h\u00F4m nay")))intent="STAFF";
-        Consultation draft=switch(intent) {
-            case "STAFF" -> staffOverview(vi,mode,role,memberId);
-            case "CLASS_MANAGEMENT" -> classManagement(vi,mode,role);
-            case "PRIVATE","UNKNOWN" -> unknown(vi,mode);
-            case "COACH" -> coach(vi,mode);
-            case "FAQ" -> faq==null?unknown(vi,mode):faqAnswer(vi,mode,faq);
-            case "BOOKING" -> response(vi,mode,"ANSWERED",t(vi,"Open a session, check its current availability and suitable sport packages, then review and confirm in the booking flow. Use My bookings to check cancellation eligibility. This consultation never books, cancels, takes payment or issues refunds.",
-                    "M\u1EDF m\u1ED9t bu\u1ED5i h\u1ECDc, ki\u1EC3m tra s\u1ED1 ch\u1ED7 c\u00F2n tr\u1ED1ng v\u00E0 g\u00F3i t\u1EADp ph\u00F9 h\u1EE3p, r\u1ED3i xem l\u1EA1i v\u00E0 x\u00E1c nh\u1EADn trong b\u01B0\u1EDBc \u0111\u1EB7t ch\u1ED7. V\u00E0o My bookings \u0111\u1EC3 xem bu\u1ED5i n\u00E0o c\u00F2n \u0111\u01B0\u1EE3c h\u1EE7y. Tr\u1EE3 l\u00FD n\u00E0y kh\u00F4ng bao gi\u1EDD t\u1EF1 \u0111\u1EB7t ch\u1ED7, h\u1EE7y, thanh to\u00E1n hay ho\u00E0n ti\u1EC1n."),
-                List.of(new ConsultationSource("PRODUCT_GUIDANCE",0,t(vi,"Session and booking workflow","Quy tr\u00ECnh \u0111\u1EB7t bu\u1ED5i h\u1ECDc"),
-                    t(vi,"Eligibility and credits are checked by the existing booking service.","\u0110i\u1EC1u ki\u1EC7n \u0111\u1EB7t v\u00E0 s\u1ED1 bu\u1ED5i trong g\u00F3i \u0111\u01B0\u1EE3c ki\u1EC3m tra khi \u0111\u1EB7t ch\u1ED7."),"/member/classes")));
-            case "CONTACT" -> response(vi,mode,"ANSWERED",t(vi,"Reception can help with questions the assistant cannot answer, such as account, payment or discount checks. Send a support request and reception will reply to you in My support requests.",
-                    "L\u1EC5 t\u00E2n c\u00F3 th\u1EC3 gi\u00FAp nh\u1EEFng c\u00E2u tr\u1EE3 l\u00FD kh\u00F4ng tr\u1EA3 l\u1EDDi \u0111\u01B0\u1EE3c, nh\u01B0 t\u00E0i kho\u1EA3n, thanh to\u00E1n hay ki\u1EC3m tra gi\u1EA3m gi\u00E1. H\u00E3y g\u1EEDi y\u00EAu c\u1EA7u h\u1ED7 tr\u1EE3, l\u1EC5 t\u00E2n s\u1EBD tr\u1EA3 l\u1EDDi b\u1EA1n trong m\u1EE5c My support requests."),
-                List.of(new ConsultationSource("SUPPORT",0,t(vi,"Contact reception","Li\u00EAn h\u1EC7 l\u1EC5 t\u00E2n"),
-                    t(vi,"Opens the support request form. Nothing is sent until you submit it.","M\u1EDF form y\u00EAu c\u1EA7u h\u1ED7 tr\u1EE3. Ch\u01B0a c\u00F3 g\u00EC \u0111\u01B0\u1EE3c g\u1EEDi cho \u0111\u1EBFn khi b\u1EA1n b\u1EA5m g\u1EEDi."),"/member/support")));
-            case "SPORTS_CATALOG" -> sportsCatalog(vi,mode);
-            case "MY_PACKAGES" -> memberId==null?signIn(vi,mode):myPackages(vi,mode,memberId);
-            case "MY_BOOKINGS" -> memberId==null?signIn(vi,mode):myBookings(vi,mode,memberId);
-            case "MY_TRAINING" -> memberId==null?signIn(vi,mode):myTraining(vi,mode,memberId);
-            case "PACKAGES" -> packages(vi,mode,sport(raw,plain,aiSport));
-            default -> sessions(vi,mode,sport(raw,plain,aiSport),day);
-        };
+        if (intent.startsWith("KB_")) {
+            handoff = null;
+        }
+        Consultation draft;
+        if (intent.startsWith("KB_")) {
+            String topicName = intent.substring(3);
+            var topic = SportifyKnowledgeBase.getTopic(topicName);
+            if (topic != null) {
+                draft = SportifyKnowledgeBase.buildConsultation(topic, role, vi, mode);
+            } else {
+                draft = unknown(vi, mode);
+            }
+        } else {
+            draft = switch(intent) {
+                case "STAFF" -> staffOverview(vi,mode,role,memberId);
+                case "CLASS_MANAGEMENT" -> classManagement(vi,mode,role);
+                case "PRIVATE","UNKNOWN" -> unknown(vi,mode);
+                case "COACH" -> coach(vi,mode);
+                case "FAQ" -> faq==null?unknown(vi,mode):faqAnswer(vi,mode,faq);
+                case "BOOKING" -> response(vi,mode,"ANSWERED",t(vi,"Open a session, check its current availability and suitable sport packages, then review and confirm in the booking flow. Use My bookings to check cancellation eligibility. This consultation never books, cancels, takes payment or issues refunds.",
+                        "M\u1EDF m\u1ED9t bu\u1ED5i h\u1ECDc, ki\u1EC3m tra s\u1ED1 ch\u1ED7 c\u00F2n tr\u1ED1ng v\u00E0 g\u00F3i t\u1EADp ph\u00F9 h\u1EE3p, r\u1ED3i xem l\u1EA1i v\u00E0 x\u00E1c nh\u1EADn trong b\u01B0\u1EDBc \u0111\u1EB7t ch\u1ED7. V\u00E0o My bookings \u0111\u1EC3 xem bu\u1ED5i n\u00E0o c\u00F2n \u0111\u01B0\u1EE3c h\u1EE7y. Tr\u1EE3 l\u00FD n\u00E0y kh\u00F4ng bao gi\u1EDD t\u1EF1 \u0111\u1EB7t ch\u1ED7, h\u1EE7y, thanh to\u00E1n hay ho\u00E0n ti\u1EC1n."),
+                    List.of(new ConsultationSource("PRODUCT_GUIDANCE",0,t(vi,"Session and booking workflow","Quy tr\u00ECnh \u0111\u1EB7t bu\u1ED5i h\u1ECDc"),
+                        t(vi,"Eligibility and credits are checked by the existing booking service.","\u0110i\u1EC1u ki\u1EC7n \u0111\u1EB7t v\u00E0 s\u1ED1 bu\u1ED5i trong g\u00F3i \u0111\u01B0\u1EE3c ki\u1EC3m tra khi \u0111\u1EB7t ch\u1ED7."),"/member/classes")));
+                case "CONTACT" -> response(vi,mode,"ANSWERED",t(vi,"Reception can help with questions the assistant cannot answer, such as account, payment or discount checks. Send a support request and reception will reply to you in My support requests.",
+                        "L\u1EC5 t\u00E2n c\u00F3 th\u1EC3 gi\u00FAp nh\u1EEFng c\u00E2u tr\u1EE3 l\u00FD kh\u00F4ng tr\u1EA3 l\u1EDDi \u0111\u01B0\u1EE3c, nh\u01B0 t\u00E0i kho\u1EA3n, thanh to\u00E1n hay ki\u1EC3m tra gi\u1EA3m gi\u00E1. H\u00E3y g\u1EEDi y\u00EAu c\u1EA7u h\u1ED7 tr\u1EE3, l\u1EC5 t\u00E2n s\u1EBD tr\u1EA3 l\u1EDDi b\u1EA1n trong m\u1EE5c My support requests."),
+                    List.of(new ConsultationSource("SUPPORT",0,t(vi,"Contact reception","Li\u00EAn h\u1EC7 l\u1EC5 t\u00E2n"),
+                        t(vi,"Opens the support request form. Nothing is sent until you submit it.","M\u1EDF form y\u00EAu c\u1EA7u h\u1ED7 tr\u1EE3. Ch\u01B0a c\u00F3 g\u00EC \u0111\u01B0\u1EE3c g\u1EEDi cho \u0111\u1EBFn khi b\u1EA1n b\u1EA5m g\u1EEDi."),"/member/support")));
+                case "SPORTS_CATALOG" -> sportsCatalog(vi,mode);
+                case "MY_PACKAGES" -> memberId==null?signIn(vi,mode):myPackages(vi,mode,memberId);
+                case "MY_BOOKINGS" -> memberId==null?signIn(vi,mode):myBookings(vi,mode,memberId);
+                case "MY_TRAINING" -> memberId==null?signIn(vi,mode):myTraining(vi,mode,memberId);
+                case "PACKAGES" -> packages(vi,mode,sport(raw,plain,aiSport));
+                default -> sessions(vi,mode,sport(raw,plain,aiSport),day);
+            };
+        }
         return compose(memberId,role,question,vi,intent,forRole(draft,staff),history,handoff);
     }
 
@@ -526,6 +540,8 @@ public class CenterConsultationService {
             || matchesWord(plain,BOOKING_PLAIN))return "BOOKING";
         if(contains(raw,"class","session","schedule","available","l\u1ECBch","bu\u1ED5i","l\u1EDBp","c\u00F2n ch\u1ED7","khung gi\u1EDD")
             || matchesWord(plain,SESSIONS_PLAIN))return "SESSIONS";
+        var kb = SportifyKnowledgeBase.findTopic(raw, plain);
+        if(kb.isPresent() && !"CLASS_MANAGEMENT".equals(kb.get().topicCode())) return "KB_" + kb.get().topicCode();
         return "UNKNOWN";
     }
 
