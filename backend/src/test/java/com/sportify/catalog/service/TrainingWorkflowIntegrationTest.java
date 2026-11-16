@@ -292,7 +292,10 @@ class TrainingWorkflowIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM support_request WHERE intake_created_by=?",reception)).isEqualTo(2);
         assertThatThrownBy(()->support.detail(reception,learning.ask(member,classId,"Private Coach question","How should I practise?"))).isInstanceOf(ResourceNotFoundException.class);
         jdbc.update("UPDATE user_account SET email=? WHERE id=?",code()+"@unified-demo.invalid",member);
-        assertThatThrownBy(()->support.create(reception,request,UUID.randomUUID())).isInstanceOf(BusinessRuleException.class);
+        UUID taggedMemberOperation=UUID.randomUUID();
+        long taggedMemberRequest=support.create(reception,request,taggedMemberOperation).id();
+        assertThat(support.create(reception,request,taggedMemberOperation).id()).isEqualTo(taggedMemberRequest);
+        assertThat(count("SELECT COUNT(*) FROM support_request WHERE intake_created_by=?",reception)).isEqualTo(3);
     }
     @Test void F6_memberSubmitsReceptionRepliesAndInternalNotesStayPrivate() throws Exception {
         UUID key=UUID.randomUUID();
@@ -682,7 +685,7 @@ class TrainingWorkflowIntegrationTest {
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
     }
 
-    @Test void RELEASE09_managerPeriodCountsUseHalfOpenBoundsAndDoNotDuplicateRescheduledBookings() throws Exception {
+    @Test void RELEASE09_managerPeriodCountsIncludeEveryMemberAndDoNotDuplicateRescheduledBookings() throws Exception {
         var from=LocalDate.of(2026,11,2); long manager=account("MANAGER");
         jdbc.update("UPDATE user_account SET created_at=? WHERE id=?",from.atStartOfDay(),member);
         jdbc.update("UPDATE user_account SET created_at=? WHERE id=?",from.plusDays(1).atStartOfDay(),peer);
@@ -694,21 +697,21 @@ class TrainingWorkflowIntegrationTest {
         jdbc.update("INSERT booking(booking_code,session_id,member_id,status,booked_at) VALUES (?,?,?,'CONFIRMED',?)",code(),session,synthetic,from.atTime(12,0));
         jdbc.update("UPDATE class_session SET booked_count=2 WHERE id=?",session);
         var report=operationsReports.report(from,from);
-        assertThat(report.registeredMembers()).isEqualTo(1); assertThat(report.currentlyEnabledMembersRegistered()).isEqualTo(1);
-        assertThat(report.classBookings().total()).isEqualTo(2); assertThat(report.classBookings().confirmed()).isEqualTo(1);
+        assertThat(report.registeredMembers()).isEqualTo(2); assertThat(report.currentlyEnabledMembersRegistered()).isEqualTo(2);
+        assertThat(report.classBookings().total()).isEqualTo(3); assertThat(report.classBookings().confirmed()).isEqualTo(2);
         assertThat(report.classBookings().cancelled()).isEqualTo(1);
         jdbc.update("UPDATE user_account SET status='INACTIVE' WHERE id=?",member);
-        assertThat(operationsReports.report(from,from).registeredMembers()).isEqualTo(1);
-        assertThat(operationsReports.report(from,from).currentlyEnabledMembersRegistered()).isZero();
+        assertThat(operationsReports.report(from,from).registeredMembers()).isEqualTo(2);
+        assertThat(operationsReports.report(from,from).currentlyEnabledMembersRegistered()).isEqualTo(1);
         jdbc.update("UPDATE user_account SET status='ACTIVE' WHERE id=?",member);
         String moved=com.sportify.support.SessionIdentityFixtures.reserve(jdbc,from.plusDays(2),sport);
         jdbc.update("UPDATE class_session SET session_date=?,session_code=? WHERE id=?",from.plusDays(2),moved,session);
-        assertThat(operationsReports.report(from,from).classBookings().total()).isEqualTo(2);
+        assertThat(operationsReports.report(from,from).classBookings().total()).isEqualTo(3);
         String path="/api/v1/manager/reports/operations?from="+from+"&to="+from;
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
                 .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(manager)))))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
-            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.classBookings.total").value(2));
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.classBookings.total").value(3));
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
                 .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(reception)))))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
@@ -752,7 +755,7 @@ class TrainingWorkflowIntegrationTest {
         assertThatThrownBy(()->reader.plan(peer,personal)).isInstanceOf(ResourceNotFoundException.class);
         String peerEmail=jdbc.queryForObject("SELECT email FROM user_account WHERE id=?",String.class,peer);
         jdbc.update("UPDATE user_account SET email=? WHERE id=?",code()+"@unified-demo.invalid",peer);
-        assertThat(reader.plans(peer)).isEmpty();
+        assertThat(reader.plans(peer)).extracting(p->p.id()).containsExactly(id);
         jdbc.update("UPDATE user_account SET email=? WHERE id=?",peerEmail,peer);
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/plans/"+id)
                 .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(peer)))))
@@ -1344,22 +1347,19 @@ class TrainingWorkflowIntegrationTest {
         assertThatThrownBy(()->writer.drillSuggestions(coach,id)).isInstanceOf(ResourceNotFoundException.class);
         drillRequest(coach,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
     }
-    @Test void F56_01_syntheticMemberBookingIsTheSamePrivacySafeNotFoundWithoutWrites() throws Exception {
+    @Test void F56_01_memberEmailMarkerDoesNotBlockAuthorizedTrainingReads() throws Exception {
         long id=badmintonDrillBooking();
-        String unknown=drillRequest(coach,Long.MAX_VALUE).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound())
-            .andReturn().getResponse().getContentAsString();
-        // Quarantine only this test's own Member in the isolated fixture database.
         jdbc.update("UPDATE user_account SET email=?,version=version+1 WHERE id=?",code().toLowerCase(java.util.Locale.ROOT)+"@unified-demo.invalid",member);
         var before=drillSideEffectSnapshot();
-        String synthetic=drillRequest(coach,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound())
-            .andReturn().getResponse().getContentAsString();
-        String memberName=jdbc.queryForObject("SELECT full_name FROM user_account WHERE id=?",String.class,member);
-        assertThat(synthetic).doesNotContain("SYNTHETIC","Synthetic",memberName,"Walking shadow footwork","\"memberId\"");
-        assertThat(synthetic.replaceAll("\"(timestamp|path|correlationId|traceId)\":\"[^\"]*\"","")).isEqualTo(unknown.replaceAll("\"(timestamp|path|correlationId|traceId)\":\"[^\"]*\"",""));
-        assertThatThrownBy(()->writer.drillSuggestions(coach,id)).isInstanceOf(ResourceNotFoundException.class);
+        drillRequest(coach,id)
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.bookingId").value(id))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.memberId").value(member))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.drafts.length()",org.hamcrest.Matchers.greaterThan(0)));
+        assertThat(writer.learnerProfile(coach,classId,member).memberId()).isEqualTo(member);
+        assertThatThrownBy(()->writer.learnerProfile(coach,classId,peer)).isInstanceOf(ResourceNotFoundException.class);
+        drillRequest(coach,Long.MAX_VALUE).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
         assertThat(drillSideEffectSnapshot()).isEqualTo(before);
-        // The shared policy keeps its own error on other operational reads.
-        assertThatThrownBy(()->writer.learnerProfile(coach,classId,member)).isInstanceOf(BusinessRuleException.class);
     }
     @Test void F56_01_unsupportedLevelOrUnsetGoalGivesAnHonestEmptyOrUngoaledResult() {
         long id=badmintonDrillBooking();

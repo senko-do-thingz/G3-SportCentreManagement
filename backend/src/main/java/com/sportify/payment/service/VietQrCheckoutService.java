@@ -1,6 +1,5 @@
 package com.sportify.payment.service;
 
-import com.sportify.catalog.service.OperationalMemberPolicy;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.UserAccount;
@@ -35,7 +34,6 @@ public class VietQrCheckoutService {
     private final VietQrApiClient api;
     private final VietQrGatewayProperties gateway;
     private final BankTransferProperties beneficiary;
-    private final OperationalMemberPolicy operational;
     private final VietQrTransactionSyncService transactionSync;
     private final EntityManager entityManager;
     private final Environment environment;
@@ -54,7 +52,6 @@ public class VietQrCheckoutService {
         Payment payment = paymentRepository.findByIdForUpdate(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + paymentId));
         requireEligiblePayment(payment);
-        operational.requireRealMember(payment.getMember().getId());
 
         if (!gateway.isEnabled()) {
             return new Checkout(paymentId, payment.getPaymentCode(), false, gateway.isSandbox(), false, null,
@@ -114,7 +111,6 @@ public class VietQrCheckoutService {
                     "This VietQR Sandbox demo payment is already complete. No real money moved.");
         }
         requireEligiblePayment(payment);
-        operational.requireRealMember(payment.getMember().getId());
         if (!gateway.isEnabled() || !gateway.isSandbox()) {
             throw new BusinessRuleException("VietQR sandbox callbacks are not enabled for this environment.", "VIETQR_SANDBOX_CALLBACK_DISABLED");
         }

@@ -32,7 +32,6 @@ public class TrainingWriteService {
     private final Clock clock;
     private final AuditService audit;
     private final jakarta.persistence.EntityManager entityManager;
-    private final OperationalMemberPolicy operationalMemberPolicy;
 
     private static final String PLAN_SELECT = """
         SELECT p.id, p.title, p.description, p.class_id, c.name class_name, p.member_id,
@@ -126,13 +125,6 @@ public class TrainingWriteService {
         // Same message for every miss so a Coach cannot probe other Coaches' bookings or account states.
         if(context.isEmpty())throw new ResourceNotFoundException("Assigned member booking not found");
         var current=context.getFirst();
-        try {
-            operationalMemberPolicy.requireRealMember(current.memberId());
-        } catch(BusinessRuleException synthetic) {
-            // This read-only preview reports a quarantined synthetic Member like any other denied booking,
-            // so the account state is not revealed. The shared policy keeps its own error for write paths.
-            throw new ResourceNotFoundException("Assigned member booking not found");
-        }
         var feedback=jdbc.query("""
             SELECT TOP(1) f.areas_for_improvement FROM coach_feedback f JOIN session_plan p ON p.id=f.plan_id
             WHERE f.coach_id=? AND f.member_id=? AND p.class_id=? ORDER BY f.created_at DESC,f.id DESC
@@ -173,15 +165,11 @@ public class TrainingWriteService {
         var members=new java.util.ArrayList<>(jdbc.query("""
             SELECT m.user_id,m.current_level,m.main_goal FROM member_profile m JOIN user_account u ON u.id=m.user_id
             JOIN role r ON r.id=u.role_id AND r.code='MEMBER'
-            WHERE u.status='ACTIVE' AND LOWER(u.email) NOT LIKE '%@unified-demo.invalid'
+            WHERE u.status='ACTIVE'
                 AND m.user_id IN (SELECT b.member_id FROM booking b JOIN class_session s ON s.id=b.session_id
                     WHERE s.class_id=? AND s.coach_id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED'
                         AND s.training_type='COACH_LED')
             """,(rs,row)->new ClassMember(rs.getLong("user_id"),rs.getString("current_level"),rs.getString("main_goal")),classId,coachId));
-        members.removeIf(member -> {
-            try { operationalMemberPolicy.requireRealMember(member.id()); return false; }
-            catch(BusinessRuleException synthetic) { return true; }
-        });
         List<DrillGenerator.MetricAverage> averages=List.of();
         if(members.size()>=3 && members.size()<=2000) {
             String placeholders=String.join(",",java.util.Collections.nCopies(members.size(),"?"));
