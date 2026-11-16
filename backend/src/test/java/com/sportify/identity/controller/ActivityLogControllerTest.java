@@ -88,6 +88,36 @@ class ActivityLogControllerTest {
         token("MANAGER",status,type); mvc.perform(get(URL).header(HttpHeaders.AUTHORIZATION,"Bearer fixture")).andExpect(status().isUnauthorized());
         verifyNoInteractions(logs);
     }
+    @Test void getDetailSuccess() throws Exception {
+        manager();
+        var entity = ActivityLog.builder()
+                .id(343L)
+                .action("LOGIN_FAILED")
+                .entityType("USER_ACCOUNT")
+                .summary("Login failed")
+                .details("{\"email\":\"bad@example.com\",\"status\":\"FAILED\",\"errorCode\":\"AUTH_INVALID_CREDENTIALS\",\"reason\":\"Invalid credentials provided\"}")
+                .createdAt(LocalDateTime.of(2026, 11, 16, 16, 27, 30))
+                .build();
+        when(logs.findById(343L)).thenReturn(java.util.Optional.of(entity));
+
+        mvc.perform(get(URL + "/343").header(HttpHeaders.AUTHORIZATION, "Bearer fixture"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(343))
+                .andExpect(jsonPath("$.action").value("LOGIN_FAILED"))
+                .andExpect(jsonPath("$.actionName").value("Login Failed"))
+                .andExpect(jsonPath("$.category").value("AUTHENTICATION"))
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.errorCode").value("AUTH_INVALID_CREDENTIALS"))
+                .andExpect(jsonPath("$.reason").value("Invalid credentials provided"))
+                .andExpect(jsonPath("$.timezone").value("Asia/Ho_Chi_Minh (UTC+7)"))
+                .andExpect(jsonPath("$.formattedCreatedAt").value("16/11/2026 16:27:30"));
+    }
+    @Test void getDetailNotFound() throws Exception {
+        manager();
+        when(logs.findById(999L)).thenReturn(java.util.Optional.empty());
+        mvc.perform(get(URL + "/999").header(HttpHeaders.AUTHORIZATION, "Bearer fixture"))
+                .andExpect(status().isNotFound());
+    }
     @Test void directServiceProtected() {
         var p=new CustomUserDetails(UserAccount.builder().role(Role.builder().code("MEMBER").build()).build());
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(p,null,p.getAuthorities()));

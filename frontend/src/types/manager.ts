@@ -116,3 +116,29 @@ export interface ActivityQuery {
   to?: string
   search?: string
 }
+
+export interface ActivityLogDetail {
+  id: number
+  createdAt: string | null
+  formattedCreatedAt: string | null
+  timezone: string | null
+  actorId: number | null
+  actorName: string
+  actorRole: string | null
+  actorType: string | null
+  action: string
+  actionName: string
+  category: string | null
+  entityType: string | null
+  entityId: number | null
+  entityCode: string | null
+  summary: string | null
+  status: string
+  reason: string | null
+  errorCode: string | null
+  errorMessage: string | null
+  inputs: Record<string, unknown>
+  outputs: Record<string, unknown>
+  metadata: Record<string, unknown>
+  ipAddress: string | null
+}

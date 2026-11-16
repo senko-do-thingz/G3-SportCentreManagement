@@ -154,6 +154,25 @@ class SporiChatTest {
     }
 
     @Test
+    void memberAndStaffCreationQuestionsReturnKnowledgeBaseGuidance() {
+        var managerMemberQuestion = service(null).chat(11L, "MANAGER", "how can I create a new member", List.of());
+        assertThat(managerMemberQuestion.status()).isEqualTo("ANSWERED");
+        assertThat(managerMemberQuestion.answer()).contains("Receptionist").contains("/reception/register");
+
+        var receptionistMemberQuestion = service(null).chat(12L, "RECEPTIONIST", "how can I create a new member", List.of());
+        assertThat(receptionistMemberQuestion.status()).isEqualTo("ANSWERED");
+        assertThat(receptionistMemberQuestion.answer()).contains("Register and renew");
+
+        var managerStaffQuestion = service(null).chat(11L, "MANAGER", "how can I create a new receptionist or coach", List.of());
+        assertThat(managerStaffQuestion.status()).isEqualTo("ANSWERED");
+        assertThat(managerStaffQuestion.answer()).contains("Add account").contains("/manager");
+
+        var coachStaffQuestion = service(null).chat(13L, "COACH", "how can I create a new receptionist or coach", List.of());
+        assertThat(coachStaffQuestion.status()).isEqualTo("ANSWERED");
+        assertThat(coachStaffQuestion.answer()).contains("Manager");
+    }
+
+    @Test
     void geminiCategoriesAreReadAndUnknownOnesFallBackToSportify() {
         var writer = new GeminiReplyWriter((uri, key, body, timeout) -> null, "http://localhost/", "gemini-test", "k",
                 Duration.ofSeconds(1), new ObjectMapper());

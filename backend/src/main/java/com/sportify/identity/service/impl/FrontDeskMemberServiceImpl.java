@@ -65,7 +65,14 @@ public class FrontDeskMemberServiceImpl implements FrontDeskMemberService {
                     .action(com.sportify.core.audit.AuditAction.USER_CREATED).entityType("USER_ACCOUNT")
                     .entityId(saved.getId()).entityCode(member.getMemberCode())
                     .summary("Member enrolled at reception")
-                    .details(java.util.Map.of("role", MEMBER_ROLE, "source", "FRONT_DESK")).build());
+                    .details(java.util.Map.of(
+                            "role", MEMBER_ROLE,
+                            "source", "FRONT_DESK",
+                            "status", "SUCCESS",
+                            "reason", "New member account enrolled at reception desk",
+                            "inputs", java.util.Map.of("role", MEMBER_ROLE, "source", "FRONT_DESK"),
+                            "outputs", java.util.Map.of("userId", saved.getId(), "memberCode", member.getMemberCode())
+                    )).build());
             // Both writes have been flushed; this accountability log runs before transaction commit.
             log.info("Staff {} created member id={} code={}", actingStaffUsername(), member.getId(), member.getMemberCode());
             return mapper.toCreated(member, temporaryPassword);

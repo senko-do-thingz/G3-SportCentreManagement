@@ -3,7 +3,7 @@ import { ApiError } from '../../api/errors'
 import { ACTIVITY_ACTIONS, managerActivityLogsApi } from '../../api/managerActivityLogsApi'
 import { Button, CalendarDateField, Card, Input, Modal, Select, Table, type TableColumn, StatIcon } from '../../components/ui'
 import { humanizeCode } from '../../utils/format'
-import type { ActivityLog, ManagerUser } from '../../types/manager'
+import type { ActivityLog, ActivityLogDetail, ManagerUser } from '../../types/manager'
 import { ActorPickerModal } from './ActorPickerModal'
 import { DetailList, ManagerError, PreviewNotice } from './ManagerShared'
 import { formatManagerDateTime } from './managerFormat'
@@ -24,6 +24,22 @@ export function ActivityLogPage() {
   const [page, setPage] = useState(0)
   const [picking, setPicking] = useState(false)
   const [selected, setSelected] = useState<ActivityLog | null>(null)
+  const [selectedDetail, setSelectedDetail] = useState<ActivityLogDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+
+  const handleSelectLog = useCallback((log: ActivityLog) => {
+    setSelected(log)
+    setSelectedDetail(null)
+    setDetailError(null)
+    setDetailLoading(true)
+    managerActivityLogsApi.getById(log.id)
+      .then((data) => setSelectedDetail(data))
+      .catch((err) => {
+        setDetailError(err instanceof Error ? err.message : 'Could not fetch activity details.')
+      })
+      .finally(() => setDetailLoading(false))
+  }, [])
   const [filtersOpen, setFiltersOpen] = useState(() => typeof window === 'undefined' || !window.matchMedia
     ? true
     : window.matchMedia('(min-width: 901px)').matches)
@@ -61,7 +77,7 @@ export function ActivityLogPage() {
     { key: 'createdAt', header: 'When', width: '19%', render: (log) => <div className="manager-activity__cell"><time dateTime={log.createdAt}>{formatManagerDateTime(log.createdAt)}</time></div> },
     { key: 'action', header: 'Activity', width: '27%', render: (log) => <div className="manager-activity__cell"><span className="manager-activity__primary">{humanizeCode(log.action)}</span><span className="manager-activity__secondary">{log.actorName || 'System / unavailable actor'}{log.actorRole ? ', ' + humanizeCode(log.actorRole) : ''}</span></div> },
     { key: 'entityId', header: 'Target', width: '33%', render: (log) => <div className="manager-activity__cell"><span className="manager-activity__primary">{log.entityType ? humanizeCode(log.entityType) : 'Record'}{log.entityId !== null ? ' #' + log.entityId : ''}</span><span className="manager-activity__secondary">{log.shortDetail || '-'}</span></div> },
-    { key: 'details', header: 'Details', width: '21%', render: (log) => <Button size="sm" variant="secondary" aria-label={'View details for ' + humanizeCode(log.action) + ' by ' + (log.actorName || 'system')} onClick={() => setSelected(log)}>View details</Button> },
+    { key: 'details', header: 'Details', width: '21%', render: (log) => <Button size="sm" variant="secondary" aria-label={'View details for ' + humanizeCode(log.action) + ' by ' + (log.actorName || 'system')} onClick={() => handleSelectLog(log)}>View details</Button> },
   ]
   return <div className="page manager-page manager-activity manager-concept-page">
     <div className="concept-header">
@@ -142,22 +158,107 @@ export function ActivityLogPage() {
       <p className="manager-activity__footnote">Activity records are read-only. Times use the center timezone (Asia/Ho_Chi_Minh). Only the safe fields returned by the activity service are shown.</p>
     </Card>
     {picking && <ActorPickerModal onClose={() => setPicking(false)} onSelect={(selectedActor) => { setActor(selectedActor); setPicking(false); setPage(0) }} />}
-    {selected && <Modal open title="Activity details" description="Read-only audit event details from verified safe fields." onClose={() => setSelected(null)} footer={<Button variant="secondary" onClick={() => setSelected(null)}>Close</Button>}>
+    {selected && <Modal open title="Activity details" description="Read-only audit event details from verified safe fields." onClose={() => { setSelected(null); setSelectedDetail(null); }} footer={<Button variant="secondary" onClick={() => { setSelected(null); setSelectedDetail(null); }}>Close</Button>}>
       <div className="manager-activity__detail">
-        <h3>Recorded event</h3>
-        <p className="manager-detail-text">{selected.shortDetail || humanizeCode(selected.action)}. This action was recorded in the Sportify audit trail.</p>
-        <DetailList items={[
-          { label: 'Audit event ID', value: selected.id },
-          { label: 'Recorded at', value: formatManagerDateTime(selected.createdAt) },
-          { label: 'Performed by', value: selected.actorName || 'System / unavailable actor' },
-          { label: 'Actor account ID', value: selected.actorId ?? 'System / unavailable' },
-          { label: 'Actor role', value: selected.actorRole ? humanizeCode(selected.actorRole) : 'Not recorded' },
-          { label: 'Action', value: humanizeCode(selected.action) },
-          { label: 'Audit action code', value: selected.action },
-          { label: 'Target record type', value: selected.entityType ? humanizeCode(selected.entityType) : 'Not recorded' },
-          { label: 'Target record ID', value: selected.entityId ?? 'Not recorded' },
-        ]} />
-        <p className="manager-activity__footnote">Sensitive audit payloads and unverified before/after values are intentionally excluded. These are all the verified details available for this event.</p>
+        <div className="manager-activity__detail-header">
+          <div className="manager-activity__badges">
+            <span className={`manager-activity__badge manager-activity__badge--${(selectedDetail?.status || (selected.action.endsWith('_FAILED') ? 'FAILED' : 'SUCCESS')).toLowerCase()}`}>
+              {selectedDetail?.status || (selected.action.endsWith('_FAILED') ? 'FAILED' : 'SUCCESS')}
+            </span>
+            {selectedDetail?.category && (
+              <span className="manager-activity__badge manager-activity__badge--category">
+                {selectedDetail.category}
+              </span>
+            )}
+          </div>
+          <h3 className="manager-activity__header-title">Recorded event</h3>
+        </div>
+
+        {(() => {
+          const isFailed = (selectedDetail?.status === 'FAILED') || (!selectedDetail && selected.action.endsWith('_FAILED'));
+          const reason = selectedDetail?.reason || (isFailed
+            ? 'The action failed or was rejected during execution.'
+            : (selected.shortDetail || humanizeCode(selected.action)) + '. This action was recorded in the Sportify audit trail.');
+          return (
+            <div className={`manager-activity__callout manager-activity__callout--${isFailed ? 'failed' : 'success'}`}>
+              <div className="manager-activity__callout-title">
+                <strong>{isFailed ? 'Execution Failure Reason' : 'Verified Event Explanation'}</strong>
+                {selectedDetail?.errorCode && <span className="manager-activity__code-chip">{selectedDetail.errorCode}</span>}
+              </div>
+              <p className="manager-activity__callout-text">{reason}</p>
+              {selectedDetail?.errorMessage && <p className="manager-activity__callout-subtext">{selectedDetail.errorMessage}</p>}
+            </div>
+          );
+        })()}
+
+        {detailLoading && <p className="manager-detail-text">Loading verified audit parameters...</p>}
+        {detailError && <p className="manager-detail-text" style={{ color: 'var(--color-danger)' }}>{detailError}</p>}
+
+        <div className="manager-activity__section">
+          <div className="manager-activity__section-title">Core Event Details</div>
+          <DetailList items={[
+            { label: 'Audit event ID', value: selected.id },
+            { label: 'Recorded at', value: selectedDetail?.formattedCreatedAt ? `${selectedDetail.formattedCreatedAt} (${selectedDetail.timezone || 'Asia/Ho_Chi_Minh'})` : formatManagerDateTime(selected.createdAt) },
+            { label: 'Performed by', value: selectedDetail?.actorName || selected.actorName || 'System / unavailable actor' },
+            { label: 'Actor account ID', value: (selectedDetail?.actorId ?? selected.actorId) ?? 'System / unavailable' },
+            { label: 'Actor role', value: humanizeCode(selectedDetail?.actorRole || selected.actorRole) || 'Not recorded' },
+            { label: 'Actor type', value: selectedDetail?.actorType || (selected.actorId ? 'USER' : 'SYSTEM') },
+            { label: 'Action', value: selectedDetail?.actionName || humanizeCode(selected.action) },
+            { label: 'Audit action code', value: selected.action },
+            { label: 'Target record type', value: humanizeCode(selectedDetail?.entityType || selected.entityType) || 'Not recorded' },
+            { label: 'Target record ID', value: (selectedDetail?.entityId ?? selected.entityId) ?? 'Not recorded' },
+            ...(selectedDetail?.entityCode ? [{ label: 'Target entity code', value: selectedDetail.entityCode }] : []),
+            ...(selectedDetail?.ipAddress ? [{ label: 'Origin IP address', value: selectedDetail.ipAddress }] : []),
+          ]} />
+        </div>
+
+        <div className="manager-activity__section">
+          <div className="manager-activity__section-title">Request Inputs (Sanitized)</div>
+          {selectedDetail?.inputs && Object.keys(selectedDetail.inputs).length > 0 ? (
+            <div className="manager-activity__param-grid">
+              {Object.entries(selectedDetail.inputs).map(([k, v]) => (
+                <div key={k} className="manager-activity__param-row">
+                  <div className="manager-activity__param-key">{k}</div>
+                  <div className="manager-activity__param-val">{typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v ?? '')}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="manager-detail-text">No input parameters recorded.</p>
+          )}
+        </div>
+
+        <div className="manager-activity__section">
+          <div className="manager-activity__section-title">Result Outputs</div>
+          {selectedDetail?.outputs && Object.keys(selectedDetail.outputs).length > 0 ? (
+            <div className="manager-activity__param-grid">
+              {Object.entries(selectedDetail.outputs).map(([k, v]) => (
+                <div key={k} className="manager-activity__param-row">
+                  <div className="manager-activity__param-key">{k}</div>
+                  <div className="manager-activity__param-val">{typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v ?? '')}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="manager-detail-text">No output results recorded.</p>
+          )}
+        </div>
+
+        {selectedDetail?.metadata && Object.keys(selectedDetail.metadata).length > 0 && (
+          <div className="manager-activity__section">
+            <div className="manager-activity__section-title">Technical Metadata</div>
+            <div className="manager-activity__param-grid">
+              {Object.entries(selectedDetail.metadata).map(([k, v]) => (
+                <div key={k} className="manager-activity__param-row">
+                  <div className="manager-activity__param-key">{k}</div>
+                  <div className="manager-activity__param-val">{typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v ?? '')}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <p className="manager-activity__footnote">Sensitive audit payloads and credentials (passwords, tokens, API keys) are intentionally excluded. These are verified safe audit details.</p>
       </div>
     </Modal>}
   </div>
