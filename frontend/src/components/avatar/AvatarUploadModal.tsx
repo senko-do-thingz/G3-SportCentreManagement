@@ -9,6 +9,7 @@ import {
   validateAvatarFile,
   readImageDimensions,
   validateAvatarDimensions,
+  SUPPORTED_AVATAR_TYPES,
 } from './avatarValidation'
 
 export interface AvatarUploadModalProps {
@@ -17,6 +18,25 @@ export interface AvatarUploadModalProps {
   currentAvatarUrl?: string | null
   fullName?: string
   onAvatarUpdated?: (newAvatarUrl: string | null) => void
+}
+
+function sanitizeAvatarSrc(src: string | null | undefined): string | null {
+  if (!src) return null
+  const trimmed = src.trim()
+  if (
+    trimmed.startsWith('blob:') ||
+    trimmed.startsWith('data:image/') ||
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('/images/') ||
+    trimmed.startsWith('/api/')
+  ) {
+    if (/[<>"']|javascript:/i.test(trimmed)) {
+      return null
+    }
+    return trimmed
+  }
+  return null
 }
 
 export function AvatarUploadModal({
@@ -69,7 +89,8 @@ export function AvatarUploadModal({
   }
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+    const input = event.currentTarget || event.target
+    const file = input?.files?.[0]
     if (!file) return
 
     setFileError(null)
@@ -94,11 +115,16 @@ export function AvatarUploadModal({
         return
       }
 
-      // 3. Create preview
+      // 3. Create preview from safe binary array buffer
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl)
       }
-      const objectUrl = URL.createObjectURL(file)
+      const buffer = await file.arrayBuffer()
+      const safeMimeType = SUPPORTED_AVATAR_TYPES.includes(file.type as (typeof SUPPORTED_AVATAR_TYPES)[number])
+        ? file.type
+        : 'image/jpeg'
+      const safeBlob = new Blob([buffer], { type: safeMimeType })
+      const objectUrl = URL.createObjectURL(safeBlob)
       setSelectedFile(file)
       setPreviewUrl(objectUrl)
     } catch (err) {
@@ -161,6 +187,7 @@ export function AvatarUploadModal({
   }
 
   const displaySrc = previewUrl || currentSrc
+  const safeDisplaySrc = sanitizeAvatarSrc(displaySrc)
   const userInitials = initials(fullName)
   const isBusy = uploading || removing
   const hasExistingAvatar = Boolean(currentAvatarUrl)
@@ -198,9 +225,9 @@ export function AvatarUploadModal({
               color: 'var(--color-primary)',
             }}
           >
-            {displaySrc ? (
+            {safeDisplaySrc ? (
               <img
-                src={displaySrc}
+                src={safeDisplaySrc}
                 alt="Avatar preview"
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
