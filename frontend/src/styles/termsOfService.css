@@ -1,0 +1,318 @@
+/*
+ * Giao dien trang Terms of Service (Dieu khoan dich vu).
+ * Thiet ke toi gian: nen trang, chu navy/blue theo bo nhan dien Sportify.
+ * Khong dung hieu ung nang hay hinh minh hoa thua.
+ */
+
+.tos-page {
+  min-height: 100vh;
+  background-color: var(--color-surface, #ffffff);
+  color: var(--color-text, #17324e);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Thanh dieu huong tren cung */
+.tos-header {
+  border-bottom: 1px solid var(--color-border, #dde6ef);
+  background-color: var(--color-surface, #ffffff);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.tos-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4, 16px) 0;
+  gap: var(--space-4, 16px);
+}
+
+.tos-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4, 16px);
+}
+
+.tos-header__back {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: var(--weight-semibold, 600);
+  color: var(--color-primary, #1f4fd8);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.tos-header__back:hover {
+  color: var(--color-primary-hover, #1a42b5);
+  text-decoration: underline;
+}
+
+/* Khu vuc noi dung chinh */
+.tos-main {
+  flex: 1;
+  max-width: 900px;
+  width: 100%;
+  margin-inline: auto;
+  padding-block: var(--space-8, 32px) var(--space-12, 48px);
+}
+
+.tos-kicker {
+  display: block;
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: var(--weight-bold, 700);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary, #1f4fd8);
+  margin-bottom: var(--space-2, 8px);
+}
+
+.tos-title {
+  font-family: var(--font-display, 'Be Vietnam Pro', sans-serif);
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--color-navy, #0b1736);
+  margin: 0 0 var(--space-3, 12px) 0;
+}
+
+.tos-meta {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--color-text-muted, #596e84);
+  margin-bottom: var(--space-6, 24px);
+}
+
+.tos-intro {
+  font-size: var(--text-base, 1rem);
+  line-height: 1.6;
+  color: var(--color-text, #17324e);
+  margin-bottom: var(--space-6, 24px);
+  padding-bottom: var(--space-6, 24px);
+  border-bottom: 1px solid var(--color-border, #dde6ef);
+}
+
+/* Thanh dieu khien dong mo tat ca accordion */
+.tos-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-4, 16px);
+}
+
+.tos-toggle-all-btn {
+  background: none;
+  border: 1px solid var(--color-border, #dde6ef);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-primary, #1f4fd8);
+  padding: 6px 14px;
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: var(--weight-semibold, 600);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.tos-toggle-all-btn:hover {
+  background-color: var(--color-primary-soft, #e9eefc);
+  border-color: var(--color-primary, #1f4fd8);
+}
+
+/* Danh sach Accordion 9 muc */
+.tos-accordion-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  margin-bottom: var(--space-10, 40px);
+}
+
+.tos-accordion-item {
+  border: 1px solid var(--color-border, #dde6ef);
+  border-radius: var(--radius-md, 6px);
+  background-color: var(--color-surface, #ffffff);
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tos-accordion-item--expanded {
+  border-color: var(--color-border-strong, #c5d3e1);
+  box-shadow: 0 1px 3px rgba(11, 23, 54, 0.05);
+}
+
+.tos-accordion-header {
+  margin: 0;
+}
+
+.tos-accordion-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4, 16px) var(--space-5, 20px);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  gap: var(--space-4, 16px);
+  color: var(--color-navy, #0b1736);
+  font-family: inherit;
+  font-size: var(--text-base, 1rem);
+  font-weight: var(--weight-bold, 700);
+  line-height: 1.4;
+}
+
+.tos-accordion-trigger:hover {
+  background-color: var(--color-surface-muted, #f7fafc);
+  color: var(--color-primary, #1f4fd8);
+}
+
+.tos-accordion-trigger:focus-visible {
+  outline: 2px solid var(--color-primary, #1f4fd8);
+  outline-offset: -2px;
+}
+
+.tos-accordion-icon {
+  font-size: 1.25rem;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--color-text-muted, #596e84);
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tos-accordion-panel {
+  padding: 0 var(--space-5, 20px) var(--space-5, 20px);
+  color: var(--color-text, #17324e);
+  font-size: var(--text-sm, 0.875rem);
+  line-height: 1.65;
+  border-top: 1px solid var(--color-border, #dde6ef);
+  margin-top: 0;
+  padding-top: var(--space-4, 16px);
+}
+
+.tos-accordion-panel p {
+  margin-top: 0;
+  margin-bottom: var(--space-3, 12px);
+}
+
+.tos-accordion-panel p:last-child {
+  margin-bottom: 0;
+}
+
+.tos-accordion-panel ul {
+  margin: 0 0 var(--space-3, 12px) var(--space-4, 16px);
+  padding: 0;
+}
+
+.tos-accordion-panel li {
+  margin-bottom: var(--space-2, 8px);
+}
+
+.tos-accordion-panel li:last-child {
+  margin-bottom: 0;
+}
+
+/* Phan lien he o cuoi trang */
+.tos-contact-section {
+  background-color: var(--color-surface-muted, #f7fafc);
+  border: 1px solid var(--color-border, #dde6ef);
+  border-radius: var(--radius-lg, 8px);
+  padding: var(--space-6, 24px) var(--space-6, 24px);
+  margin-top: var(--space-8, 32px);
+}
+
+.tos-contact-title {
+  font-family: var(--font-display, 'Be Vietnam Pro', sans-serif);
+  font-size: var(--text-xl, 1.25rem);
+  font-weight: 700;
+  color: var(--color-navy, #0b1736);
+  margin: 0 0 var(--space-2, 8px) 0;
+}
+
+.tos-contact-desc {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--color-text-muted, #596e84);
+  line-height: 1.5;
+  margin: 0 0 var(--space-5, 20px) 0;
+}
+
+.tos-contact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-4, 16px);
+}
+
+.tos-contact-card {
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #dde6ef);
+  border-radius: var(--radius-md, 6px);
+  padding: var(--space-4, 16px);
+}
+
+.tos-contact-card h3 {
+  font-size: var(--text-base, 1rem);
+  font-weight: var(--weight-bold, 700);
+  color: var(--color-navy, #0b1736);
+  margin: 0 0 var(--space-2, 8px) 0;
+}
+
+.tos-contact-card p {
+  font-size: var(--text-xs, 0.75rem);
+  line-height: 1.5;
+  color: var(--color-text, #17324e);
+  margin: 0 0 var(--space-1, 4px) 0;
+}
+
+.tos-contact-card p:last-child {
+  margin-bottom: 0;
+}
+
+.tos-contact-card a {
+  color: var(--color-primary, #1f4fd8);
+  text-decoration: none;
+  font-weight: var(--weight-semibold, 600);
+}
+
+.tos-contact-card a:hover {
+  text-decoration: underline;
+}
+
+/* Chan trang toi gian */
+.tos-footer {
+  border-top: 1px solid var(--color-border, #dde6ef);
+  background-color: var(--color-surface, #ffffff);
+  padding-block: var(--space-6, 24px);
+  margin-top: auto;
+}
+
+.tos-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4, 16px);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-text-muted, #596e84);
+}
+
+.tos-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4, 16px);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tos-footer__links a {
+  color: var(--color-primary, #1f4fd8);
+  text-decoration: none;
+}
+
+.tos-footer__links a:hover {
+  text-decoration: underline;
+}

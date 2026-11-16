@@ -7,6 +7,7 @@ import { homePathFor } from '../../auth/roles'
 import { useAuth } from '../../auth/useAuth'
 import { Button, Modal } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
+import { Footer } from '../../components/Footer'
 import { useResource } from '../../hooks/useResource'
 import { BROWSE_LEVELS } from '../member/scheduleFilters'
 import { isSingleVisit } from '../member/packagesModel'
@@ -377,15 +378,10 @@ export function HomePage() {
         </section>
       </main>
 
-      <footer className="home-footer">
-        <div className="home-wrap home-footer__grid">
-          <div><p className="home-footer__logo">Sportify</p><p>One center. Six sports. More ways to grow.</p></div>
-          <nav aria-label="Footer explore"><h2>Explore</h2><ul><li><a href="#finder">Find a class</a></li><li><a href="#sports">Sports</a></li><li><a href="#facilities">Facilities</a></li><li><a href="#coaches">Coaches</a></li><li><a href="#packages">Packages</a></li></ul></nav>
-          <nav aria-label="Footer sports"><h2>Sports</h2><ul>{HOME_SPORTS.map((sport) => <li key={sport.name}><a href="#sports">{sport.name}</a></li>)}</ul></nav>
-          <div className="home-footer__help"><h2>Need help?</h2><Button onClick={() => setNotice(HOME_NOTICES.reception)}>Contact reception</Button><Button variant="secondary" onClick={() => setNotice(HOME_NOTICES.assistant)}>AI Assistant</Button></div>
-        </div>
-        <div className="home-wrap home-footer__bottom"><small>Copyright 2026 Sportify Sports Center</small><Link to="/credits">Photo credits</Link></div>
-      </footer>
+      <Footer
+        onContactReception={() => setNotice(HOME_NOTICES.reception)}
+        onOpenAssistant={() => setNotice(HOME_NOTICES.assistant)}
+      />
 
       <BackToTop />
 
