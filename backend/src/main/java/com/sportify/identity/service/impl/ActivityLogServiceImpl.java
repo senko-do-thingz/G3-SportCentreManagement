@@ -1,40 +1,31 @@
 package com.sportify.identity.service.impl;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sportify.catalog.dto.PageResponse;
-import com.sportify.core.exception.ResourceNotFoundException;
-import com.sportify.identity.dto.ActivityLogDetailResponse;
 import com.sportify.identity.dto.ActivityLogQuery;
 import com.sportify.identity.dto.ActivityLogResponse;
-import com.sportify.identity.entity.ActivityLog;
 import com.sportify.identity.repository.ActivityLogRepository;
 import com.sportify.identity.service.ActivityLogService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-
-@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @PreAuthorize("hasRole('MANAGER')")
 public class ActivityLogServiceImpl implements ActivityLogService {
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ActivityLogServiceImpl.class);
+    private static final java.time.format.DateTimeFormatter FORMATTER = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
     private static final String TIMEZONE = "Asia/Ho_Chi_Minh (UTC+7)";
 
-    private static final Set<String> SENSITIVE_KEYS = Set.of(
+    private static final java.util.Set<String> SENSITIVE_KEYS = java.util.Set.of(
             "password", "passwordhash", "secret", "token", "apikey", "authorization",
             "refreshtoken", "accesstoken", "temporarypassword"
     );
 
     private final ActivityLogRepository logs;
-    private final ObjectMapper objectMapper;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @Override
     public PageResponse<ActivityLogResponse> list(Long actorId, String action, String from, String to,
@@ -44,9 +35,9 @@ public class ActivityLogServiceImpl implements ActivityLogService {
     }
 
     @Override
-    public ActivityLogDetailResponse getDetail(Long id) {
-        ActivityLog logEntity = logs.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Activity log not found with id: " + id));
+    public com.sportify.identity.dto.ActivityLogDetailResponse getDetail(Long id) {
+        com.sportify.identity.entity.ActivityLog logEntity = logs.findById(id)
+                .orElseThrow(() -> new com.sportify.core.exception.ResourceNotFoundException("Activity log not found with id: " + id));
 
         Long actorId = logEntity.getActor() != null ? logEntity.getActor().getId() : null;
         String actorName = logEntity.getActor() != null && logEntity.getActor().getFullName() != null && !logEntity.getActor().getFullName().isBlank()
@@ -65,19 +56,19 @@ public class ActivityLogServiceImpl implements ActivityLogService {
         String actionName = humanizeAction(action);
         String category = categorizeAction(action);
 
-        Map<String, Object> rawDetails = parseDetails(logEntity.getDetails());
-        Map<String, Object> sanitized = sanitizeMap(rawDetails);
+        java.util.Map<String, Object> rawDetails = parseDetails(logEntity.getDetails());
+        java.util.Map<String, Object> sanitized = sanitizeMap(rawDetails);
 
         String status = extractStatus(action, sanitized);
         String reason = extractReason(action, status, logEntity.getSummary(), sanitized);
         String errorCode = extractErrorCode(action, status, sanitized);
         String errorMessage = extractErrorMessage(sanitized);
 
-        Map<String, Object> inputs = extractInputs(sanitized);
-        Map<String, Object> outputs = extractOutputs(sanitized);
-        Map<String, Object> metadata = extractMetadata(sanitized, inputs, outputs);
+        java.util.Map<String, Object> inputs = extractInputs(sanitized);
+        java.util.Map<String, Object> outputs = extractOutputs(sanitized);
+        java.util.Map<String, Object> metadata = extractMetadata(sanitized, inputs, outputs);
 
-        return new ActivityLogDetailResponse(
+        return new com.sportify.identity.dto.ActivityLogDetailResponse(
                 logEntity.getId(),
                 logEntity.getCreatedAt(),
                 formattedCreatedAt,
@@ -104,34 +95,34 @@ public class ActivityLogServiceImpl implements ActivityLogService {
         );
     }
 
-    private Map<String, Object> parseDetails(String detailsJson) {
+    private java.util.Map<String, Object> parseDetails(String detailsJson) {
         if (detailsJson == null || detailsJson.isBlank()) {
-            return Collections.emptyMap();
+            return java.util.Collections.emptyMap();
         }
         try {
-            return objectMapper.readValue(detailsJson, new TypeReference<Map<String, Object>>() {});
+            return objectMapper.readValue(detailsJson, new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Object>>() {});
         } catch (Exception e) {
             log.debug("Could not parse activity log details JSON: {}", e.getMessage());
-            return Collections.emptyMap();
+            return java.util.Collections.emptyMap();
         }
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> sanitizeMap(Map<String, Object> source) {
+    private java.util.Map<String, Object> sanitizeMap(java.util.Map<String, Object> source) {
         if (source == null || source.isEmpty()) {
-            return Collections.emptyMap();
+            return java.util.Collections.emptyMap();
         }
-        Map<String, Object> result = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : source.entrySet()) {
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        for (java.util.Map.Entry<String, Object> entry : source.entrySet()) {
             String key = entry.getKey();
             if (key == null) continue;
-            String normalizedKey = key.toLowerCase(Locale.ROOT).replaceAll("[_-]", "");
+            String normalizedKey = key.toLowerCase(java.util.Locale.ROOT).replaceAll("[_-]", "");
             if (SENSITIVE_KEYS.contains(normalizedKey)) {
                 continue;
             }
             Object val = entry.getValue();
-            if (val instanceof Map) {
-                result.put(key, sanitizeMap((Map<String, Object>) val));
+            if (val instanceof java.util.Map) {
+                result.put(key, sanitizeMap((java.util.Map<String, Object>) val));
             } else {
                 result.put(key, val);
             }
@@ -148,15 +139,15 @@ public class ActivityLogServiceImpl implements ActivityLogService {
         for (String part : parts) {
             if (part.isEmpty()) continue;
             if (sb.length() > 0) sb.append(" ");
-            sb.append(part.substring(0, 1).toUpperCase(Locale.ROOT))
-              .append(part.substring(1).toLowerCase(Locale.ROOT));
+            sb.append(part.substring(0, 1).toUpperCase(java.util.Locale.ROOT))
+              .append(part.substring(1).toLowerCase(java.util.Locale.ROOT));
         }
         return sb.toString();
     }
 
     private String categorizeAction(String action) {
         if (action == null) return "SYSTEM_OPERATION";
-        String upper = action.toUpperCase(Locale.ROOT);
+        String upper = action.toUpperCase(java.util.Locale.ROOT);
         if (upper.contains("LOGIN") || upper.contains("LOGOUT") || upper.contains("PASSWORD") || upper.contains("AUTH")) {
             return "AUTHENTICATION";
         }
@@ -184,9 +175,9 @@ public class ActivityLogServiceImpl implements ActivityLogService {
         return "SYSTEM_OPERATION";
     }
 
-    private String extractStatus(String action, Map<String, Object> sanitized) {
+    private String extractStatus(String action, java.util.Map<String, Object> sanitized) {
         if (sanitized.containsKey("status") && sanitized.get("status") != null) {
-            return String.valueOf(sanitized.get("status")).trim().toUpperCase(Locale.ROOT);
+            return String.valueOf(sanitized.get("status")).trim().toUpperCase(java.util.Locale.ROOT);
         }
         if (action.endsWith("_FAILED") || action.contains("FAIL") || action.contains("REJECT")) {
             return "FAILED";
@@ -194,7 +185,7 @@ public class ActivityLogServiceImpl implements ActivityLogService {
         return "SUCCESS";
     }
 
-    private String extractReason(String action, String status, String summary, Map<String, Object> sanitized) {
+    private String extractReason(String action, String status, String summary, java.util.Map<String, Object> sanitized) {
         if (sanitized.containsKey("reason") && sanitized.get("reason") != null) {
             return String.valueOf(sanitized.get("reason")).trim();
         }
@@ -216,18 +207,18 @@ public class ActivityLogServiceImpl implements ActivityLogService {
             return summary + ".";
         }
 
-        return switch (action.toUpperCase(Locale.ROOT)) {
+        return switch (action.toUpperCase(java.util.Locale.ROOT)) {
             case "LOGIN" -> "User successfully authenticated and established an active session.";
             case "LOGOUT" -> "User session was terminated normally.";
             case "USER_CREATED" -> "A new user account was successfully created and provisioned in the system.";
             case "USER_STATUS_CHANGED" -> "User account operational status was modified.";
             case "PASSWORD_CHANGED" -> "Account security credentials were successfully updated.";
             case "PASSWORD_RESET_COMPLETED" -> "User account password was reset by an authorized administrator.";
-            default -> "Action " + humanizeAction(action).toLowerCase(Locale.ROOT) + " executed successfully.";
+            default -> "Action " + humanizeAction(action).toLowerCase(java.util.Locale.ROOT) + " executed successfully.";
         };
     }
 
-    private String extractErrorCode(String action, String status, Map<String, Object> sanitized) {
+    private String extractErrorCode(String action, String status, java.util.Map<String, Object> sanitized) {
         if (sanitized.containsKey("errorCode") && sanitized.get("errorCode") != null) {
             return String.valueOf(sanitized.get("errorCode")).trim();
         }
@@ -240,7 +231,7 @@ public class ActivityLogServiceImpl implements ActivityLogService {
         return null;
     }
 
-    private String extractErrorMessage(Map<String, Object> sanitized) {
+    private String extractErrorMessage(java.util.Map<String, Object> sanitized) {
         if (sanitized.containsKey("errorMessage") && sanitized.get("errorMessage") != null) {
             return String.valueOf(sanitized.get("errorMessage")).trim();
         }
@@ -251,17 +242,17 @@ public class ActivityLogServiceImpl implements ActivityLogService {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> extractInputs(Map<String, Object> sanitized) {
-        if (sanitized.containsKey("inputs") && sanitized.get("inputs") instanceof Map) {
-            return (Map<String, Object>) sanitized.get("inputs");
+    private java.util.Map<String, Object> extractInputs(java.util.Map<String, Object> sanitized) {
+        if (sanitized.containsKey("inputs") && sanitized.get("inputs") instanceof java.util.Map) {
+            return (java.util.Map<String, Object>) sanitized.get("inputs");
         }
-        Set<String> inputKeys = Set.of(
+        java.util.Set<String> inputKeys = java.util.Set.of(
                 "email", "role", "sportids", "from", "to", "targetstatus", "phone", "fullname",
                 "name", "source", "filters", "searchquery", "amount", "date", "slotid", "classid"
         );
-        Map<String, Object> inputs = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> e : sanitized.entrySet()) {
-            String norm = e.getKey().toLowerCase(Locale.ROOT).replaceAll("[_-]", "");
+        java.util.Map<String, Object> inputs = new java.util.LinkedHashMap<>();
+        for (java.util.Map.Entry<String, Object> e : sanitized.entrySet()) {
+            String norm = e.getKey().toLowerCase(java.util.Locale.ROOT).replaceAll("[_-]", "");
             if (inputKeys.contains(norm)) {
                 inputs.put(e.getKey(), e.getValue());
             }
@@ -270,17 +261,17 @@ public class ActivityLogServiceImpl implements ActivityLogService {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> extractOutputs(Map<String, Object> sanitized) {
-        if (sanitized.containsKey("outputs") && sanitized.get("outputs") instanceof Map) {
-            return (Map<String, Object>) sanitized.get("outputs");
+    private java.util.Map<String, Object> extractOutputs(java.util.Map<String, Object> sanitized) {
+        if (sanitized.containsKey("outputs") && sanitized.get("outputs") instanceof java.util.Map) {
+            return (java.util.Map<String, Object>) sanitized.get("outputs");
         }
-        Set<String> outputKeys = Set.of(
+        java.util.Set<String> outputKeys = java.util.Set.of(
                 "userid", "membercode", "orderid", "paymentid", "status", "newstatus",
                 "previousstatus", "affectedrows", "passwordreset", "createdid"
         );
-        Map<String, Object> outputs = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> e : sanitized.entrySet()) {
-            String norm = e.getKey().toLowerCase(Locale.ROOT).replaceAll("[_-]", "");
+        java.util.Map<String, Object> outputs = new java.util.LinkedHashMap<>();
+        for (java.util.Map.Entry<String, Object> e : sanitized.entrySet()) {
+            String norm = e.getKey().toLowerCase(java.util.Locale.ROOT).replaceAll("[_-]", "");
             if (outputKeys.contains(norm) && !norm.equals("status")) {
                 outputs.put(e.getKey(), e.getValue());
             }
@@ -288,20 +279,20 @@ public class ActivityLogServiceImpl implements ActivityLogService {
         return outputs;
     }
 
-    private Map<String, Object> extractMetadata(Map<String, Object> sanitized, Map<String, Object> inputs, Map<String, Object> outputs) {
-        if (sanitized.containsKey("metadata") && sanitized.get("metadata") instanceof Map) {
+    private java.util.Map<String, Object> extractMetadata(java.util.Map<String, Object> sanitized, java.util.Map<String, Object> inputs, java.util.Map<String, Object> outputs) {
+        if (sanitized.containsKey("metadata") && sanitized.get("metadata") instanceof java.util.Map) {
             @SuppressWarnings("unchecked")
-            Map<String, Object> explicit = (Map<String, Object>) sanitized.get("metadata");
+            java.util.Map<String, Object> explicit = (java.util.Map<String, Object>) sanitized.get("metadata");
             return explicit;
         }
-        Set<String> knownTopLevel = Set.of(
+        java.util.Set<String> knownTopLevel = java.util.Set.of(
                 "inputs", "outputs", "metadata", "status", "reason", "message",
                 "errorcode", "error_code", "errormessage", "error_message"
         );
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> e : sanitized.entrySet()) {
+        java.util.Map<String, Object> metadata = new java.util.LinkedHashMap<>();
+        for (java.util.Map.Entry<String, Object> e : sanitized.entrySet()) {
             String key = e.getKey();
-            String norm = key.toLowerCase(Locale.ROOT).replaceAll("[_-]", "");
+            String norm = key.toLowerCase(java.util.Locale.ROOT).replaceAll("[_-]", "");
             if (!knownTopLevel.contains(norm) && !inputs.containsKey(key) && !outputs.containsKey(key)) {
                 metadata.put(key, e.getValue());
             }
