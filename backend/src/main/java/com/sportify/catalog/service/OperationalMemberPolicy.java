@@ -6,7 +6,8 @@ import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-/** Synthetic identities and settlement provenance never grant live operational access. */
+/** Protects external payment and member-specific AI drill flows from local-demo payment identities.
+ * Ordinary class bookings, attendance, and training records remain available to every active member. */
 @Service
 @RequiredArgsConstructor
 public class OperationalMemberPolicy {
@@ -33,7 +34,7 @@ public class OperationalMemberPolicy {
                 THEN 1 ELSE 0 END
                 """, Integer.class, memberId, memberId, memberId);
         if (configured || Integer.valueOf(1).equals(synthetic)) {
-            throw new BusinessRuleException("Synthetic members cannot use operational classes or training records",
+            throw new BusinessRuleException("This account cannot use external payment processing because it has local payment-demo history",
                     "SYNTHETIC_OPERATION_DENIED");
         }
     }
