@@ -1,7 +1,7 @@
 import { api } from './client'
 import { normalizePage } from './page'
 import type { PageResponse } from './types'
-import type { ActivityLog, ActivityQuery } from '../types/manager'
+import type { ActivityLog, ActivityLogDetail, ActivityQuery } from '../types/manager'
 
 export const ACTIVITY_ACTIONS = [
   'REGISTER',
@@ -49,5 +49,8 @@ export const ACTIVITY_ACTIONS = [
 export const managerActivityLogsApi = {
   async list(query: ActivityQuery, signal?: AbortSignal): Promise<PageResponse<ActivityLog>> {
     return normalizePage(await api.get<PageResponse<ActivityLog>>('/manager/activity-logs', { query: { ...query }, signal }))
+  },
+  async getById(id: number, signal?: AbortSignal): Promise<ActivityLogDetail> {
+    return api.get<ActivityLogDetail>(`/manager/activity-logs/${id}`, { signal })
   },
 }

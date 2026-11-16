@@ -29,4 +29,9 @@ public class ActivityLogController {
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(activityLogService.list(actorId, action, from, to, search, page, size));
     }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<com.sportify.identity.dto.ActivityLogDetailResponse> getDetail(@org.springframework.web.bind.annotation.PathVariable Long id) {
+        return ResponseEntity.ok(activityLogService.getDetail(id));
+    }
 }

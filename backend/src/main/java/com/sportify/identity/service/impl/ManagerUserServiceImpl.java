@@ -122,9 +122,15 @@ public class ManagerUserServiceImpl implements ManagerUserService {
             createCoachRows(saved, sportIds);
         }
 
-        Map<String, Object> details = isCoach
-                ? Map.of("role", roleCode, "sportIds", sportIds)
-                : Map.of("role", roleCode);
+        Map<String, Object> details = new java.util.LinkedHashMap<>();
+        details.put("role", roleCode);
+        if (isCoach) {
+            details.put("sportIds", sportIds);
+        }
+        details.put("status", "SUCCESS");
+        details.put("reason", "Manager provisioned a new staff account with role " + roleCode);
+        details.put("inputs", Map.of("fullName", request.fullName().trim(), "email", email, "phone", phone, "role", roleCode));
+        details.put("outputs", Map.of("userId", saved.getId(), "role", roleCode, "status", saved.getStatus()));
         auditService.record(AuditEvent.builder()
                 .actor(actor)
                 .action(AuditAction.USER_CREATED)
@@ -156,13 +162,20 @@ public class ManagerUserServiceImpl implements ManagerUserService {
         user.setStatus(status.name());
         UserAccount saved = userRepository.save(user);
 
+        Map<String, Object> details = new java.util.LinkedHashMap<>();
+        details.put("from", String.valueOf(previous));
+        details.put("to", status.name());
+        details.put("status", "SUCCESS");
+        details.put("reason", "Account status was changed from " + previous + " to " + status.name());
+        details.put("inputs", Map.of("userId", userId, "targetStatus", status.name()));
+        details.put("outputs", Map.of("userId", saved.getId(), "previousStatus", String.valueOf(previous), "newStatus", status.name()));
         auditService.record(AuditEvent.builder()
                 .actor(actor)
                 .action(AuditAction.USER_STATUS_CHANGED)
                 .entityType(ENTITY_TYPE)
                 .entityId(saved.getId())
                 .summary("User status changed from " + previous + " to " + status.name())
-                .details(Map.of("from", String.valueOf(previous), "to", status.name()))
+                .details(details)
                 .build());
 
         return userMapper.toResponse(saved);
@@ -178,12 +191,18 @@ public class ManagerUserServiceImpl implements ManagerUserService {
         }
         user.setPasswordHash(passwordEncoder.encode(MEMBER_RESET_PASSWORD));
         userRepository.save(user);
+        Map<String, Object> details = new java.util.LinkedHashMap<>();
+        details.put("status", "SUCCESS");
+        details.put("reason", "Manager successfully reset member account password to system default");
+        details.put("inputs", Map.of("userId", userId, "email", user.getEmail()));
+        details.put("outputs", Map.of("userId", user.getId(), "passwordReset", true));
         auditService.record(AuditEvent.builder()
                 .actor(actor)
                 .action(AuditAction.PASSWORD_RESET_COMPLETED)
                 .entityType(ENTITY_TYPE)
                 .entityId(user.getId())
                 .summary("Manager reset Member password")
+                .details(details)
                 .build());
     }
 

@@ -1614,12 +1614,11 @@
 }
 
 .spori-sources small {
-  display: -webkit-box;
-  overflow: hidden;
+  display: block;
   color: var(--color-text-muted);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  word-break: break-word;
 }
 
 .spori-sources-fold {
