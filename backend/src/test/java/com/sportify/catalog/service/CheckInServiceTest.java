@@ -94,17 +94,50 @@ public class CheckInServiceTest {
     }
 
     @Test
-    void disabledMemberCannotUseManualArrivalFallback() {
-        memberProfile.getUserAccount().setStatus("INACTIVE");
-        var request=stubAllowedArrivalForAccountGuard();
-        assertThrows(com.sportify.core.exception.BusinessRuleException.class,()->checkInService.recordCheckIn(request,receptionist));
+    void qrScan_activeMember_checksInSuccessfully() {
+        var request = new CheckInRequest();
+        // Gia tri may quet gui len chinh la noi dung QR co dinh (member code), co the kem xuong dong.
+        request.setIdentifier(MemberCheckInQrService.qrContent("MEM-123") + "\n");
+        stubAllowedArrivalForAccountGuard();
+
+        CheckInResponse res = checkInService.recordCheckIn(request, receptionist);
+
+        assertEquals("ALLOWED", res.getResult());
+        assertEquals("MEM-123", res.getMemberCode());
+        assertEquals(30L, res.getBookingId());
+        verify(checkInRepository).save(any(CheckIn.class));
+    }
+
+    @Test
+    void qrScan_inactiveMember_isRejectedWithoutCheckInRecord() {
+        for (String status : List.of("INACTIVE", "LOCKED", "DISABLED")) {
+            memberProfile.getUserAccount().setStatus(status);
+            var request = stubAllowedArrivalForAccountGuard();
+            var error = assertThrows(com.sportify.core.exception.BusinessRuleException.class,
+                    () -> checkInService.recordCheckIn(request, receptionist));
+            assertEquals("Account is inactive, check-in denied", error.getMessage());
+        }
+        verify(checkInRepository, org.mockito.Mockito.never()).save(any());
+        verify(auditService, org.mockito.Mockito.never()).record(any());
+    }
+
+    @Test
+    void qrScan_unknownMemberCode_isRejectedWithMemberNotFound() {
+        var request = new CheckInRequest(); request.setIdentifier("MEM-UNKNOWN");
+        when(memberProfileRepository.findByMemberCode("MEM-UNKNOWN")).thenReturn(Optional.empty());
+
+        var error = assertThrows(ResourceNotFoundException.class, () -> checkInService.recordCheckIn(request, receptionist));
+
+        assertEquals("Member not found", error.getMessage());
+        verify(checkInRepository, org.mockito.Mockito.never()).save(any());
     }
 
     @Test
     void alternateRoleCannotUseRetainedMemberProfileForArrival() {
         memberProfile.getUserAccount().setRole(Role.builder().code("COACH").build());
         var request=stubAllowedArrivalForAccountGuard();
-        assertThrows(com.sportify.core.exception.BusinessRuleException.class,()->checkInService.recordCheckIn(request,receptionist));
+        assertThrows(ResourceNotFoundException.class,()->checkInService.recordCheckIn(request,receptionist));
+        verify(checkInRepository, org.mockito.Mockito.never()).save(any());
     }
 
     private CheckInRequest stubAllowedArrivalForAccountGuard() {

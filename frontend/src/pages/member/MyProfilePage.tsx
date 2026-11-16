@@ -95,7 +95,7 @@ export function MyProfilePage() {
         description="Update your personal details, training preferences and password."
         actions={profile.status === 'ready' && roleOf(profile.data) === 'MEMBER' ? <>
           <Link className={buttonClassName('secondary')} to="/member/profile/health">Health &amp; Training</Link>
-          <Link className={buttonClassName('secondary')} to="/member/check-in-pass">Open check-in pass</Link>
+          <Link className={buttonClassName('secondary')} to="/member/check-in-qr">My check-in QR</Link>
         </> : undefined}
       />
       <MemberCommerceHero

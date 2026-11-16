@@ -353,7 +353,7 @@ export function itemHref(area: RoleArea, item: NavItem): string {
 const SUB_PAGE_TITLES: Record<string, string> = {
   notifications: 'Inbox',
   inbox: 'Action inbox',
-  'check-in-pass': 'Check-in pass',
+  'check-in-qr': 'Check-in QR',
   assistant: 'Center assistant',
   'sessions/': 'Session detail',
   'classes/new': 'Create class',

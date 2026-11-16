@@ -6,7 +6,6 @@ import { Badge, Button, Card, Input, PageHeader, Table, type TableColumn } from 
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { useResource } from '../../hooks/useResource'
 import { formatTime } from '../../utils/format'
-import { CheckInPassReader } from './CheckInPassReader'
 import {
   CHECK_IN_IDENTIFIER_MAX,
   checkInVerdict,
@@ -19,7 +18,7 @@ import { ReceptionScreen, ReceptionStat, ReceptionStats } from './ReceptionConce
 
 /**
  * Check-in (Figma F1-15 with the Recorded and Rejected states): the desk types a member code or scans
- * the member card, POST /check-ins records the arrival and the backend decides ALLOWED or DENIED with
+ * the member's fixed check-in QR (its content is the member code), POST /check-ins records the arrival and the backend decides ALLOWED or DENIED with
  * the reason. An unknown code (404) is shown as Rejected with "Member not found". GET /check-ins?date=
  * lists persisted check-ins for the centre calendar day. Failed loads show an error with Retry.
  */
@@ -131,18 +130,14 @@ export function CheckInPage() {
             value={todayList.data.filter((row) => checkInVerdict(row) !== 'recorded').length} />
         </ReceptionStats>
       )}
-      <CheckInPassReader onRecorded={(record) => {
-        setLast({ record, identifier: record.memberCode ?? String(record.memberId ?? '') })
-        reloadToday()
-      }} />
       <div className="reception-checkin">
         <Card title="Record arrival">
           <form className="reception-form" onSubmit={submit} noValidate aria-label="Check-in">
             <div className="reception-form__grid">
               <Input
                 id={IDENTIFIER_ID}
-                label="Member code or card scan"
-                hint="Scan the member card, or type the member code (for example MEM-0016)."
+                label="Member code or QR scan"
+                hint="Scan the member check-in QR, or type the member code (for example MEM-0016)."
                 placeholder="e.g. MEM-0016"
                 required
                 autoFocus

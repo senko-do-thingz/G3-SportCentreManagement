@@ -34,7 +34,7 @@ All routes and endpoints are relative to the frontend root and `/api/v1`, respec
 | R02 | Reception registers a new member | /reception/register | POST /members | receptionScreens.test.tsx; onboarding SQL |
 | R03 | Reception registers/renews packages and cards | /reception/register | SportPackageController, MembershipCardController | Reception desk-sale tests; tier/onboarding SQL |
 | R04 | Reception checks package status and validity | /reception member overview | FrontDeskMemberOverviewController | receptionScreens.test.tsx; canonical validity regression |
-| R05 | Reception records arrival | /reception/check-in | CheckInController, MemberCheckInPassController | RELEASE11 SQL; existing check-in tests |
+| R05 | Reception records arrival | /reception/check-in | CheckInController, MemberCheckInQrController | RELEASE11 SQL; existing check-in tests |
 | R06 | Reception books or assists cancellation | /reception/bookings | BookingController | receptionBookingScreens.test.tsx; booking SQL |
 | R07 | Reception records payment and exports receipt | /reception/payments | PaymentVerificationController, InvoiceController | receptionPayments.test.tsx; finance/payment SQL |
 | R08 | Reception receives and records support requests | /reception/support | /reception/support-requests list/detail/create/status; ReceptionSupportController | RELEASE14/16 SQL; supportRequests.test.tsx; R11-01 |

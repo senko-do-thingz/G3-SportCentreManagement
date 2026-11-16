@@ -878,7 +878,7 @@
     {
       "id": "S10",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/CheckInServiceImpl.java",
-      "line": 54,
+      "line": 56,
       "definition": "public CheckInResponse recordCheckIn"
     },
     {

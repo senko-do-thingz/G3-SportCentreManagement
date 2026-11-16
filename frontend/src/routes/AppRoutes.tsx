@@ -16,7 +16,7 @@ import { ReceptionInboxPage } from '../pages/reception/ReceptionInboxPage'
 import { NotificationsPage } from '../pages/NotificationsPage'
 import { MyProfilePage } from '../pages/member/MyProfilePage'
 import { HealthAssessmentPage } from '../pages/member/HealthAssessmentPage'
-import { CheckInPassPage } from '../pages/member/CheckInPassPage'
+import { CheckInQrPage } from '../pages/member/CheckInQrPage'
 import { PackageDetailPage } from '../pages/member/PackageDetailPage'
 import { PaymentStatusPage } from '../pages/member/PaymentStatusPage'
 import { PaymentSummaryPage } from '../pages/member/PaymentSummaryPage'
@@ -151,7 +151,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
   '/member': [
     { path: 'notifications', element: <NotificationsPage /> },
     { path: 'training/plans', element: <TrainingPlansPage /> },
-    { path: 'check-in-pass', element: <CheckInPassPage /> },
+    { path: 'check-in-qr', element: <CheckInQrPage /> },
     { path: 'profile/health', element: <HealthAssessmentPage /> },
     { path: 'training/classes', element: <MemberClassesPage /> },
     { path: 'training/classes/:id', element: <MemberClassDetailPage /> },
