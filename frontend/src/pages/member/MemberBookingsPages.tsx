@@ -52,8 +52,8 @@ export function MemberBookingsPage({ embedded = false }: { embedded?: boolean })
         description="Review your upcoming sessions and booking history."
         actions={
           <>
-            <Link className={buttonClassName('secondary')} to="/member/check-in-pass">
-              Check-in pass
+            <Link className={buttonClassName('secondary')} to="/member/check-in-qr">
+              Check-in QR
             </Link>
             <Link className={buttonClassName()} to="/member/classes">
               Find Classes

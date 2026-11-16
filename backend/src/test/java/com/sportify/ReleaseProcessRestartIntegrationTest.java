@@ -103,8 +103,8 @@ class ReleaseProcessRestartIntegrationTest {
         call("PUT","/manager/sessions/"+next,manager,Map.of("date","2026-11-04","startTime","11:00:00","endTime","12:00:00","facilityId",facility,"coachId",coachId,"capacity",10,"expectedRevision",0,"rescheduleReason","Release acceptance reschedule"),200);
         assertThat(call("GET","/member/notifications",owner,null,200).path("notices").size()).isEqualTo(1);
         call("DELETE","/bookings/"+future,reception,null,200);
-        var issued=call("POST","/member/check-in-pass",owner,null,200);String pass=issued.path("token").asText();
-        assertThat(call("POST","/reception/check-in-pass/redeem",reception,Map.of("token",pass,"bookingId",booking),200).path("result").asText()).isEqualTo("ALLOWED");
+        var issued=call("GET","/member/check-in-qr",owner,null,200);String qr=issued.path("qrContent").asText();
+        assertThat(call("POST","/check-ins",reception,Map.of("identifier",qr,"bookingId",booking),201).path("result").asText()).isEqualTo("ALLOWED");
         long plan=id(call("POST","/coach/training/plans",coach,Map.of("classId",classId,"memberId",member,"bookingId",booking,"title","Release personal plan","steps",List.of(Map.of("title","Footwork","durationMinutes",10,"instructions","Follow Coach guidance"))),201));
         call("POST","/coach/training/class-plans",coach,Map.of("classId",classId,"title","Release class plan","steps",List.of(Map.of("title","Warm up","durationMinutes",5))),201);
         call("POST","/coach/training/attendance",coach,Map.of("bookingId",booking,"status","PRESENT","notes","Actual session participation"),201);
@@ -124,7 +124,9 @@ class ReleaseProcessRestartIntegrationTest {
         call("GET","/manager/activity-logs",manager,null,200);
         stopOwnedProcess();start(fixture,"2026-11-02T06:00:00Z");
         reception=login("reception@release.test",password);coach=login("coach@release.test",password);owner=login("learner@release.test",memberPassword);
-        call("POST","/reception/check-in-pass/redeem",reception,Map.of("token",pass,"bookingId",booking),409);
+        // QR co dinh van giong het sau khi khoi dong lai; quet lai cung booking bi tu choi vi da check-in.
+        assertThat(call("GET","/member/check-in-qr",owner,null,200).path("qrContent").asText()).isEqualTo(qr);
+        assertThat(call("POST","/check-ins",reception,Map.of("identifier",qr,"bookingId",booking),201).path("denialReason").asText()).isEqualTo("Already checked in for this session");
         call("GET","/member/training/plans/"+plan,owner,null,200);
         long result=id(call("POST","/coach/training/results",coach,Map.of("sessionId",session,"memberId",member,"notes","Release persisted notes-only outcome","scores",List.of()),201));
         call("POST","/coach/training/plans/"+plan+"/feedback",coach,Map.of("rating",4,"comments","Release persisted Coach feedback"),201);

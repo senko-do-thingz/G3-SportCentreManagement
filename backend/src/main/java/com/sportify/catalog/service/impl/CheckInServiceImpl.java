@@ -45,6 +45,8 @@ public class CheckInServiceImpl implements CheckInService {
     private final EntityManager entityManager;
     private final com.sportify.catalog.service.OperationalMemberPolicy operationalMemberPolicy;
 
+    public static final String INACTIVE_ACCOUNT_MESSAGE = "Account is inactive, check-in denied";
+
     private static final Comparator<Booking> BY_SESSION_START = Comparator
             .comparing((Booking b) -> b.getSession().getStartTime())
             .thenComparing(Booking::getId);
@@ -52,7 +54,8 @@ public class CheckInServiceImpl implements CheckInService {
     @Override
     @Transactional
     public CheckInResponse recordCheckIn(CheckInRequest request, UserAccount receptionist) {
-        String identifier = request.getIdentifier();
+        // Gia tri quet tu QR co dinh (member code) co the kem khoang trang / xuong dong tu may quet.
+        String identifier = request.getIdentifier() == null ? "" : request.getIdentifier().trim();
         Optional<MemberProfile> profileOpt = memberProfileRepository.findByMemberCode(identifier);
         if (profileOpt.isEmpty()) {
             try {
@@ -63,9 +66,13 @@ public class CheckInServiceImpl implements CheckInService {
 
         MemberProfile profile = profileOpt.orElseThrow(() -> new ResourceNotFoundException("Member not found"));
         UserAccount member = profile.getUserAccount();
-        if (member == null || !"ACTIVE".equals(member.getStatus()) || member.getRole() == null
-                || !"MEMBER".equals(member.getRole().getCode())) {
-            throw new BusinessRuleException("An enabled Member account is required", "CHECK_IN_MEMBER_UNAVAILABLE");
+        // Profile con lai cua tai khoan da doi sang vai tro khac khong phai la hoi vien.
+        if (member == null || member.getRole() == null || !"MEMBER".equals(member.getRole().getCode())) {
+            throw new ResourceNotFoundException("Member not found");
+        }
+        // Chi tai khoan ACTIVE moi duoc check-in; tu choi thi khong tao ban ghi check_in.
+        if (!"ACTIVE".equals(member.getStatus())) {
+            throw new BusinessRuleException(INACTIVE_ACCOUNT_MESSAGE, "CHECK_IN_ACCOUNT_INACTIVE");
         }
         operationalMemberPolicy.requireRealMember(profile.getId());
 

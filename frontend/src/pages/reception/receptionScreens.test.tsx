@@ -667,7 +667,7 @@ describe('FE-05 Check-in (F1-15)', () => {
   it('TC-FE05-050 Recorded: POST /check-ins with the code, result shown and today list reloaded', async () => {
     const { calls } = await open('/reception/check-in?code=MB-0248')
     const user = userEvent.setup()
-    expect(screen.getByLabelText(/Member code or card scan/)).toHaveValue('MB-0248')
+    expect(screen.getByLabelText(/Member code or QR scan/)).toHaveValue('MB-0248')
     await user.click(screen.getByRole('button', { name: 'Confirm check-in' }))
     const result = await screen.findByRole('status', { name: 'Check-in recorded' })
     expect(within(result).getByText('Taylor Nguyen')).toBeInTheDocument()
@@ -678,7 +678,7 @@ describe('FE-05 Check-in (F1-15)', () => {
       note: null,
     })
     expect(calls.filter((call) => call.path === '/check-ins?date=2026-10-13')).toHaveLength(2)
-    expect(screen.getByLabelText(/Member code or card scan/)).toHaveValue('')
+    expect(screen.getByLabelText(/Member code or QR scan/)).toHaveValue('')
   })
 
   it('TC-FE05-051 Rejected: the reason from the backend and the way to Register or renew', async () => {
@@ -690,7 +690,7 @@ describe('FE-05 Check-in (F1-15)', () => {
       ],
     })
     const user = userEvent.setup()
-    await user.type(screen.getByLabelText(/Member code or card scan/), 'MB-0248')
+    await user.type(screen.getByLabelText(/Member code or QR scan/), 'MB-0248')
     await user.click(screen.getByRole('button', { name: 'Confirm check-in' }))
     const result = await screen.findByRole('status', { name: 'Check-in rejected' })
     expect(within(result).getByTestId('denial-reason')).toHaveTextContent('No confirmed booking for today')
@@ -710,7 +710,7 @@ describe('FE-05 Check-in (F1-15)', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm check-in' }))
     expect(screen.getByText('Enter a member code or scan the member card')).toBeInTheDocument()
     expect(calls.some((call) => call.path === '/check-ins' && call.method === 'POST')).toBe(false)
-    const field = screen.getByLabelText(/Member code or card scan/)
+    const field = screen.getByLabelText(/Member code or QR scan/)
     await user.type(field, 'MB-9999')
     await user.click(screen.getByRole('button', { name: 'Confirm check-in' }))
     const result = await screen.findByRole('status', { name: 'Check-in rejected' })
@@ -740,7 +740,7 @@ describe('FE-05 Check-in (F1-15)', () => {
     fail = false
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText('No check-in yet today')).toBeInTheDocument()
-    const field = screen.getByLabelText(/Member code or card scan/)
+    const field = screen.getByLabelText(/Member code or QR scan/)
     await user.type(field, 'UNKNOWN-TEST')
     await user.click(screen.getByRole('button', { name: 'Confirm check-in' }))
     expect(await screen.findByText('No check-in was saved for this unknown code.')).toBeInTheDocument()

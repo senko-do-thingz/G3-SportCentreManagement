@@ -79,7 +79,8 @@ class TrainingWorkflowIntegrationTest {
     @Autowired CenterConsultationService consultation;
     @Autowired com.sportify.payment.service.OperationsReportService operationsReports;
     @Autowired ClassPlanService classPlans;
-    @Autowired MemberCheckInPassService arrivalPasses;
+    @Autowired MemberCheckInQrService checkInQr;
+    @Autowired CheckInService checkIns;
     @Autowired TrainingProgressService progress;
     @Autowired ClassNoticeService notices;
     @Autowired ReceptionSupportService support;
@@ -97,7 +98,6 @@ class TrainingWorkflowIntegrationTest {
     private final List<Long> fixtureMetrics = new ArrayList<>();
     private SessionIdentityFixtures.Snapshot fixtureCounters;
     @AfterEach void cleanupSessionFixtures() {
-        jdbc.update("DELETE FROM member_check_in_pass WHERE member_id IN (?,?)", member,peer);
         if (!fixtureSessions.isEmpty()) {
             String ids = fixtureSessions.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
             String bookings = "SELECT id FROM booking WHERE session_id IN (" + ids + ")";
@@ -489,8 +489,7 @@ class TrainingWorkflowIntegrationTest {
             new Route("GET","/api/v1/member/training/notices",null,Set.of("MEMBER")),
             new Route("GET","/api/v1/member/notifications",null,Set.of("MEMBER")),
             new Route("GET","/api/v1/member/support-requests",null,Set.of("MEMBER")),
-            new Route("POST","/api/v1/member/check-in-pass",null,Set.of("MEMBER")),
-            new Route("POST","/api/v1/reception/check-in-pass/redeem","{\"token\":\"SCIN1."+"A".repeat(43)+"\"}",Set.of("RECEPTIONIST")),
+            new Route("GET","/api/v1/member/check-in-qr",null,Set.of("MEMBER")),
             new Route("GET","/api/v1/reception/support-requests",null,Set.of("RECEPTIONIST")),
             new Route("POST","/api/v1/reception/support-requests","{\"memberId\":"+member+",\"category\":\"GENERAL\",\"subject\":\"Help\",\"description\":\"Opening hours\"}",Set.of("RECEPTIONIST")),
             new Route("GET","/api/v1/payments/vietqr-banks",null,Set.of("MEMBER","RECEPTIONIST","MANAGER")));
@@ -508,79 +507,71 @@ class TrainingWorkflowIntegrationTest {
                 mvc.perform(wrong).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());checks++;
             }
         }
-        assertThat(checks).isEqualTo(78);
+        assertThat(checks).isEqualTo(74);
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/reception/support-requests?memberId=-1").with(as(reception)))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/coach/training/notices").with(as(coach)).contentType("application/json")
             .content("{\"classId\":"+classId+",\"type\":\"ANNOUNCEMENT\",\"title\":\"Help\",\"content\":\"Bring equipment\"}"))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
     }
-    @Test void RELEASE11_actualHttpIssueRedeemReplayAndPurposeIsolation() throws Exception {
+    private com.sportify.catalog.dto.CheckInResponse scan(String qrContent,Long bookingId,long actorId) {
+        var request=new com.sportify.catalog.dto.CheckInRequest(); request.setIdentifier(qrContent); request.setBookingId(bookingId);
+        return checkIns.recordCheckIn(request,actor(actorId));
+    }
+    @Test void RELEASE11_fixedQrIsStableAndScanUsesTheSingleCheckInEndpoint() throws Exception {
         long registration=arrivalEntitlement();
-        var issued=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/member/check-in-pass").with(as(member)))
-            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
-            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control","no-store"))
-            .andReturn().getResponse().getContentAsString();
-        var json=new com.fasterxml.jackson.databind.ObjectMapper().readTree(issued);
-        assertThat(json.size()).isEqualTo(4);
-        String token=json.get("token").asText(); assertThat(token).matches("SCIN1\\.[A-Za-z0-9_-]{43}");
-        String path="/api/v1/reception/check-in-pass/redeem";
-        String body="{\"token\":\""+token+"\",\"bookingId\":"+booking+"}";
-        for(long forbidden:new long[]{member,coach,account("MANAGER")}) {
-            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path).with(as(forbidden)).contentType("application/json").content(body))
+        String memberCode=jdbc.queryForObject("SELECT member_code FROM member_profile WHERE user_id=?",String.class,member);
+        var mapper=new com.fasterxml.jackson.databind.ObjectMapper();
+        var first=mapper.readTree(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/check-in-qr").with(as(member)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn().getResponse().getContentAsString());
+        var second=mapper.readTree(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/check-in-qr").with(as(member)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(first).isEqualTo(second);
+        assertThat(first.get("qrContent").asText()).isEqualTo(memberCode).isEqualTo(first.get("memberCode").asText());
+        clock.value=clock.value.plus(Duration.ofDays(1));
+        assertThat(checkInQr.forMember(member).qrContent()).as("QR never expires or rotates").isEqualTo(memberCode);
+        clock.value=clock.value.minus(Duration.ofDays(1));
+        String body="{\"identifier\":\""+first.get("qrContent").asText()+"\",\"bookingId\":"+booking+"}";
+        for(long forbidden:new long[]{member,coach})
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/check-ins").with(as(forbidden)).contentType("application/json").content(body))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
-        }
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path).contentType("application/json").content(body))
-            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/member/check-in-pass").with(as(reception)))
-            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path).with(as(reception)).contentType("application/json").content(body))
-            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/check-ins").with(as(reception)).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.result").value("ALLOWED"))
-            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.memberCode").value(json.get("memberCode").asText()));
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path).with(as(reception)).contentType("application/json").content(body))
-            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.memberCode").value(memberCode));
+        assertThat(scan(memberCode,booking,reception).getDenialReason()).isEqualTo("Already checked in for this session");
         assertThat(count("SELECT COUNT(*) FROM check_in WHERE booking_id=? AND result='ALLOWED'",booking)).isEqualTo(1);
         assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isZero();
         assertThat(count("SELECT remaining_sessions FROM sport_package_registration WHERE id=?",registration)).isEqualTo(9);
-        String audit=String.join("",jdbc.queryForList("SELECT COALESCE(details,'') FROM activity_log WHERE actor_user_id IN (?,?)",String.class,member,reception));
-        assertThat(audit).doesNotContain(token).doesNotContain(jdbc.queryForObject("SELECT token_hash FROM member_check_in_pass WHERE member_id=?",String.class,member));
-        for(String invalid:List.of("000201010212VietQR","eyJhbGciOiJIUzI1NiJ9.payload.signature", "SCIN1."+"A".repeat(43)))
-            assertThatThrownBy(()->arrivalPasses.redeem(invalid,booking,actor(reception))).isInstanceOf(BusinessRuleException.class);
     }
-    @Test void RELEASE11_expiryAccountVersionAndQuarantineFailClosed() {
+    @Test void RELEASE11_inactiveUnknownAndNonMemberScansAreRejectedWithoutRecords() {
         arrivalEntitlement();
-        var pass=arrivalPasses.issue(member); clock.value=clock.value.plusSeconds(120);
-        assertThatThrownBy(()->arrivalPasses.redeem(pass.token(),booking,actor(reception))).isInstanceOf(BusinessRuleException.class);
-        clock.value=clock.value.minusSeconds(120); var beforeDisable=arrivalPasses.issue(member);
+        String qr=checkInQr.forMember(member).qrContent();
         jdbc.update("UPDATE user_account SET status='INACTIVE',version=version+1 WHERE id=?",member);
-        assertThatThrownBy(()->arrivalPasses.redeem(beforeDisable.token(),booking,actor(reception))).isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(()->scan(qr,booking,reception)).isInstanceOf(BusinessRuleException.class).hasMessage("Account is inactive, check-in denied");
         jdbc.update("UPDATE user_account SET status='ACTIVE',version=version+1 WHERE id=?",member);
-        assertThatThrownBy(()->arrivalPasses.redeem(beforeDisable.token(),booking,actor(reception))).isInstanceOf(BusinessRuleException.class);
-        var beforeRole=arrivalPasses.issue(member);
+        assertThat(checkInQr.forMember(member).qrContent()).as("reactivation keeps the same QR").isEqualTo(qr);
+        assertThatThrownBy(()->scan("MEM-DOES-NOT-EXIST",booking,reception)).isInstanceOf(ResourceNotFoundException.class).hasMessage("Member not found");
         jdbc.update("UPDATE user_account SET role_id=(SELECT id FROM role WHERE code='COACH'),version=version+1 WHERE id=?",member);
-        assertThatThrownBy(()->arrivalPasses.redeem(beforeRole.token(),booking,actor(reception))).isInstanceOf(BusinessRuleException.class);
-        jdbc.update("UPDATE user_account SET role_id=(SELECT id FROM role WHERE code='MEMBER'),version=version+1,email=? WHERE id=?",code()+"@unified-demo.invalid",member);
-        assertThatThrownBy(()->arrivalPasses.issue(member)).isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(()->scan(qr,booking,reception)).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE user_account SET role_id=(SELECT id FROM role WHERE code='MEMBER'),version=version+1 WHERE id=?",member);
         assertThat(count("SELECT COUNT(*) FROM check_in WHERE member_id=?",member)).isZero();
     }
-    @Test void RELEASE11_concurrentReceptionScansHaveOneDurableWinner() throws Exception {
-        arrivalEntitlement(); var pass=arrivalPasses.issue(member); long second=account("RECEPTIONIST");
-        var firstActor=actor(reception);var secondActor=actor(second);
+    @Test void RELEASE11_concurrentReceptionScansHaveOneAllowedArrival() throws Exception {
+        arrivalEntitlement(); String qr=checkInQr.forMember(member).qrContent(); long second=account("RECEPTIONIST");
         try(var pool=Executors.newFixedThreadPool(2)) {
             var start=new CountDownLatch(1);
-            Callable<Boolean> one=()->{start.await();try{arrivalPasses.redeem(pass.token(),booking,firstActor);return true;}catch(ConflictException used){return false;}};
-            Callable<Boolean> two=()->{start.await();try{arrivalPasses.redeem(pass.token(),booking,secondActor);return true;}catch(ConflictException used){return false;}};
+            Callable<String> one=()->{start.await();return scan(qr,booking,reception).getResult();};
+            Callable<String> two=()->{start.await();return scan(qr,booking,second).getResult();};
             var a=pool.submit(one);var b=pool.submit(two);start.countDown();
-            assertThat(List.of(a.get(60,TimeUnit.SECONDS),b.get(60,TimeUnit.SECONDS))).containsExactlyInAnyOrder(true,false);
+            assertThat(List.of(a.get(60,TimeUnit.SECONDS),b.get(60,TimeUnit.SECONDS))).containsExactlyInAnyOrder("ALLOWED","DENIED");
         }
-        assertThat(count("SELECT COUNT(*) FROM check_in WHERE booking_id=?",booking)).isEqualTo(1);
-        assertThat(count("SELECT COUNT(*) FROM member_check_in_pass WHERE member_id=? AND redeemed_at_utc IS NOT NULL",member)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM check_in WHERE booking_id=? AND result='ALLOWED'",booking)).isEqualTo(1);
     }
     @Test void RELEASE11_cancelledBookingProducesDeniedArrivalWithoutAttendanceOrDebit() {
-        long registration=arrivalEntitlement();var pass=arrivalPasses.issue(member);
+        long registration=arrivalEntitlement();String qr=checkInQr.forMember(member).qrContent();
         jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?",booking);
-        assertThat(arrivalPasses.redeem(pass.token(),booking,actor(reception)).getResult()).isEqualTo("DENIED");
+        assertThat(scan(qr,booking,reception).getResult()).isEqualTo("DENIED");
         assertThat(count("SELECT remaining_sessions FROM sport_package_registration WHERE id=?",registration)).isEqualTo(9);
         assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isZero();
     }
