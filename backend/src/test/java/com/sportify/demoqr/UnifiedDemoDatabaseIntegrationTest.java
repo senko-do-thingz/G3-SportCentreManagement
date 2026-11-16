@@ -167,7 +167,7 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
         String reception = login("lan.reception@example.com");
         var localRegistration = purchase(member); var actualRegistration = purchase(real);
         java.math.BigDecimal amount = jdbcTemplate.queryForObject("SELECT amount FROM payment WHERE id=?", java.math.BigDecimal.class, actualRegistration.getPaymentId());
-        assertThat(write("/api/v1/payments/" + actualRegistration.getPaymentId(), HttpMethod.PUT,
+        assertThat(write("/api/v1/payments/" + actualRegistration.getPaymentId() + "/confirm", HttpMethod.PUT,
                 Map.of("method", "BANK_TRANSFER", "referenceCode", "UNIFY-REAL-PAID", "amountReceived", amount), reception).getStatusCode()).isEqualTo(HttpStatus.OK);
         long sport = jdbcTemplate.queryForObject("SELECT p.sport_id FROM sport_package p JOIN sport_package_registration r ON r.package_id=p.id WHERE r.id=?", Long.class, actualRegistration.getId());
         var date = jdbcTemplate.queryForObject("SELECT CAST(DATEADD(day,7,GETDATE()) AS date)", java.sql.Date.class);
