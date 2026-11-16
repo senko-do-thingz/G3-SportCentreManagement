@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type FormEvent } from 'react'
+import { Suspense, lazy, useCallback, useRef, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError, getErrorMessage } from '../../api/errors'
 import { isMemberNotFound, MEMBER_NOT_FOUND_MESSAGE, receptionApi, type CheckInRecord } from '../../api/receptionApi'
@@ -24,8 +24,15 @@ import { ReceptionScreen, ReceptionStat, ReceptionStats } from './ReceptionConce
  */
 const IDENTIFIER_ID = 'check-in-identifier'
 
-/** Client-only feedback for an unknown code; never inserted into the persisted history. */
-function memberNotFoundRecord(code: string): CheckInRecord {
+// Chi tai thu vien quet QR (@zxing) khi le tan bam "Scan QR".
+const CameraQrScanner = lazy(() => import('./CameraQrScanner').then((module) => ({ default: module.CameraQrScanner })))
+
+/** Ma loi backend khi tai khoan hoi vien khong ACTIVE (CheckInServiceImpl). */
+const ACCOUNT_INACTIVE_CODE = 'CHECK_IN_ACCOUNT_INACTIVE'
+const CHECK_IN_SUCCESS_MESSAGE = 'Check-in successful - member may enter the centre'
+
+/** Client-only feedback for a rejected scan that saved nothing; never inserted into the persisted history. */
+function unsavedRejectionRecord(code: string, reason: string): CheckInRecord {
   return {
     id: -1,
     memberId: null,
@@ -35,10 +42,19 @@ function memberNotFoundRecord(code: string): CheckInRecord {
     packageRegistrationId: null,
     checkedInAt: new Date().toISOString(),
     result: 'DENIED',
-    denialReason: MEMBER_NOT_FOUND_MESSAGE,
+    denialReason: reason,
     note: null,
   }
 }
+
+/** Loi nghiep vu "khong luu ban ghi" duoc hien nhu ket qua Rejected thay vi thong bao loi ky thuat. */
+function unsavedRejectionReason(failure: unknown): string | null {
+  if (isMemberNotFound(failure)) return MEMBER_NOT_FOUND_MESSAGE
+  if (failure instanceof ApiError && failure.code === ACCOUNT_INACTIVE_CODE) return failure.message
+  return null
+}
+
+type ArrivalSource = 'manual' | 'camera'
 
 function focusIdentifier() {
   document.getElementById(IDENTIFIER_ID)?.focus()
@@ -52,11 +68,42 @@ export function CheckInPage() {
   const [requestError, setRequestError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const inFlight = useRef(false)
-  const [last, setLast] = useState<{ record: CheckInRecord; identifier: string } | null>(null)
+  const [last, setLast] = useState<{ record: CheckInRecord; identifier: string; source: ArrivalSource } | null>(null)
+  const [scanning, setScanning] = useState(false)
 
   const today = receptionDate(new Date())
   const loadToday = useCallback((signal: AbortSignal) => receptionApi.checkInsOn(today, { signal }), [today])
   const [todayList, reloadToday] = useResource(loadToday)
+
+  /**
+   * Mot duong ghi nhan duy nhat cho ca nhap tay va quet camera: POST /check-ins hien co.
+   * Tra ve true khi backend da luu ban ghi (ALLOWED hoac DENIED).
+   */
+  const recordArrival = useCallback(
+    async (code: string, source: ArrivalSource, arrivalNote: string | null): Promise<boolean> => {
+      setRequestError(null)
+      try {
+        const record = await receptionApi.recordCheckIn({ identifier: code, note: arrivalNote })
+        setLast({ record, identifier: code, source })
+        reloadToday()
+        return true
+      } catch (failure) {
+        setLast(null)
+        const reason = unsavedRejectionReason(failure)
+        if (reason) {
+          // Rejected with the reason. Any other 404 (for example "Resource not found") is a technical
+          // error and goes to the notice below.
+          setLast({ record: unsavedRejectionRecord(code, reason), identifier: code, source })
+        } else if (source === 'manual' && failure instanceof ApiError && failure.fieldErrors.identifier) {
+          setFieldError(failure.fieldErrors.identifier)
+        } else {
+          setRequestError(getErrorMessage(failure))
+        }
+        return false
+      }
+    },
+    [reloadToday],
+  )
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -72,22 +119,9 @@ export function CheckInPage() {
     setSaving(true)
     inFlight.current = true
     try {
-      const record = await receptionApi.recordCheckIn({ identifier: code, note: note.trim() || null })
-      setLast({ record, identifier: code })
-      setIdentifier('')
-      setNote('')
-      reloadToday()
-    } catch (failure) {
-      setLast(null)
-      if (isMemberNotFound(failure)) {
-        // Rejected with the reason; the code stays in the field for correction. Any other 404 (for
-        // example "Resource not found") is a technical error and goes to the notice below.
-        const record = memberNotFoundRecord(code)
-        setLast({ record, identifier: code })
-      } else if (failure instanceof ApiError && failure.fieldErrors.identifier) {
-        setFieldError(failure.fieldErrors.identifier)
-      } else {
-        setRequestError(getErrorMessage(failure))
+      if (await recordArrival(code, 'manual', note.trim() || null)) {
+        setIdentifier('')
+        setNote('')
       }
     } finally {
       inFlight.current = false
@@ -95,6 +129,25 @@ export function CheckInPage() {
       // Ready for the next scan.
       focusIdentifier()
     }
+  }
+
+  const scan = useCallback(
+    async (code: string) => {
+      // Ma tu QR da duoc trim; dung chung khoa voi form nhap tay de khong gui hai yeu cau cung luc.
+      if (inFlight.current || validateIdentifier(code)) return
+      inFlight.current = true
+      try {
+        await recordArrival(code, 'camera', null)
+      } finally {
+        inFlight.current = false
+      }
+    },
+    [recordArrival],
+  )
+
+  const closeScanner = () => {
+    setScanning(false)
+    focusIdentifier()
   }
 
   const columns: TableColumn<CheckInRecord>[] = [
@@ -131,7 +184,29 @@ export function CheckInPage() {
         </ReceptionStats>
       )}
       <div className="reception-checkin">
-        <Card title="Record arrival">
+        <Card
+          title="Record arrival"
+          actions={
+            !scanning && (
+              <Button type="button" variant="secondary" size="sm" onClick={() => setScanning(true)}>
+                Scan QR
+              </Button>
+            )
+          }
+        >
+          {scanning && (
+            <Suspense fallback={<p role="status">Loading the QR scanner...</p>}>
+              <CameraQrScanner
+                onScan={scan}
+                onClose={closeScanner}
+                result={
+                  last?.source === 'camera' ? (
+                    <CheckInResult record={last.record} identifier={last.identifier} />
+                  ) : undefined
+                }
+              />
+            </Suspense>
+          )}
           <form className="reception-form" onSubmit={submit} noValidate aria-label="Check-in">
             <div className="reception-form__grid">
               <Input
@@ -171,7 +246,9 @@ export function CheckInPage() {
               </Button>
             </div>
           </form>
-          {last && <CheckInResult record={last.record} identifier={last.identifier} />}
+          {last && !(scanning && last.source === 'camera') && (
+            <CheckInResult record={last.record} identifier={last.identifier} />
+          )}
         </Card>
         <Card
           title="Today's check-ins"
@@ -207,12 +284,25 @@ function CheckInResult({ record, identifier }: { record: CheckInRecord; identifi
       aria-label={recorded ? 'Check-in recorded' : 'Check-in rejected'}
     >
       <h3 className="checkin-result__title">{recorded ? 'Check-in recorded' : 'Check-in rejected'}</h3>
-      {record.id < 0 && <p>No check-in was saved for this unknown code.</p>}
+      {recorded && <p className="checkin-result__verdict">{CHECK_IN_SUCCESS_MESSAGE}</p>}
+      {record.id < 0 && (
+        <p>
+          {record.denialReason === MEMBER_NOT_FOUND_MESSAGE
+            ? 'No check-in was saved for this unknown code.'
+            : 'No check-in was saved.'}
+        </p>
+      )}
       <dl className="summary-list">
         <div>
           <dt>Member</dt>
           <dd>{who}</dd>
         </div>
+        {record.memberCode && (
+          <div>
+            <dt>Member code</dt>
+            <dd>{record.memberCode}</dd>
+          </div>
+        )}
         <div>
           <dt>Time</dt>
           <dd>{formatTime(record.checkedInAt)}</dd>
