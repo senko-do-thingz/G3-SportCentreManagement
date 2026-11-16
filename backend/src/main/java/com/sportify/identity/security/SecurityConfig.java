@@ -49,6 +49,9 @@ public class SecurityConfig {
                                 // Preflight requests never carry a token
                                 .requestMatchers(HttpMethod.OPTIONS, "/**")
                                 .permitAll()
+                                // Current user avatar operations require authentication
+                                .requestMatchers("/api/v1/users/me/avatar")
+                                .authenticated()
                                 // Public catalog (read only)
                                 .requestMatchers(HttpMethod.GET, "/api/v1/sports", "/api/v1/sports/*", "/api/v1/plans", "/api/v1/plans/*", "/api/v1/packages", "/api/v1/packages/*", "/api/v1/packages/sport/*", "/api/v1/membership-cards/tiers", "/api/v1/coaches/public", "/api/v1/facilities/public", "/api/v1/users/*/avatar")
                                 .permitAll()

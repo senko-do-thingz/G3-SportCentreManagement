@@ -51,6 +51,20 @@ public class UserAvatarStore {
                 .stream().findFirst();
     }
 
+    /** Finds stored avatar for an active user account. */
+    public Optional<StoredAvatar> findByUserId(Long userId) {
+        return jdbcTemplate.query("""
+                        SELECT a.content_type, a.data FROM user_avatar a
+                        JOIN user_account u ON u.id = a.user_id
+                        WHERE u.id = ? AND u.status = 'ACTIVE' AND u.avatar_url IS NOT NULL
+                          AND a.content_type IN ('image/jpeg', 'image/png', 'image/webp')
+                          AND a.size_bytes BETWEEN 1 AND 2097152 AND a.size_bytes = DATALENGTH(a.data)
+                        """,
+                        (rs, row) -> new StoredAvatar(rs.getString("content_type"), rs.getBytes("data")),
+                        userId)
+                .stream().findFirst();
+    }
+
     public void delete(Long userId) {
         jdbcTemplate.update("DELETE FROM user_avatar WHERE user_id = ?", userId);
     }

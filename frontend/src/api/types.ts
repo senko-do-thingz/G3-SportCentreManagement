@@ -43,6 +43,7 @@ export interface UserProfile {
   /** BEGINNER, INTERMEDIATE or ADVANCED. */
   currentLevel?: string | null
   memberCode?: string | null
+  avatarUrl?: string | null
 }
 
 /** Mirrors com.sportify.identity.dto.AuthRequest. */

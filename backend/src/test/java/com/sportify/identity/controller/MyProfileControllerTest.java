@@ -3,6 +3,7 @@ package com.sportify.identity.controller;
 import com.sportify.core.exception.FieldValidationException;
 import com.sportify.identity.dto.*;
 import com.sportify.identity.entity.*;
+import com.sportify.identity.repository.UserAvatarStore;
 import com.sportify.identity.security.*;
 import com.sportify.identity.service.UserService;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -182,5 +184,69 @@ class MyProfileControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content(payload))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.details.newPassword").exists());
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void getAvatar_anonymousReturns401() throws Exception {
+        mvc.perform(get("/api/v1/users/me/avatar")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getAvatar_notFoundReturns404() throws Exception {
+        when(service.getCurrentUserAvatar(any())).thenReturn(null);
+        mvc.perform(get("/api/v1/users/me/avatar").with(user(principal("MEMBER"))))
+                .andExpect(status().isNotFound())
+                .andExpect(header().string("Cache-Control", "no-store"));
+    }
+
+    @Test
+    void getAvatar_existsReturns200WithWebpBytes() throws Exception {
+        byte[] webp = new byte[]{1, 2, 3};
+        when(service.getCurrentUserAvatar(any())).thenReturn(new UserAvatarStore.StoredAvatar("image/webp", webp));
+        mvc.perform(get("/api/v1/users/me/avatar").with(user(principal("MEMBER"))))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("image/webp"))
+                .andExpect(content().bytes(webp))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+    }
+
+    @Test
+    void uploadAvatar_anonymousReturns401() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "test.jpg", "image/jpeg", new byte[]{1, 2});
+        mvc.perform(multipart("/api/v1/users/me/avatar").file(file))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void uploadAvatar_emptyFileReturns400() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "test.jpg", "image/jpeg", new byte[0]);
+        mvc.perform(multipart("/api/v1/users/me/avatar").file(file).with(user(principal("MEMBER"))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void uploadAvatar_validReturns200WithProfile() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "test.jpg", "image/jpeg", new byte[]{1, 2, 3});
+        var profile = UserProfileResponse.builder().id(11L).role("MEMBER").email("self@example.test")
+                .fullName("Saved Name").avatarUrl("/api/v1/users/me/avatar?v=123").build();
+        when(service.uploadCurrentUserAvatar(any(), any(org.springframework.web.multipart.MultipartFile.class)))
+                .thenReturn(profile);
+
+        mvc.perform(multipart("/api/v1/users/me/avatar").file(file).with(user(principal("MEMBER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.avatarUrl").value("/api/v1/users/me/avatar?v=123"));
+    }
+
+    @Test
+    void deleteAvatar_anonymousReturns401() throws Exception {
+        mvc.perform(delete("/api/v1/users/me/avatar")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void deleteAvatar_authenticatedReturns204() throws Exception {
+        mvc.perform(delete("/api/v1/users/me/avatar").with(user(principal("MEMBER"))))
+                .andExpect(status().isNoContent());
+        verify(service).deleteCurrentUserAvatar(any());
     }
 }
