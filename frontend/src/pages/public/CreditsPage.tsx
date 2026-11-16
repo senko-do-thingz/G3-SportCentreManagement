@@ -50,7 +50,15 @@ export function CreditsPage() {
         <p className="credits-intro">The project also keeps small copies of the credited photos below, shown only when an online photo cannot load.</p>
       </main>
       <footer className="home-footer credits-footer">
-        <div className="home-wrap home-footer__bottom"><small>Copyright 2026 Sportify Sports Center</small><Link to="/">Back to Home</Link></div>
+        <div className="home-wrap home-footer__bottom">
+          <small>Copyright 2026 Sportify Sports Center</small>
+          <div className="home-footer__links">
+            <Link to="/terms">Terms of Service</Link>
+            <Link to="/terms#privacy">Privacy Policy</Link>
+            <Link to="/terms#contact-section">Contact</Link>
+            <Link to="/">Back to Home</Link>
+          </div>
+        </div>
       </footer>
     </div>
   )
