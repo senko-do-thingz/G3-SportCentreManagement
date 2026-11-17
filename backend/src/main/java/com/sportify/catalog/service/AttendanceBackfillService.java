@@ -29,7 +29,6 @@ public class AttendanceBackfillService {
     private final Clock clock;
     private final AttendanceBackfillPolicy policy;
     private final ObjectMapper mapper;
-    private final OperationalMemberPolicy operationalMemberPolicy;
 
     public record Candidate(long bookingId, long sessionId, String memberName, String className,
                             LocalDate date, LocalTime startTime, LocalTime endTime,
@@ -92,14 +91,13 @@ public class AttendanceBackfillService {
         if (bookings.isEmpty() || bookings.getFirst().sessionId() != ids.getFirst())
             throw new ConflictException("Booking changed; reload and retry");
         var booking = bookings.getFirst();
-        operationalMemberPolicy.requireRealBooking(request.bookingId());
         var session = sessions.getFirst();
         if (!booking.status().equals("CONFIRMED")
             || (!session.status().equals("PUBLISHED") && !session.status().equals("COMPLETED"))
             || !session.type().equals("COACH_LED"))
             throw new BusinessRuleException("Backfill requires a confirmed booking for a published or completed coach-led session");
         if (jdbc.queryForObject("SELECT COUNT(*) FROM member_profile m JOIN user_account u ON u.id=m.user_id JOIN role r ON r.id=u.role_id WHERE m.user_id=? AND r.code='MEMBER'", Integer.class, booking.memberId()) != 1)
-            throw new BusinessRuleException("A real member booking is required");
+            throw new BusinessRuleException("A member booking is required");
         Instant now = clock.instant();
         if (!session.date().isBefore(now.atZone(CENTER).toLocalDate()) || !within(now, end(session.date(), session.start(), session.end()), window))
             throw new BusinessRuleException("Backfill requires a completed past-date session within the configured window");

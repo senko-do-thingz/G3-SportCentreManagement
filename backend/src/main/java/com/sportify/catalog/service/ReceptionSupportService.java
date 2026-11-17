@@ -59,7 +59,6 @@ public class ReceptionSupportService {
 
     private final JdbcTemplate jdbc;
     private final Clock clock;
-    private final OperationalMemberPolicy operational;
     private final AuditService audit;
     private final EntityManager em;
     private final ObjectMapper json;
@@ -172,7 +171,6 @@ public class ReceptionSupportService {
                 JOIN role r ON r.id=u.role_id WHERE m.user_id=? AND r.code='MEMBER' AND u.status='ACTIVE'
                 """,Long.class,member).size()!=1)
             throw new ResourceNotFoundException("Member not found");
-        operational.requireRealMember(member);
         String fingerprint=fingerprint(request);
         var prior=prior(member,operation,fingerprint);
         if(prior!=null)return memberDetail(member,prior);
@@ -229,7 +227,6 @@ public class ReceptionSupportService {
     @Transactional public MemberTicket memberReply(long member,long id,ReplyRequest request) {
         jdbc.queryForList("SELECT id FROM support_request WITH(UPDLOCK,HOLDLOCK) WHERE id=? AND member_id=?",Long.class,id,member);
         var current=memberOwned(member,id);
-        operational.requireRealMember(member);
         String message=request.message()==null?"":request.message().trim();
         if(message.isEmpty())throw new BusinessRuleException("Enter a message for Reception");
         var latest=jdbc.query("SELECT TOP (1) sender_id,message_body FROM support_request_message WHERE request_id=? ORDER BY created_at DESC,id DESC",
@@ -290,13 +287,11 @@ public class ReceptionSupportService {
     private void requireMember(long member) {
         if(jdbc.queryForObject("SELECT COUNT(*) FROM member_profile m JOIN user_account u ON u.id=m.user_id JOIN role r ON r.id=u.role_id WHERE m.user_id=? AND r.code='MEMBER'",Integer.class,member)!=1)
             throw new ResourceNotFoundException("Member not found");
-        operational.requireRealMember(member);
     }
     private void requireOwnBooking(long member,Long booking) {
         if(booking==null)return;
         if(jdbc.queryForObject("SELECT COUNT(*) FROM booking WHERE id=? AND member_id=?",Integer.class,booking,member)!=1)
             throw new ResourceNotFoundException("Member booking not found");
-        operational.requireRealBooking(booking);
     }
     private String fingerprint(Object request) {
         try {return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(json.writeValueAsBytes(request)));}

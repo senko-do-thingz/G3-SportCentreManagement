@@ -63,7 +63,6 @@ export function bookingErrorMessage(error: unknown): string {
     case 'SESSION_STARTED': return 'This session has already started and can no longer be booked.'
     case 'CANCELLATION_CUTOFF': return 'The cancellation deadline has passed. This booking was not cancelled.'
     case 'CANNOT_CANCEL': return 'This booking can no longer be cancelled.'
-    case 'SYNTHETIC_OPERATION_DENIED': return 'Synthetic members cannot use operational classes or training records.'
     case 'TIME_CONFLICT': return 'This booking overlaps another confirmed booking at the same time. Choose another session.'
     case 'AGE_RESTRICTED': return 'The member age on the session date is outside this class age group. Choose a class for their age group.'
     default: return error.message || 'The request could not be completed. Please try again.'
