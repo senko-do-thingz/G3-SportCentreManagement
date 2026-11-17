@@ -1,13 +1,14 @@
 import { sessionIdText, sessionRouteReference } from '../../api/sessionIdentity'
 import '../../components/sessionContext.css'
 import '../../styles/managerSchedule.css'
+import '../../styles/manager-concept-a.css'
 import { useCallback, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { memberBookingsApi, type MemberBookingRecord } from '../../api/memberBookingsApi'
-import { Badge, Button, Card, EmptyState, Input, PageHeader, PageLoader, buttonClassName } from '../../components/ui'
+import { Badge, Button, Card, EmptyState, PageHeader, PageLoader, StatIcon, buttonClassName } from '../../components/ui'
 import { BrowseError } from './BrowseError'
 import { MemberScheduleNav } from './MemberScheduleNav'
-import { browseAddDays, browseDate, browseDay, browseIsoWeek, browseMonday, browseMondayFromIsoWeek, browseToday, validBrowseDate } from './memberScheduleDates'
+import { browseAddDays, browseDate, browseDay, browseMonday, browseToday, validBrowseDate } from './memberScheduleDates'
 import { useMemberResource } from './useMemberResource'
 
 export const NO_SCHEDULE_YET = "You don't have any scheduled sessions yet."
@@ -39,6 +40,13 @@ export function MemberSchedulePage({ embedded = false }: { embedded?: boolean })
     }, { replace: true })
   }
 
+  const weekBookings = resource.status === 'ready'
+    ? resource.data.filter((booking) => booking.sessionDate >= from && booking.sessionDate <= to)
+    : []
+  const bookedCount = resource.status === 'ready' ? String(weekBookings.length).padStart(2, '0') : '--'
+  const sportsCount = resource.status === 'ready' ? String(new Set(weekBookings.map((b) => b.sportName).filter(Boolean)).size).padStart(2, '0') : '--'
+  const coachesCount = resource.status === 'ready' ? String(new Set(weekBookings.map((b) => b.coachName).filter(Boolean)).size).padStart(2, '0') : '--'
+
   return (
     <div className={`page browse-page member-schedule-theme${embedded ? ' schedule-workspace__embedded' : ''}`}>
       {!embedded && <MemberScheduleNav />}
@@ -49,25 +57,45 @@ export function MemberSchedulePage({ embedded = false }: { embedded?: boolean })
         actions={<Link className={buttonClassName()} to={FIND_CLASSES}>Find Classes</Link>}
       />}
 
+      <div className="concept-stats concept-stats--schedule">
+        <div className="concept-stat concept-stat--schedule">
+          <StatIcon name="calendar" />
+          <div>
+            <strong>{bookedCount}</strong>
+            <small>Week sessions</small>
+          </div>
+        </div>
+        <div className="concept-stat concept-stat--schedule">
+          <StatIcon name="sports" />
+          <div>
+            <strong>{sportsCount}</strong>
+            <small>Active sports</small>
+          </div>
+        </div>
+        <div className="concept-stat concept-stat--schedule">
+          <StatIcon name="coach" />
+          <div>
+            <strong>{coachesCount}</strong>
+            <small>Active coaches</small>
+          </div>
+        </div>
+        <div className="concept-stat concept-stat--schedule">
+          <StatIcon name="calendar" />
+          <div>
+            <strong>{browseDate(from)} - {browseDate(to)}</strong>
+            <small>Week in view</small>
+          </div>
+        </div>
+      </div>
+
       <Card title="Weekly schedule">
         <div className="manager-row-actions schedule-controls">
-          <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, -7))}>Previous week</Button>
-          <Button variant={from === currentWeek ? 'primary' : 'secondary'} disabled={from === currentWeek} onClick={() => changeWeek(currentWeek)}>
-            This week
-          </Button>
-          <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, 7))}>Next week</Button>
-          <strong>{browseDate(from)} - {browseDate(to)}</strong>
-          <div className="schedule-week-nav" role="group" aria-label="Week navigation" style={{ marginLeft: 'auto' }}>
-            <Input
-              className="schedule-week-input"
-              label="Choose week"
-              type="week"
-              value={browseIsoWeek(from)}
-              onChange={(event) => {
-                const monday = browseMondayFromIsoWeek(event.target.value)
-                if (monday) changeWeek(monday)
-              }}
-            />
+          <div className="schedule-week-nav" role="group" aria-label="Schedule week navigation">
+            <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, -7))}>Previous week</Button>
+            <Button variant={from === currentWeek ? 'primary' : 'secondary'} onClick={() => changeWeek(currentWeek)}>
+              This week
+            </Button>
+            <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, 7))}>Next week</Button>
           </div>
         </div>
 
@@ -142,10 +170,10 @@ function WeeklyScheduleTable({ bookings, days, today, returnTo }: {
         <table className="f2-schedule-table schedule-table" aria-label="Weekly schedule" aria-describedby="member-schedule-grouping">
           <thead>
             <tr>
-              <th className="f2-schedule-table__time-heading schedule-table__time-heading" scope="col">Time</th>
+              <th className="f2-schedule-table__time-heading schedule-table__time-heading" scope="col">Starts at</th>
               {days.map((day) => (
                 <th className={day === today ? 'f2-schedule-table__today schedule-table__today' : undefined} scope="col" key={day} aria-current={day === today ? 'date' : undefined}>
-                  <span>{browseDay(day)}</span>
+                  <span>{browseDay(day).toUpperCase()}</span>
                   <time dateTime={day}>{browseDate(day)}</time>
                 </th>
               ))}

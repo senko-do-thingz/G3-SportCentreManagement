@@ -1,7 +1,9 @@
 /* Sportify Manager UI - Concept A Foundation Styles */
 /* Strict adherence to design tokens: no raw color literals. */
 
-.staff-content:has(> .manager-concept-page) {
+.staff-content:has(> .manager-concept-page),
+.staff-content:has(.manager-concept-page),
+.staff-content:has(.manager-schedule-page) {
   max-width: 1722px;
   padding: var(--space-6) var(--space-8);
 }
@@ -253,13 +255,15 @@
 
 /* Scaled up schedule dashboard statistic blocks */
 .concept-stats--schedule,
-.manager-schedule-page .concept-stats {
+.manager-schedule-page .concept-stats,
+.member-schedule-theme .concept-stats {
   gap: var(--space-4);
   margin-bottom: var(--space-5);
 }
 
 .concept-stat--schedule,
-.manager-schedule-page .concept-stat {
+.manager-schedule-page .concept-stat,
+.member-schedule-theme .concept-stat {
   min-height: 104px;
   padding: var(--space-5) var(--space-5);
   gap: var(--space-4);
@@ -269,14 +273,16 @@
 }
 
 .concept-stat--schedule:hover,
-.manager-schedule-page .concept-stat:hover {
+.manager-schedule-page .concept-stat:hover,
+.member-schedule-theme .concept-stat:hover {
   border-color: var(--color-primary-soft-hover);
   box-shadow: var(--shadow-md);
   transform: translateY(-2px);
 }
 
 .concept-stat--schedule .stat-icon,
-.manager-schedule-page .concept-stat .stat-icon {
+.manager-schedule-page .concept-stat .stat-icon,
+.member-schedule-theme .concept-stat .stat-icon {
   flex: 0 0 2.75rem;
   width: 2.75rem;
   height: 2.75rem;
@@ -287,7 +293,8 @@
 }
 
 .concept-stat--schedule strong,
-.manager-schedule-page .concept-stat strong {
+.manager-schedule-page .concept-stat strong,
+.member-schedule-theme .concept-stat strong {
   font-size: var(--text-3xl);
   line-height: 1.1;
   font-weight: 900;
@@ -297,7 +304,8 @@
 }
 
 .concept-stat--schedule small,
-.manager-schedule-page .concept-stat small {
+.manager-schedule-page .concept-stat small,
+.member-schedule-theme .concept-stat small {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);

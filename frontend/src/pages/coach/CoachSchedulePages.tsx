@@ -86,9 +86,9 @@ function ScheduleMetricIcon({ name }: { name: ScheduleMetricIconName }) {
 export function CoachTeachingSchedulePage() {
   const [params, setParams] = useSearchParams()
   const [selection, setSelection] = useState<{ week: string; sessionId: string } | null>(null)
-  const [overviewOpen, setOverviewOpen] = useState(true)
   const week = sessionWeek(params)
   const weekEnd = browseAddDays(week, 6)
+  const isThisWeek = week === browseMonday(browseToday())
   const loader = useCallback((signal: AbortSignal) => coachScheduleApi.list(week, weekEnd, signal), [week, weekEnd])
   const [resource, reload] = useResource(loader)
   // Loai bo cac ban ghi ca day bi trung lap hoac xung dot gio tren cung mot ngay, chi giu lai ca som nhat
@@ -181,93 +181,65 @@ export function CoachTeachingSchedulePage() {
           </div>
         </div>
       </section>
-      <div className={`coach-schedule-layout${overviewOpen ? ' coach-schedule-layout--with-overview' : ' coach-schedule-layout--collapsed'}`}>
-        <Card className="coach-schedule-weekly" title="Weekly schedule">
-          <div className="manager-row-actions coach-schedule-week-nav" role="group" aria-label="Teaching week navigation">
-            <Button variant="secondary" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, -7)))}>Previous week</Button>
-            <Button variant="secondary" onClick={() => setParams((current) => changeWeekParams(current, browseMonday(browseToday())))}>This week</Button>
-            <Button variant="secondary" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, 7)))}>Next week</Button>
-            <strong>{browseDate(week)} - {browseDate(weekEnd)}</strong>
-          </div>
-          {sessions.length === 0 ? <div className="coach-schedule-empty"><EmptyState title="No assigned sessions this week" description="Your schedule will show sessions assigned to your coach account." /></div> : <>
-            <p id="coach-schedule-grouping" className="f2-schedule-table__guidance">Sessions are grouped by start time. Each card shows its full time range; separate rows can overlap.</p>
-            <div className="f2-schedule-table-wrap" role="region" aria-label={`Sessions from ${browseDate(week)} to ${browseDate(weekEnd)}`} tabIndex={0}>
-              <table className="f2-schedule-table" aria-label="Coach teaching schedule" aria-describedby="coach-schedule-grouping">
-                <thead>
-                  <tr>
-                    <th className="f2-schedule-table__time-heading" scope="col">Starts at</th>
+      <Card className="coach-schedule-weekly" title="Weekly schedule">
+        <div className="manager-row-actions coach-schedule-week-nav" role="group" aria-label="Teaching week navigation">
+          <Button variant="secondary" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, -7)))}>Previous week</Button>
+          <Button variant={isThisWeek ? 'primary' : 'secondary'} onClick={() => setParams((current) => changeWeekParams(current, browseMonday(browseToday())))}>This week</Button>
+          <Button variant="secondary" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, 7)))}>Next week</Button>
+        </div>
+        {sessions.length === 0 ? <div className="coach-schedule-empty"><EmptyState title="No assigned sessions this week" description="Your schedule will show sessions assigned to your coach account." /></div> : <>
+          <p id="coach-schedule-grouping" className="f2-schedule-table__guidance">Sessions are grouped by start time. Each card shows its full time range; separate rows can overlap.</p>
+          <div className="f2-schedule-table-wrap" role="region" aria-label={`Sessions from ${browseDate(week)} to ${browseDate(weekEnd)}`} tabIndex={0}>
+            <table className="f2-schedule-table" aria-label="Coach teaching schedule" aria-describedby="coach-schedule-grouping">
+              <thead>
+                <tr>
+                  <th className="f2-schedule-table__time-heading" scope="col">Starts at</th>
+                  {dates.map((date) => {
+                    const isToday = date === today
+                    return (
+                      <th className={isToday ? 'f2-schedule-table__today' : undefined} scope="col" key={date} aria-current={isToday ? 'date' : undefined}>
+                        <span>{browseDay(date).toUpperCase()}</span>
+                        <time dateTime={date}>{browseDate(date)}</time>
+                      </th>
+                    )
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {timeSlots.map((time) => (
+                  <tr key={time}>
+                    <th scope="row">{time}</th>
                     {dates.map((date) => {
+                      const cellSessions = sessionsByDateAndTime.get(`${date}|${time}`) ?? []
                       const isToday = date === today
                       return (
-                        <th className={isToday ? 'f2-schedule-table__today' : undefined} scope="col" key={date} aria-current={isToday ? 'date' : undefined}>
-                          <span>{browseDay(date)}</span>
-                          <time dateTime={date}>{browseDate(date)}</time>
-                        </th>
+                        <td className={isToday ? 'f2-schedule-table__today' : undefined} key={date}>
+                          {cellSessions.length ? (
+                            <div className="f2-schedule-table__entries">
+                              {cellSessions.map((s) => (
+                                <CoachScheduleEntry
+                                  key={s.id}
+                                  session={s}
+                                  selected={selectedSession?.id === s.id}
+                                  onSelect={() => setSelection({ week, sessionId: sessionRouteReference(s) })}
+                                  week={week}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="f2-schedule-table__empty-cell" aria-label="No sessions">-</span>
+                          )}
+                        </td>
                       )
                     })}
                   </tr>
-                </thead>
-                <tbody>
-                  {timeSlots.map((time) => (
-                    <tr key={time}>
-                      <th scope="row">{time}</th>
-                      {dates.map((date) => {
-                        const cellSessions = sessionsByDateAndTime.get(`${date}|${time}`) ?? []
-                        const isToday = date === today
-                        return (
-                          <td className={isToday ? 'f2-schedule-table__today' : undefined} key={date}>
-                            {cellSessions.length ? (
-                              <div className="f2-schedule-table__entries">
-                                {cellSessions.map((s) => (
-                                  <CoachScheduleEntry
-                                    key={s.id}
-                                    session={s}
-                                    selected={selectedSession?.id === s.id}
-                                    onSelect={() => {
-                                      setSelection({ week, sessionId: sessionRouteReference(s) })
-                                      setOverviewOpen(true)
-                                    }}
-                                  />
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="f2-schedule-table__empty-cell" aria-label="No sessions">-</span>
-                            )}
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="coach-schedule-hint">Select a session to see its status, coach, facility and booking details.</p>
-          </>}
-        </Card>
-        <Card
-          className={`coach-schedule-overview${overviewOpen ? ' coach-schedule-overview--open' : ' coach-schedule-overview--collapsed'}`}
-          title="Session overview"
-          actions={<Button variant="ghost" size="sm" aria-label="Toggle session overview" onClick={() => setOverviewOpen((prev) => !prev)}>{overviewOpen ? 'Hide' : 'Show'}</Button>}
-        >
-          {selectedSession ? <>
-            <div className="coach-schedule-overview__feature">
-              <p>{selectedSession === nextSession ? 'Next visible session' : 'Selected session'}</p>
-              <h3>{sessionTitle(selectedSession)}</h3>
-              <span>Session {sessionIdText(selectedSession.sessionId)}</span>
-              <span>{browseDate(selectedSession.sessionDate)} | {displayTime(selectedSession.startTime)} - {displayTime(selectedSession.endTime)}</span>
-              <span>{selectedSession.facilityName || 'Facility not provided'}</span>
-            </div>
-            <dl className="coach-schedule-overview__facts">
-              <div><dt>Session status</dt><dd><StatusBadge status={selectedSession.status} /></dd></div>
-              <div><dt>Members booked</dt><dd>{selectedSession.bookedCount}{selectedSession.capacity ? ` / ${selectedSession.capacity}` : ''}</dd></div>
-              <div><dt>Coach</dt><dd>{selectedSession.coachName || 'Not assigned'}</dd></div>
-              <div><dt>Facility</dt><dd>{selectedSession.facilityName || 'Not provided'}</dd></div>
-              {selectedSession.trainingType && <div><dt>Training type</dt><dd>{selectedSession.trainingType === 'SELF_TRAINING' ? 'Self-training' : 'Coach-led'}</dd></div>}
-            </dl>
-            <Link className="btn btn--primary btn--md coach-schedule-overview__action" to={rosterHref(selectedSession, week)}>View roster</Link>
-          </> : <div className="coach-schedule-overview__empty"><p>No session to review</p><span>Choose another week to view assigned sessions and rosters.</span></div>}
-        </Card>
-      </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="coach-schedule-hint">Select a session to see its status, coach, facility and booking details.</p>
+        </>}
+      </Card>
     </>}
   </div>
 }
@@ -276,10 +248,12 @@ function CoachScheduleEntry({
   session,
   selected,
   onSelect,
+  week,
 }: {
   session: CoachSessionRecord
   selected: boolean
   onSelect: () => void
+  week: string
 }) {
   const [expanded, setExpanded] = useState(false)
   const isCancelled = session.status === 'CANCELLED'
@@ -308,7 +282,7 @@ function CoachScheduleEntry({
       <div className="f2-session__header">
         <span className="session-identity"><code>{sessionIdText(session.sessionId)}</code></span>
       </div>
-      <strong className="f2-session__title">{sessionTitle(session)}</strong>
+      <h3 className="f2-session__title">{sessionTitle(session)}</h3>
       <div className="f2-session__timing">
         <span>{displayTime(session.startTime)} - {displayTime(session.endTime)}</span>
         <StatusBadge status={session.status} />
@@ -318,12 +292,19 @@ function CoachScheduleEntry({
       </p>
 
       <div className={`f2-session__details ${expanded ? 'f2-session__details--expanded' : 'f2-session__details--collapsed'}`}>
+        <p className="f2-session__meta"><span>Session status: </span>{session.status}</p>
         <p className="f2-session__meta">Sport: {session.sportName}</p>
         <p className="f2-session__meta">{session.coachName ? `Coach: ${session.coachName}` : 'No assigned coach'}</p>
         <p className="f2-session__meta">Facility: {session.facilityName || 'Facility not provided'}</p>
         {session.trainingType && (
           <p className="f2-session__meta">Type: {session.trainingType === 'COACH_LED' ? 'Coach-led' : 'Self-training'}</p>
         )}
+      </div>
+
+      <div className="f2-session__actions f2-session__actions--coach" onClick={(e) => e.stopPropagation()}>
+        <Link className="btn btn--secondary btn--md f2-session__view-btn" to={rosterHref(session, week)}>
+          View roster
+        </Link>
       </div>
     </article>
   )
