@@ -60,10 +60,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -1393,6 +1395,70 @@ public class SportPackageServiceImplTest {
         assertEquals(new BigDecimal("332500.00"), failure.getDetails().get("currentAmountDue"));
         verify(registrationRepository, never()).save(any());
         verifyNoInteractions(paymentVerificationService, paymentService, auditService);
+    }
+
+    @Test
+    void createPackage_DuplicateCode_ThrowsFieldValidationException() {
+        SportPackageCreateRequest req = SportPackageCreateRequest.builder()
+                .code("PK-020")
+                .name("Demo Duplicate Package")
+                .sportId(1L)
+                .trainingFormat(TrainingFormat.COACH_LED)
+                .durationDays(30)
+                .sessionCount(10)
+                .priceAmount(BigDecimal.valueOf(500000.00))
+                .build();
+
+        when(sportPackageRepository.findByCode("PK-020")).thenReturn(Optional.of(sportPackage));
+
+        var ex = assertThrows(com.sportify.core.exception.FieldValidationException.class,
+                () -> sportPackageService.createPackage(req, managerUser));
+        assertTrue(ex.getDetails().containsKey("code"));
+        verify(sportPackageRepository, never()).save(any());
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    void deletePackage_BlankReason_ThrowsBusinessRuleException() {
+        assertThrows(BusinessRuleException.class, () -> sportPackageService.deletePackage(10L, "  ", managerUser));
+        verify(sportPackageRepository, never()).delete(any(SportPackage.class));
+    }
+
+    @Test
+    void deletePackage_ZeroRegistrations_HardDeletes() {
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(sportPackage));
+        when(registrationRepository.countBySportPackageId(10L)).thenReturn(0L);
+
+        sportPackageService.deletePackage(10L, "Outdated package test", managerUser);
+
+        verify(sportPackageRepository).delete(sportPackage);
+        verify(auditService).record(argThat(event ->
+                AuditAction.PACKAGE_DELETED.equals(event.getAction())
+                        && "SPORT_PACKAGE".equals(event.getEntityType())
+                        && Long.valueOf(10L).equals(event.getEntityId())
+                        && "Outdated package test".equals(event.getDetails().get("reason"))
+                        && Boolean.TRUE.equals(event.getDetails().get("hardDeleted"))
+        ));
+    }
+
+    @Test
+    void deletePackage_WithExistingRegistrations_SoftDeactivates() {
+        sportPackage.setIsActive(true);
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(sportPackage));
+        when(registrationRepository.countBySportPackageId(10L)).thenReturn(3L);
+
+        sportPackageService.deletePackage(10L, "Discontinuing package", managerUser);
+
+        verify(sportPackageRepository, never()).delete(any(SportPackage.class));
+        verify(sportPackageRepository).saveAndFlush(sportPackage);
+        assertFalse(sportPackage.getIsActive());
+        verify(auditService).record(argThat(event ->
+                AuditAction.PACKAGE_DELETED.equals(event.getAction())
+                        && "SPORT_PACKAGE".equals(event.getEntityType())
+                        && Long.valueOf(10L).equals(event.getEntityId())
+                        && "Discontinuing package".equals(event.getDetails().get("reason"))
+                        && Boolean.FALSE.equals(event.getDetails().get("hardDeleted"))
+        ));
     }
 
 }

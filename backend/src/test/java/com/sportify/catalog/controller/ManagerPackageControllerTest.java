@@ -37,6 +37,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -390,6 +391,37 @@ class ManagerPackageControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isForbidden());
+        verifyNoInteractions(sportPackageService);
+    }
+
+    @Test
+    void deletePackage_asManager_shouldReturn204() throws Exception {
+        mockMvc.perform(delete(PACKAGES_URL + "/10")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Outdated promotional package\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(sportPackageService).deletePackage(eq(10L), eq("Outdated promotional package"), any(UserAccount.class));
+    }
+
+    @Test
+    void deletePackage_withoutBody_usesDefaultReasonAndReturns204() throws Exception {
+        mockMvc.perform(delete(PACKAGES_URL + "/10")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN)))
+                .andExpect(status().isNoContent());
+
+        verify(sportPackageService).deletePackage(eq(10L), eq("Deleted by manager"), any(UserAccount.class));
+    }
+
+    @Test
+    void deletePackage_asMember_shouldReturn403() throws Exception {
+        mockMvc.perform(delete(PACKAGES_URL + "/10")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MEMBER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Outdated promotional package\"}"))
+                .andExpect(status().isForbidden());
+
         verifyNoInteractions(sportPackageService);
     }
 }

@@ -4,7 +4,7 @@ import { packagesApi } from '../../api/packagesApi'
 import { Button, Card, Input, Select, StatusBadge, Table, useToast, type TableColumn, StatIcon } from '../../components/ui'
 import { formatMoney } from '../../utils/format'
 import type { ManagerPackage } from '../../types/manager'
-import { ConfirmationModal, ManagerError, PreviewNotice } from './ManagerShared'
+import { ConfirmationModal, DeleteReasonModal, ManagerError, PreviewNotice } from './ManagerShared'
 import { PackageEditorModal } from './PackageEditorModal'
 import { useResource } from './useManagerTools'
 
@@ -24,6 +24,7 @@ export function ManagerPackagesPage() {
   const [page, setPage] = useState(0)
   const [editing, setEditing] = useState<ManagerPackage | 'create' | null>(null)
   const [changing, setChanging] = useState<ManagerPackage | null>(null)
+  const [deleting, setDeleting] = useState<ManagerPackage | null>(null)
   const [sports, retrySports] = useResource(loadSports)
   const load = useCallback((signal: AbortSignal) => managerPackagesApi.list({ sportId, format, active }, signal), [sportId, format, active])
   const [resource, reload] = useResource(load)
@@ -38,6 +39,13 @@ export function ManagerPackagesPage() {
     setChanging(null)
     setPage(0)
     toast.success('Sport package saved', 'Existing registrations keep their stored price and discount. Your filters have been preserved.')
+    reload()
+  }
+
+  function deleted() {
+    setDeleting(null)
+    setPage(0)
+    toast.success('Sport package deleted', 'The sport package was successfully removed or deactivated.')
     reload()
   }
 
@@ -92,7 +100,7 @@ export function ManagerPackagesPage() {
       </div>,
     },
     {
-      key: 'actions', header: 'Actions', width: '15%',
+      key: 'actions', header: 'Actions', width: '20%',
       render: (row) => {
         const canChangeStatus = row.isActive !== null && row.sessionCount !== null && row.sessionMinutes !== null && [60, 90].includes(row.sessionMinutes)
         return <div className="manager-catalog__cell manager-catalog__actions">
@@ -102,6 +110,7 @@ export function ManagerPackagesPage() {
             <Button variant={row.isActive ? 'danger' : 'secondary'} size="sm" disabled={!canChangeStatus} title={!canChangeStatus ? 'Status cannot be changed until the package data is complete.' : undefined} onClick={() => setChanging(row)}>
               {row.isActive ? 'Deactivate' : 'Activate'}
             </Button>
+            <Button variant="danger" size="sm" onClick={() => setDeleting(row)}>Delete</Button>
           </div>
         </div>
       },
@@ -193,7 +202,7 @@ export function ManagerPackagesPage() {
       </div>
     </Card>
 
-    {editing !== null && sports.status === 'ready' && <PackageEditorModal item={editing === 'create' ? undefined : editing} sports={sports.data} onClose={() => setEditing(null)} onSuccess={saved} />}
+    {editing !== null && sports.status === 'ready' && <PackageEditorModal item={editing === 'create' ? undefined : editing} sports={sports.data} existingPackages={resource.status === 'ready' ? resource.data : []} onClose={() => setEditing(null)} onSuccess={saved} />}
     {changing && <ConfirmationModal
       title={changing.isActive ? 'Deactivate package' : 'Activate package'}
       description={(changing.isActive ? 'Deactivate ' : 'Activate ') + changing.name + '? Existing paid registrations will keep their benefits.'}
@@ -202,6 +211,15 @@ export function ManagerPackagesPage() {
       onSuccess={saved}
       confirmLabel={changing.isActive ? 'Deactivate package' : 'Activate package'}
       danger={Boolean(changing.isActive)}
+    />}
+    {deleting && <DeleteReasonModal
+      title="Delete Sport Package"
+      entityName={`${deleting.name} (${deleting.code})`}
+      description="If there are active or historical member registrations using this package, it will be safely deactivated to preserve accounting records. Otherwise it will be permanently deleted."
+      confirmLabel="Delete package"
+      onClose={() => setDeleting(null)}
+      onConfirm={(reason) => managerPackagesApi.delete(deleting.id, reason)}
+      onSuccess={deleted}
     />}
   </div>
 }

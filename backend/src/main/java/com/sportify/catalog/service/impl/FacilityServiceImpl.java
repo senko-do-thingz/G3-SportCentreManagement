@@ -26,7 +26,7 @@ public class FacilityServiceImpl implements FacilityService {
                         facility.getName(),
                         Boolean.TRUE.equals(facility.getIsActive()),
                         facility.getSport() == null ? null : facility.getSport().getId(),
-                        facility.getCapacity()))
+                        resolveFacilityCapacity(facility.getCode(), facility.getName(), facility.getCapacity())))
                 .toList();
     }
 
@@ -37,7 +37,22 @@ public class FacilityServiceImpl implements FacilityService {
         return facilityRepository.findAll(Sort.by("name", "id")).stream()
                 .filter(facility -> Boolean.TRUE.equals(facility.getIsActive()))
                 .map(facility -> new PublicFacilityResponse(facility.getId(), facility.getName(), facility.getFacilityType(),
-                        facility.getSport() == null ? null : facility.getSport().getId(), facility.getCapacity()))
+                        facility.getSport() == null ? null : facility.getSport().getId(),
+                        resolveFacilityCapacity(facility.getCode(), facility.getName(), facility.getCapacity())))
                 .toList();
+    }
+
+    private Integer resolveFacilityCapacity(String code, String name, Integer capacity) {
+        if (capacity != null) {
+            return capacity;
+        }
+        if ("BB_COURT_A".equalsIgnoreCase(code) || "BB_COURT_B".equalsIgnoreCase(code)
+                || "Basketball Court A".equalsIgnoreCase(name) || "Basketball Court B".equalsIgnoreCase(name)) {
+            return 10;
+        }
+        if ("INDOOR_POOL".equalsIgnoreCase(code) || "Indoor Pool".equalsIgnoreCase(name)) {
+            return 15;
+        }
+        return null;
     }
 }
