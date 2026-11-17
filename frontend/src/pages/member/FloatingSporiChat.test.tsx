@@ -112,19 +112,19 @@ describe('FloatingSporiChat', () => {
 
   it('shows expand link for members but not for staff roles', () => {
     const fakeStaffAuth: AuthContextValue = {
-      user: { id: 1, email: 'mgr@sportify.test', fullName: 'Manager User' },
+      user: { id: 1, email: 'mgr@sportify.test', fullName: 'Manager User', phone: null, role: 'MANAGER', status: 'ACTIVE' },
       role: 'MANAGER',
       status: 'authenticated',
       sessionExpired: false,
       signedOutElsewhere: false,
       signOutNotice: null,
-      accountSwitch: null,
-      dismissAccountSwitchNotice: vi.fn(),
+      accountSwitched: null,
+      dismissAccountSwitch: vi.fn(),
+      loadError: null,
       login: vi.fn(),
       register: vi.fn(),
       logout: vi.fn(),
-      refresh: vi.fn(),
-      refreshProfile: vi.fn(),
+      reloadUser: vi.fn(),
     }
 
     const { unmount } = render(
@@ -143,7 +143,7 @@ describe('FloatingSporiChat', () => {
     const fakeMemberAuth: AuthContextValue = {
       ...fakeStaffAuth,
       role: 'MEMBER',
-      user: { id: 2, email: 'member@sportify.test', fullName: 'Member User' },
+      user: { id: 2, email: 'member@sportify.test', fullName: 'Member User', phone: null, role: 'MEMBER', status: 'ACTIVE' },
     }
 
     render(
