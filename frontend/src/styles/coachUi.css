@@ -487,76 +487,13 @@
 }
 
 .coach-ui .coach-schedule-weekly {
-  flex: 1 1 0%;
-  min-width: 0;
-  padding: 0;
-  transition: flex 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.coach-ui .coach-schedule-layout--collapsed .coach-schedule-weekly {
-  flex: 1 1 100%;
   width: 100%;
 }
 
-.coach-ui .coach-schedule-layout--with-overview .coach-schedule-weekly {
-  flex: 1 1 0%;
-  min-width: 0;
-}
-
-.coach-ui .coach-schedule-overview {
-  flex: 0 0 350px;
-  width: 350px;
-  max-width: 350px;
-  min-width: 0;
-  padding: 0;
-  position: sticky;
-  top: var(--space-4);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              flex-basis 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.25s ease,
-              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.coach-ui .coach-schedule-overview--open {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-.coach-ui .coach-schedule-overview--collapsed {
-  flex: 0 0 0px !important;
-  width: 0 !important;
-  max-width: 0 !important;
-  min-width: 0 !important;
-  opacity: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  border: 0 !important;
-  overflow: hidden !important;
-  pointer-events: none !important;
-  transform: translateX(30px);
-}
-
-@media (max-width: 1024px) {
-  .coach-ui .coach-schedule-layout {
-    flex-direction: column;
-  }
-  .coach-ui .coach-schedule-layout--with-overview .coach-schedule-overview {
-    flex: 1 1 100%;
-    width: 100%;
-    max-width: 100%;
-    position: static;
-  }
-}
-
-.coach-ui .coach-schedule-weekly .card__header,
-.coach-ui .coach-schedule-overview .card__header {
+.coach-ui .coach-schedule-weekly .card__header {
   min-height: 3.75rem;
   margin-bottom: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: 0 0 var(--space-3) 0;
   border-bottom: 1px solid var(--coach-rule);
 }
 
@@ -566,7 +503,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3) var(--space-4);
-  padding: var(--space-3) var(--space-4);
+  padding: 0;
+  margin-block: var(--space-4);
 }
 
 .coach-ui .coach-week-controls {

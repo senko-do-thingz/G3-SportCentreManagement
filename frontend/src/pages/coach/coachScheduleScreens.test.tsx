@@ -47,12 +47,12 @@ describe('FE-10 coach schedule and roster screens', () => {
     expect(scheduleSummary.querySelectorAll('.coach-schedule-metric__mark')).toHaveLength(0)
     expect(screen.getByRole('link', { name: 'View roster' })).toHaveAttribute('href', '/coach/roster?sessionId=5&week=2026-10-19')
     expect(screen.getByRole('link', { name: 'View class roster' })).toHaveAttribute('href', '/coach/roster?sessionId=5&week=2026-10-19')
-    expect(screen.getByText('Session status').parentElement).toHaveTextContent('Published')
+    expect(screen.getByText('Published')).toBeInTheDocument()
     expect(calls.some((call) => call.path === '/coach/sessions?from=2026-10-19&to=2026-10-25')).toBe(true)
     expect(calls.some((call) => call.path.includes('coachId='))).toBe(false)
   })
 
-  it('updates the session overview when a different real session is selected', async () => {
+  it('updates the selected session and roster link when a different real session is selected', async () => {
     const otherSession = {
       ...session, id: 6, className: 'Swimming Technique', sportName: 'Swimming', sessionDate: '2026-10-21',
       startTime: '09:00:00', endTime: '10:00:00', facilityName: 'Indoor Pool', capacity: 12, bookedCount: 4,
@@ -64,8 +64,8 @@ describe('FE-10 coach schedule and roster screens', () => {
     await user.click(await screen.findByRole('button', { name: /Swimming Technique/ }))
 
     expect(screen.getByRole('heading', { name: 'Swimming Technique' })).toBeInTheDocument()
-    expect(screen.getByText('Members booked').parentElement).toHaveTextContent('4 / 12')
-    expect(screen.getByRole('link', { name: 'View roster' })).toHaveAttribute('href', '/coach/roster?sessionId=6&week=2026-10-19')
+    expect(screen.getByText('4 / 12 booked')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'View class roster' })).toHaveAttribute('href', '/coach/roster?sessionId=6&week=2026-10-19')
   })
 
   it('navigates to another week while keeping the week query and loading that date range', async () => {

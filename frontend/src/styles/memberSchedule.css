@@ -93,8 +93,9 @@
   color: var(--schedule-gold-bright);
 }
 
-.member-schedule-theme .page-header__title {
-  color: #ffffff;
+.member-schedule-theme .page-header__title,
+:is(.member-layout, .staff-layout) .member-schedule-theme .page-header__title {
+  color: var(--color-on-primary) !important;
   font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
   font-size: var(--ui-title-size);
   font-weight: 800;
