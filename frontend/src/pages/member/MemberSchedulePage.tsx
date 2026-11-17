@@ -51,13 +51,15 @@ export function MemberSchedulePage({ embedded = false }: { embedded?: boolean })
 
       <Card title="Weekly schedule">
         <div className="manager-row-actions schedule-controls">
-          <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, -7))}>Previous week</Button>
-          <Button variant={from === currentWeek ? 'primary' : 'secondary'} onClick={() => changeWeek(currentWeek)}>
-            This week
-          </Button>
-          <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, 7))}>Next week</Button>
+          <div className="schedule-week-nav" role="group" aria-label="Schedule week navigation">
+            <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, -7))}>Previous week</Button>
+            <Button variant={from === currentWeek ? 'primary' : 'secondary'} onClick={() => changeWeek(currentWeek)}>
+              This week
+            </Button>
+            <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, 7))}>Next week</Button>
+          </div>
           <strong>{browseDate(from)} - {browseDate(to)}</strong>
-          <div className="schedule-week-nav" role="group" aria-label="Week navigation" style={{ marginLeft: 'auto' }}>
+          <div className="schedule-week-picker" role="group" aria-label="Week navigation" style={{ marginLeft: 'auto' }}>
             <Input
               className="schedule-week-input"
               label="Choose week"

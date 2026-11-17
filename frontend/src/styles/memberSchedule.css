@@ -10,7 +10,7 @@
 .browse-filters .field { min-width: 0; }
 .schedule-controls { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .schedule-week-input { width: min(100%, 260px); }
-.schedule-week-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.schedule-week-nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); }
 .schedule-scroll-hint { display: none; margin: 0 0 8px; color: var(--color-text-muted); font-size: 12px; }
 .schedule-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: 10px; overscroll-behavior-x: contain; }
 .schedule-table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
@@ -210,9 +210,14 @@
 }
 
 .member-schedule-theme .schedule-week-nav .btn {
-  min-height: 42px;
-  border-radius: 4px;
-  font-weight: 700;
+  height: 40px;
+  min-height: 40px;
+  max-height: 40px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-md);
+  border-radius: 0;
+  font-weight: var(--weight-semibold);
+  box-shadow: none;
   transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 

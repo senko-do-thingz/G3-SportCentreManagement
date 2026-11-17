@@ -128,7 +128,7 @@ export function ManagerSchedulePage() {
       {coaches.status === 'error' && <ManagerError error={coaches.error} onRetry={retryCoaches} />}
       {manualFacility ? <div className="notice notice--info">The facility dropdown API is not available. You can still create and edit sessions using a known facility ID; the scheduling API validates it. No sample IDs are substituted. <Button variant="ghost" onClick={retryFacilities}>Retry facility lookup</Button></div> : facilities.status === 'error' && <ManagerError error={facilities.error} onRetry={retryFacilities} />}
       {classes.status === 'ready' && !classes.data.some((item) => item.active) && <p className="notice notice--info">Create an active class before scheduling sessions. <Link to="/manager/classes/new">Create class</Link></p>}
-      <div className="manager-row-actions">
+      <div className="manager-row-actions schedule-week-nav" role="group" aria-label="Schedule week navigation">
         <Button variant="secondary" onClick={() => query('week', addDays(week, -7))}>Previous week</Button>
         <Button variant={isThisWeek ? 'primary' : 'secondary'} onClick={() => query('week', monday(centerNow().date))}>This week</Button>
         <Button variant="secondary" onClick={() => query('week', addDays(week, 7))}>Next week</Button>
