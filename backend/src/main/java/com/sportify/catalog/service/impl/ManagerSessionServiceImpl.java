@@ -350,13 +350,6 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
                 throw new BusinessRuleException("An authenticated manager is required to delete a session");
             }
             ClassSession session = findForUpdate(id);
-            ensureCanChange(session);
-
-            int attended = cancellationRepository.countBookingsWithParticipation(id);
-            if (attended > 0) {
-                throw new ConflictException("Session has " + attended + " booking(s) with recorded attendance or check-in;"
-                        + " deleting it would affect attended records", "SESSION_HAS_PARTICIPATION");
-            }
 
             LocalDateTime now = LocalDateTime.now(clock);
             Map<String, Object> before = snapshot(session);

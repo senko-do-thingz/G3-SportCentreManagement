@@ -202,23 +202,57 @@ function ManagerScheduleEntry({
   onPublish: () => void
   onDelete: () => void
 }) {
-  return <article className={`f2-session f2-session--${session.status.toLowerCase()}`}>
-    <span className="session-identity">Session ID <code>{sessionIdText(session.sessionId)}</code></span>
-    <strong className="f2-session__title">{session.class?.name ?? 'Unassigned class'}</strong>
-    <p className="f2-session__meta">{session.sportName}</p>
-    <div className="f2-session__timing">
-      <span>{session.startTime.slice(0, 5)} - {session.endTime.slice(0, 5)}</span>
-      <StatusBadge status={session.status} />
-    </div>
-    <p className="f2-session__meta">{session.trainingType === 'SELF_TRAINING' && !session.coach ? 'Self-training - No assigned coach' : `Coach: ${session.coach?.name ?? 'Coach not assigned'}`}</p>
-    <p className="f2-session__meta">Facility: {session.facility?.name ?? 'Not assigned'}</p>
-    <p className="f2-session__meta">{session.bookedCount} / {session.capacity} booked - {session.trainingType === 'COACH_LED' ? 'Coach-led' : 'Self-training'}</p>
-    {session.status === 'CANCELLED' && <p className="f2-session__meta f2-session__reason">Reason: {session.cancelReason || 'Not provided'}</p>}
-    {canManage && <div className="f2-session__actions">
-      {session.status === 'DRAFT' && <Button size="sm" onClick={onPublish}>Publish</Button>}
-      <Button size="sm" variant="secondary" disabled={editDisabled} onClick={onEdit}>Edit</Button>
-      <Button size="sm" variant="danger" aria-label="Cancel session" title="Cancel session" onClick={onCancel}>Cancel</Button>
-      <Button size="sm" variant="danger" aria-label="Delete session" title="Delete session" onClick={onDelete}>Delete</Button>
-    </div>}
-  </article>
+  const [expanded, setExpanded] = useState(false)
+
+  const toggleExpanded = (event: React.MouseEvent | React.KeyboardEvent) => {
+    const target = event.target as HTMLElement
+    if (target.closest('button') || target.closest('a') || target.closest('input')) {
+      return
+    }
+    setExpanded((prev) => !prev)
+  }
+
+  return (
+    <article
+      className={`f2-session f2-session--${session.status.toLowerCase()}${expanded ? ' f2-session--expanded' : ' f2-session--collapsed'}`}
+      onClick={toggleExpanded}
+    >
+      <div className="f2-session__header">
+        <span className="session-identity"><code>{sessionIdText(session.sessionId)}</code></span>
+        <button
+          type="button"
+          className="f2-session__toggle-btn"
+          aria-expanded={expanded}
+          aria-label={expanded ? 'Hide full details' : 'Show full details'}
+          onClick={(e) => {
+            e.stopPropagation()
+            setExpanded((prev) => !prev)
+          }}
+        >
+          {expanded ? '▲ Less' : '▼ Details'}
+        </button>
+      </div>
+      <strong className="f2-session__title">{session.class?.name ?? 'Unassigned class'}</strong>
+      <div className="f2-session__timing">
+        <span>{session.startTime.slice(0, 5)} - {session.endTime.slice(0, 5)}</span>
+        <StatusBadge status={session.status} />
+      </div>
+      <p className="f2-session__meta f2-session__booked">{session.bookedCount} / {session.capacity} booked</p>
+
+      <div className={`f2-session__details ${expanded ? 'f2-session__details--expanded' : 'f2-session__details--collapsed'}`}>
+        <p className="f2-session__meta">Sport: {session.sportName}</p>
+        <p className="f2-session__meta">{session.trainingType === 'SELF_TRAINING' && !session.coach ? 'Self-training - No assigned coach' : `Coach: ${session.coach?.name ?? 'Coach not assigned'}`}</p>
+        <p className="f2-session__meta">Facility: {session.facility?.name ?? 'Not assigned'}</p>
+        <p className="f2-session__meta">Type: {session.trainingType === 'COACH_LED' ? 'Coach-led' : 'Self-training'}</p>
+        {session.status === 'CANCELLED' && <p className="f2-session__meta f2-session__reason">Reason: {session.cancelReason || 'Not provided'}</p>}
+      </div>
+
+      <div className="f2-session__actions" onClick={(e) => e.stopPropagation()}>
+        {session.status === 'DRAFT' && <Button size="sm" onClick={onPublish}>Publish</Button>}
+        {canManage && <Button size="sm" variant="secondary" disabled={editDisabled} onClick={onEdit}>Edit</Button>}
+        {canManage && session.status === 'PUBLISHED' && <Button size="sm" variant="danger" aria-label="Cancel session" title="Cancel session" onClick={onCancel}>Cancel</Button>}
+        <Button size="sm" variant="danger" aria-label="Delete session" title="Delete session" onClick={onDelete}>Delete</Button>
+      </div>
+    </article>
+  )
 }

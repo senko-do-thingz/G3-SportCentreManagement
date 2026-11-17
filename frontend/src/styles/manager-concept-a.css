@@ -235,6 +235,20 @@
   gap: var(--space-3);
   box-shadow: var(--shadow-sm);
   border-radius: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.concept-stat:hover {
+  border-color: var(--color-primary-soft-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.concept-stat .stat-icon {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary-soft-hover);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 /* Scaled up schedule dashboard statistic blocks */

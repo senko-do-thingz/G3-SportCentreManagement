@@ -75,6 +75,16 @@
   width: 42px;
   height: 42px;
   flex: none;
+  transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.workspace-header .home-theme:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.workspace-header .home-theme:active {
+  transform: translateY(0);
 }
 
 .workspace-header .user-menu {
@@ -555,12 +565,21 @@
   background: color-mix(in srgb, var(--color-on-hero) 14%, transparent);
   color: var(--color-on-hero);
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.header-inbox__button:hover,
+.header-inbox__button:hover {
+  background: color-mix(in srgb, var(--color-on-hero) 26%, transparent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
 .header-inbox__button[aria-expanded='true'] {
   background: color-mix(in srgb, var(--color-on-hero) 26%, transparent);
+}
+
+.header-inbox__button:active {
+  transform: translateY(0);
 }
 
 .header-inbox__button:focus-visible,
@@ -652,10 +671,12 @@
   font-size: 0.75rem;
 }
 
+.home-account .header-inbox__panel [role='status'],
+.header-inbox__panel .header-inbox__empty,
 .header-inbox__empty {
   margin: 0;
   padding: 24px 16px;
-  color: var(--color-text-muted);
+  color: var(--color-text);
   font-size: 0.88rem;
   font-weight: 500;
   text-align: center;
