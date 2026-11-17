@@ -39,12 +39,11 @@ class MemberScheduleServiceImplTest {
     @Mock BookingRepository bookings;
     @Mock SportPackageRegistrationRepository registrations;
     @Mock MemberProfileRepository members;
-    @Mock com.sportify.catalog.service.OperationalMemberPolicy operationalMemberPolicy;
     MemberScheduleServiceImpl service;
     UserAccount actor;
 
     @BeforeEach void setUp() {
-        service = new MemberScheduleServiceImpl(sessions, bookings, registrations, members, CLOCK, operationalMemberPolicy);
+        service = new MemberScheduleServiceImpl(sessions, bookings, registrations, members, CLOCK);
         actor = account("MEMBER", 2);
     }
 
@@ -216,19 +215,6 @@ class MemberScheduleServiceImplTest {
         var result = service.getSession(100L, actor);
         assertThat(result.eligible()).isTrue();
         assertThat(result.suitableRegistrations()).extracting(SessionDetailResponse.SuitableRegistration::registrationId).containsExactly(200L, 201L);
-    }
-
-    @Test void syntheticMemberIsRejectedWithSyntheticOperationDeniedAndZeroPackages() {
-        detail(0); member();
-        doThrow(new BusinessRuleException("Synthetic members cannot use operational classes or training records",
-                "SYNTHETIC_OPERATION_DENIED")).when(operationalMemberPolicy).requireRealMember(2L);
-        var result = service.getSession(100L, actor);
-        assertThat(result.memberContext()).isTrue();
-        assertThat(result.eligible()).isFalse();
-        assertThat(result.alreadyBooked()).isFalse();
-        assertThat(result.reason()).isEqualTo(SYNTHETIC_OPERATION_DENIED);
-        assertThat(result.suitableRegistrations()).isEmpty();
-        verifyNoInteractions(registrations);
     }
 
     @Test void precedence_alreadyBookedWinsOverFullAndPackageFailure() {

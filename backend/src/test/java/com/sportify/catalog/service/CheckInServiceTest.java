@@ -62,7 +62,6 @@ public class CheckInServiceTest {
     @org.mockito.Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-10-05T00:00:00Z"), ZoneId.of("UTC"));
 
-    @org.mockito.Mock com.sportify.catalog.service.OperationalMemberPolicy operationalMemberPolicy;
     @InjectMocks
     private CheckInServiceImpl checkInService;
 
@@ -480,7 +479,7 @@ public class CheckInServiceTest {
     // allowed, including after the session has ended.
     private CheckInServiceImpl serviceAt(String instant) {
         return new CheckInServiceImpl(checkInRepository, bookingRepository, memberProfileRepository, auditService,
-                Clock.fixed(Instant.parse(instant), ZoneId.of("UTC")), sessionRepository, entityManager, operationalMemberPolicy);
+                Clock.fixed(Instant.parse(instant), ZoneId.of("UTC")), sessionRepository, entityManager);
     }
 
     private Booking bookingAt(long bookingId, long sessionId, int startHour) {
