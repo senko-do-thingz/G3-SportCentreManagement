@@ -64,7 +64,7 @@ class TrainingWriteServiceDatePolicyTest {
             Arguments.of(path,"2026-11-03T17:00:01Z",false)));
     }
     private long mark(Path path,Instant time) throws Exception {
-        var service=new TrainingWriteService(jdbc,Clock.fixed(time,ZoneId.of("Asia/Ho_Chi_Minh")),audit,entityManager, mock(OperationalMemberPolicy.class));
+        var service=new TrainingWriteService(jdbc,Clock.fixed(time,ZoneId.of("Asia/Ho_Chi_Minh")),audit,entityManager);
         if(path==Path.SELF_TRAINING){when(row.getString("training_type")).thenReturn("SELF_TRAINING");return service.selfAttendance(5L,11L,null).id();}
         var request=new TrainingWriteRequest.Attendance(11L,TrainingWriteRequest.AttendanceStatus.PRESENT,"Unit date boundary");
         return service.coachAttendance(5L,request).id();

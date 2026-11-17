@@ -137,7 +137,6 @@ public class PaymentServiceImpl implements PaymentService {
         }
         return payment;
     }
-    private com.sportify.catalog.service.OperationalMemberPolicy transferMemberPolicy;
     private com.sportify.core.audit.AuditService auditService;
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -151,11 +150,6 @@ public class PaymentServiceImpl implements PaymentService {
                 .entityCode(payment.getPaymentCode()).summary("Payment " + payment.getPaymentCode() + " "
                         + (action.equals(com.sportify.core.audit.AuditAction.PAYMENT_CANCELLED) ? "cancelled" : "submitted for verification"))
                 .build());
-    }
-
-    @org.springframework.beans.factory.annotation.Autowired
-    void setTransferMemberPolicy(com.sportify.catalog.service.OperationalMemberPolicy policy) {
-        this.transferMemberPolicy = policy;
     }
 
     @Override
@@ -472,14 +466,9 @@ public class PaymentServiceImpl implements PaymentService {
 
     private boolean liveTransferAllowed(Payment payment) {
         if (!bankProperties.isLiveInstructionsEnabled() || !bankProperties.isLiveBeneficiaryValid()
-                || transferMemberPolicy == null || payment.getMember() == null
+                || payment.getMember() == null
                 || "SIMULATED".equals(payment.getSettlementType()) || payment.getSimulatedTransactionId() != null
                 || "SPORTIFY_SIMULATOR".equals(payment.getSettlementProvider())) return false;
-        try {
-            transferMemberPolicy.requireRealMember(payment.getMember().getId());
-            return true;
-        } catch (BusinessRuleException quarantined) {
-            return false;
-        }
+        return true;
     }
 }

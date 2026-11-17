@@ -26,7 +26,6 @@ public class ClassNoticeService {
                          String content,LocalDate dueDate,String status,LocalDateTime createdAt) {}
     private final JdbcTemplate jdbc;
     private final Clock clock;
-    private final OperationalMemberPolicy operational;
     private final AuditService audit;
     private final EntityManager em;
     private final ObjectMapper json;
@@ -38,7 +37,6 @@ public class ClassNoticeService {
         """;
     public List<Notice> coach(long coach) { return jdbc.query(SELECT+" WHERE n.coach_id=? ORDER BY n.created_at DESC,n.id DESC",this::map,coach); }
     public List<Notice> member(long member) {
-        operational.requireRealMember(member);
         return jdbc.query(SELECT+"""
             WHERE n.status='PUBLISHED' AND EXISTS(
                 SELECT 1 FROM booking b JOIN class_session s ON s.id=b.session_id
