@@ -62,7 +62,6 @@ public interface SportPackageRegistrationRepository extends JpaRepository<SportP
     Optional<SportPackageRegistration> findByRegistrationCode(String registrationCode);
     List<SportPackageRegistration> findByMemberIdOrderByStartDateDesc(Long memberId);
     Optional<SportPackageRegistration> findByPaymentId(Long paymentId);
-    long countBySportPackageId(Long sportPackageId);
 
     /**
      * The payment id of a registration, read as a single value so that no registration entity is loaded before the
@@ -129,4 +128,6 @@ public interface SportPackageRegistrationRepository extends JpaRepository<SportP
     List<SportPackageRegistration> findPendingOnlineOrders(@Param("memberId") Long memberId,
                                                           @Param("packageId") Long packageId,
                                                           @Param("startDate") LocalDate startDate);
+
+    long countBySportPackageId(Long sportPackageId);
 }
