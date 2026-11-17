@@ -8,6 +8,7 @@ import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.FieldValidationException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.dto.ChangePasswordRequest;
+import com.sportify.identity.dto.DeleteAccountRequest;
 import com.sportify.identity.dto.ProfileCardResponse;
 import com.sportify.identity.dto.UpdateProfileRequest;
 import com.sportify.identity.dto.UserProfileResponse;
@@ -118,6 +119,30 @@ public class UserServiceImpl implements UserService {
         userRefreshTokenRepository.revokeAllForUser(user.getId(), LocalDateTime.now(clock));
         auditService.record(AuditEvent.builder().actor(user).action(AuditAction.PASSWORD_CHANGED)
                 .entityType("USER_ACCOUNT").entityId(user.getId()).summary("Password changed").build());
+    }
+
+    @Override
+    @Transactional
+    public void deleteCurrentUserAccount(CustomUserDetails userDetails, DeleteAccountRequest request) {
+        UserAccount user = currentAccount(userDetails);
+        if (request == null || request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new FieldValidationException("password", "Password is required to confirm account deletion");
+        }
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new FieldValidationException("password", "Current password is incorrect");
+        }
+        user.setStatus("INACTIVE");
+        users.save(user);
+        users.flush();
+        userRefreshTokenRepository.revokeAllForUser(user.getId(), LocalDateTime.now(clock));
+        auditService.record(AuditEvent.builder()
+                .actor(user)
+                .action(AuditAction.USER_DELETED)
+                .entityType("USER_ACCOUNT")
+                .entityId(user.getId())
+                .summary("Member deleted own account")
+                .details(Map.of("status", "SUCCESS", "userId", user.getId(), "email", user.getEmail()))
+                .build());
     }
 
     @Override

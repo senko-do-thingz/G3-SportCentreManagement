@@ -122,6 +122,7 @@ function ProfileContent({ initial }: { initial: UserProfile }) {
       <div className="profile-layout__main">
         <PersonalInfoCard initial={initial} onSaved={setSaved} />
         <ChangePasswordCard />
+        {role === 'MEMBER' && <DeleteAccountCard />}
       </div>
       <aside className="profile-layout__side" aria-label="Profile summary">
         <Card title="Profile summary">
@@ -439,6 +440,91 @@ function ChangePasswordCard() {
           </div>
         </fieldset>
       </form>
+    </Card>
+  )
+}
+
+function DeleteAccountCard() {
+  const { logout } = useAuth()
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!password.trim()) {
+      setError('Password is required to confirm account deletion')
+      return
+    }
+    setError(null)
+    setDeleting(true)
+    try {
+      await memberApi.deleteAccount(password)
+      logout('Your account has been deleted.')
+    } catch (err) {
+      if (err instanceof ApiError && err.hasFieldErrors && err.fieldErrors.password) {
+        setError(err.fieldErrors.password)
+      } else {
+        setError(getErrorMessage(err))
+      }
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <Card title="Delete account">
+      <div className="notice notice--warning" style={{ marginBottom: 'var(--space-4)' }}>
+        <p><strong>Warning:</strong> Deleting your account will immediately deactivate your profile, cancel future bookings, and sign you out permanently.</p>
+      </div>
+      {!confirming ? (
+        <div>
+          <p style={{ color: 'var(--color-text-muted)', marginBottom: 'var(--space-4)' }}>
+            Once you delete your account, there is no going back. Please be certain.
+          </p>
+          <Button
+            type="button"
+            variant="danger"
+            onClick={() => { setConfirming(true); setError(null); setPassword('') }}
+          >
+            Delete my account
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} noValidate aria-busy={deleting} aria-label="Confirm account deletion">
+          <fieldset className="profile-form" disabled={deleting} style={{ border: 'none', padding: 0, margin: 0 }}>
+            <p style={{ marginBottom: 'var(--space-3)', fontWeight: 'var(--weight-semibold)' }}>
+              Please enter your password to confirm account deletion:
+            </p>
+            <div style={{ maxWidth: '400px', marginBottom: 'var(--space-4)' }}>
+              <PasswordInput
+                label="Confirm your password"
+                name="deleteAccountPassword"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(null) }}
+                error={error ?? undefined}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="profile-form__actions" style={{ display: 'flex', gap: 'var(--space-3)' }}>
+              <Button type="submit" variant="danger" loading={deleting}>
+                Permanently delete account
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={deleting}
+                onClick={() => { setConfirming(false); setError(null); setPassword('') }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </fieldset>
+        </form>
+      )}
     </Card>
   )
 }

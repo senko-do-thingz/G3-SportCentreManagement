@@ -1,6 +1,7 @@
 package com.sportify.identity.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sportify.identity.dto.DeleteAccountRequest;
 import com.sportify.identity.dto.UserProfileResponse;
 import com.sportify.identity.security.*;
 import com.sportify.identity.service.UserService;
@@ -18,8 +19,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -118,5 +122,51 @@ class UserControllerTest {
         mockMvc.perform(get("/api/v1/not-found-endpoint")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer valid.access.token"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteCurrentUser_withValidPassword_shouldReturn204() throws Exception {
+        UserAccount userAccount = UserAccount.builder()
+                .email("test@sportify.com")
+                .role(Role.builder().code("MEMBER").build())
+                .status("ACTIVE")
+                .build();
+        CustomUserDetails userDetails = new CustomUserDetails(userAccount);
+
+        when(jwtService.extractUsername("valid.access.token")).thenReturn("test@sportify.com");
+        when(jwtService.extractTokenType("valid.access.token")).thenReturn("access");
+        when(userDetailsService.loadUserByUsername("test@sportify.com")).thenReturn(userDetails);
+        when(jwtService.isTokenValid("valid.access.token", userDetails)).thenReturn(true);
+
+        mockMvc.perform(delete("/api/v1/users/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer valid.access.token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new DeleteAccountRequest("ValidPassword123"))))
+                .andExpect(status().isNoContent());
+
+        verify(userService).deleteCurrentUserAccount(any(), any());
+    }
+
+    @Test
+    void deleteCurrentUserPost_withValidPassword_shouldReturn204() throws Exception {
+        UserAccount userAccount = UserAccount.builder()
+                .email("test@sportify.com")
+                .role(Role.builder().code("MEMBER").build())
+                .status("ACTIVE")
+                .build();
+        CustomUserDetails userDetails = new CustomUserDetails(userAccount);
+
+        when(jwtService.extractUsername("valid.access.token")).thenReturn("test@sportify.com");
+        when(jwtService.extractTokenType("valid.access.token")).thenReturn("access");
+        when(userDetailsService.loadUserByUsername("test@sportify.com")).thenReturn(userDetails);
+        when(jwtService.isTokenValid("valid.access.token", userDetails)).thenReturn(true);
+
+        mockMvc.perform(post("/api/v1/users/me/delete")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer valid.access.token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new DeleteAccountRequest("ValidPassword123"))))
+                .andExpect(status().isNoContent());
+
+        verify(userService).deleteCurrentUserAccount(any(), any());
     }
 }

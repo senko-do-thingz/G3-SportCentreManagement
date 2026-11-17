@@ -351,4 +351,32 @@ class UserServiceImplTest {
         assertThrows(DisabledException.class, () -> service.getCurrentUserAvatar(principal));
         verifyNoInteractions(audit);
     }
+
+    @Test
+    void deleteCurrentUserAccount_success() {
+        service.deleteCurrentUserAccount(principal, new DeleteAccountRequest("Original123"));
+        assertEquals("INACTIVE", user.getStatus());
+        verify(users).save(user);
+        verify(users).flush();
+        verify(userRefreshTokenRepository).revokeAllForUser(eq(10L), any(LocalDateTime.class));
+        verify(audit).record(argThat(event -> AuditAction.USER_DELETED.equals(event.getAction())
+                && event.getSummary().contains("Member deleted own account")));
+    }
+
+    @Test
+    void deleteCurrentUserAccount_wrongPassword() {
+        var ex = assertThrows(FieldValidationException.class,
+                () -> service.deleteCurrentUserAccount(principal, new DeleteAccountRequest("WrongPassword")));
+        assertEquals("Current password is incorrect", ex.getDetails().get("password"));
+        assertEquals("ACTIVE", user.getStatus());
+        verify(users, never()).save(user);
+    }
+
+    @Test
+    void deleteCurrentUserAccount_blankPassword() {
+        var ex = assertThrows(FieldValidationException.class,
+                () -> service.deleteCurrentUserAccount(principal, new DeleteAccountRequest("   ")));
+        assertEquals("Password is required to confirm account deletion", ex.getDetails().get("password"));
+        assertEquals("ACTIVE", user.getStatus());
+    }
 }
