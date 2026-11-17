@@ -21,8 +21,12 @@ public class FacilityServiceImpl implements FacilityService {
     public List<FacilityResponse> getFacilities() {
         // Retain inactive facilities for historical calendar filters; saves still require active assignments.
         return facilityRepository.findAll(Sort.by("name", "id")).stream()
-                .map(facility -> new FacilityResponse(facility.getId(), facility.getName(),
-                        Boolean.TRUE.equals(facility.getIsActive())))
+                .map(facility -> new FacilityResponse(
+                        facility.getId(),
+                        facility.getName(),
+                        Boolean.TRUE.equals(facility.getIsActive()),
+                        facility.getSport() == null ? null : facility.getSport().getId(),
+                        facility.getCapacity()))
                 .toList();
     }
 

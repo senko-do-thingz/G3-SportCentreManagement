@@ -9,6 +9,7 @@ public final class AuditAction {
     public static final String USER_CREATED = "USER_CREATED";
     public static final String USER_UPDATED = "USER_UPDATED";
     public static final String USER_STATUS_CHANGED = "USER_STATUS_CHANGED";
+    public static final String USER_DELETED = "USER_DELETED";
     public static final String ROLE_UPDATED = "ROLE_UPDATED";
     public static final String ROLE_PERMISSIONS_UPDATED = "ROLE_PERMISSIONS_UPDATED";
     
@@ -40,9 +41,11 @@ public final class AuditAction {
     public static final String CLASS_CREATED = "CLASS_CREATED";
     public static final String CLASS_UPDATED = "CLASS_UPDATED";
     public static final String CLASS_STATUS_CHANGED = "CLASS_STATUS_CHANGED";
+    public static final String CLASS_DELETED = "CLASS_DELETED";
     public static final String SESSION_CREATED = "SESSION_CREATED";
     public static final String SESSION_UPDATED = "SESSION_UPDATED";
     public static final String SESSION_CANCELLED = "SESSION_CANCELLED";
+    public static final String SESSION_DELETED = "SESSION_DELETED";
     public static final String SESSION_PUBLISHED = "SESSION_PUBLISHED";
     public static final String BOOKING_CREATED = "BOOKING_CREATED";
     public static final String BOOKING_CANCELLED = "BOOKING_CANCELLED";

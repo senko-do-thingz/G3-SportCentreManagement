@@ -206,6 +206,37 @@ public class ManagerUserServiceImpl implements ManagerUserService {
                 .build());
     }
 
+    @Override
+    @Transactional
+    public void deleteUser(Long userId, String reason, UserAccount actor) {
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessRuleException("Deletion reason is required");
+        }
+        if (actor != null && userId.equals(actor.getId())) {
+            throw new BusinessRuleException("You cannot delete your own account");
+        }
+        UserAccount user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        user.setStatus("INACTIVE");
+        userRepository.save(user);
+
+        Map<String, Object> details = new java.util.LinkedHashMap<>();
+        details.put("status", "SUCCESS");
+        details.put("reason", reason.trim());
+        details.put("inputs", Map.of("userId", userId, "email", user.getEmail(), "role", user.getRole().getCode()));
+        details.put("outputs", Map.of("userId", user.getId(), "deleted", true));
+
+        auditService.record(AuditEvent.builder()
+                .actor(actor)
+                .action(AuditAction.USER_DELETED)
+                .entityType(ENTITY_TYPE)
+                .entityId(user.getId())
+                .summary("User account deleted: " + reason.trim())
+                .details(details)
+                .build());
+    }
+
     private String normalizeRoleFilter(String role) {
         if (role == null || role.isBlank()) {
             return null;

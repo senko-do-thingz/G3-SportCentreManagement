@@ -1,6 +1,7 @@
 package com.sportify.catalog.controller;
 
 import com.sportify.catalog.dto.ClassStatusUpdateRequest;
+import com.sportify.catalog.dto.DeletionReasonRequest;
 import com.sportify.catalog.dto.ManagerClassResponse;
 import com.sportify.catalog.dto.PageResponse;
 import com.sportify.catalog.dto.SportClassRequest;
@@ -14,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -74,6 +76,24 @@ public class ManagerClassController {
             @Valid @RequestBody ClassStatusUpdateRequest request,
             @AuthenticationPrincipal CustomUserDetails principal) {
         return ResponseEntity.ok(managerClassService.changeStatus(id, request.active(), actor(principal)));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteClass(
+            @PathVariable Long id,
+            @Valid @RequestBody DeletionReasonRequest request,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        managerClassService.deleteClass(id, request.reason(), actor(principal));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<Void> deleteClassPost(
+            @PathVariable Long id,
+            @Valid @RequestBody DeletionReasonRequest request,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        managerClassService.deleteClass(id, request.reason(), actor(principal));
+        return ResponseEntity.noContent().build();
     }
 
     private static UserAccount actor(CustomUserDetails principal) {

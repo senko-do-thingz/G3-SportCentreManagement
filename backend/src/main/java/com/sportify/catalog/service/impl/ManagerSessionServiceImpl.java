@@ -3,6 +3,8 @@ package com.sportify.catalog.service.impl;
 import com.sportify.catalog.dto.ManagerSessionResponse;
 import com.sportify.catalog.dto.SessionCancelRequest;
 import com.sportify.catalog.dto.SessionConflictResponse;
+import com.sportify.catalog.dto.SessionConflictValidationRequest;
+import com.sportify.catalog.dto.SessionConflictValidationResponse;
 import com.sportify.catalog.dto.SessionCreateRequest;
 import com.sportify.catalog.dto.SessionUpdateRequest;
 import com.sportify.catalog.entity.BookingStatus;
@@ -292,6 +294,90 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             ClassSession saved = sessionRepository.saveAndFlush(session);
             audit(saved, actor, AuditAction.SESSION_PUBLISHED, Map.of("before", before, "after", snapshot(saved)));
             return toResponse(saved, bookingCounts(List.of(id)).getOrDefault(id, 0L));
+        });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SessionConflictValidationResponse validateConflicts(SessionConflictValidationRequest request) {
+        if (request == null || request.startTime() == null || request.endTime() == null) {
+            return SessionConflictValidationResponse.ok();
+        }
+        List<LocalDate> dates = request.dates();
+        if ((dates == null || dates.isEmpty()) && request.date() != null) {
+            dates = List.of(request.date());
+        }
+        if (dates == null || dates.isEmpty()) {
+            return SessionConflictValidationResponse.ok();
+        }
+
+        if (dates.size() > 1 && (request.coachId() != null || request.facilityId() != null)) {
+            List<com.sportify.catalog.service.ScheduleConflictValidator.SessionScheduleItem> items = dates.stream()
+                    .map(d -> new com.sportify.catalog.service.ScheduleConflictValidator.SessionScheduleItem(
+                            d, request.startTime(), request.endTime(), request.coachId(), request.facilityId()))
+                    .toList();
+            try {
+                conflictValidator.validateIntraBatchConflicts(items);
+            } catch (BusinessRuleException ex) {
+                return SessionConflictValidationResponse.conflict(List.of(), ex.getMessage());
+            }
+        }
+
+        try {
+            conflictValidator.validateDatabaseConflicts(
+                    dates,
+                    request.startTime(),
+                    request.endTime(),
+                    request.coachId(),
+                    request.facilityId(),
+                    request.excludedSessionId()
+            );
+        } catch (ScheduleConflictException ex) {
+            return SessionConflictValidationResponse.conflict(ex.getConflicts(), "Schedule conflicts detected");
+        }
+
+        return SessionConflictValidationResponse.ok();
+    }
+
+    @Override
+    @Transactional
+    public void deleteSession(Long id, String reason, UserAccount actor) {
+        withLockHandling(() -> {
+            if (reason == null || reason.isBlank()) {
+                throw new BusinessRuleException("Deletion reason is required");
+            }
+            if (actor == null || actor.getId() == null) {
+                throw new BusinessRuleException("An authenticated manager is required to delete a session");
+            }
+            ClassSession session = findForUpdate(id);
+            ensureCanChange(session);
+
+            int attended = cancellationRepository.countBookingsWithParticipation(id);
+            if (attended > 0) {
+                throw new ConflictException("Session has " + attended + " booking(s) with recorded attendance or check-in;"
+                        + " deleting it would affect attended records", "SESSION_HAS_PARTICIPATION");
+            }
+
+            LocalDateTime now = LocalDateTime.now(clock);
+            Map<String, Object> before = snapshot(session);
+
+            var cancellation = cancellationRepository.cancelConfirmedBookings(id, actor.getId(), reason.trim(), now);
+
+            session.setStatus(SessionStatus.CANCELLED);
+            session.setCancelReason(reason.trim());
+            session.setCancelledBy(actor);
+            session.setCancelledAt(now);
+            session.setBookedCount(0);
+            ClassSession saved = sessionRepository.saveAndFlush(session);
+
+            audit(saved, actor, AuditAction.SESSION_DELETED, Map.of(
+                    "before", before,
+                    "after", snapshot(saved),
+                    "reason", reason.trim(),
+                    "bookingsCancelled", cancellation.cancelledCount()
+            ));
+
+            return null;
         });
     }
 

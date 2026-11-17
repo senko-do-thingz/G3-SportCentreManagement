@@ -1,7 +1,10 @@
 package com.sportify.catalog.controller;
 
+import com.sportify.catalog.dto.DeletionReasonRequest;
 import com.sportify.catalog.dto.ManagerSessionResponse;
 import com.sportify.catalog.dto.SessionCancelRequest;
+import com.sportify.catalog.dto.SessionConflictValidationRequest;
+import com.sportify.catalog.dto.SessionConflictValidationResponse;
 import com.sportify.catalog.dto.SessionCreateRequest;
 import com.sportify.catalog.dto.SessionUpdateRequest;
 import com.sportify.catalog.service.ManagerSessionService;
@@ -14,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -95,6 +99,46 @@ public class ManagerSessionController {
             @Valid @RequestBody SessionCancelRequest request,
             @AuthenticationPrincipal CustomUserDetails principal) {
         return ResponseEntity.ok(managerSessionService.cancelSession(id, request, actor(principal)));
+    }
+
+    @DeleteMapping("/sessions/{id}")
+    public ResponseEntity<Void> deleteSession(@PathVariable Long id,
+            @Valid @RequestBody DeletionReasonRequest request,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        managerSessionService.deleteSession(id, request.reason(), actor(principal));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/sessions/{id}/delete")
+    public ResponseEntity<Void> deleteSessionPost(@PathVariable Long id,
+            @Valid @RequestBody DeletionReasonRequest request,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        managerSessionService.deleteSession(id, request.reason(), actor(principal));
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/sessions/by-code/{sessionId}")
+    public ResponseEntity<Void> deleteSessionByCode(@PathVariable String sessionId,
+            @Valid @RequestBody DeletionReasonRequest request,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        managerSessionService.deleteSession(
+                managerSessionService.getSessionByCode(sessionId).id(), request.reason(), actor(principal));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/sessions/by-code/{sessionId}/delete")
+    public ResponseEntity<Void> deleteSessionByCodePost(@PathVariable String sessionId,
+            @Valid @RequestBody DeletionReasonRequest request,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        managerSessionService.deleteSession(
+                managerSessionService.getSessionByCode(sessionId).id(), request.reason(), actor(principal));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/sessions/validate")
+    public ResponseEntity<SessionConflictValidationResponse> validateSchedule(
+            @RequestBody SessionConflictValidationRequest request) {
+        return ResponseEntity.ok(managerSessionService.validateConflicts(request));
     }
 
     private static UserAccount actor(CustomUserDetails principal) {

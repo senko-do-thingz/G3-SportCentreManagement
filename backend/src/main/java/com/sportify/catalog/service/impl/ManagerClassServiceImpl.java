@@ -266,6 +266,43 @@ public class ManagerClassServiceImpl implements ManagerClassService {
         return toResponse(saved, upcoming);
     }
 
+    @Override
+    @Transactional
+    public void deleteClass(Long id, String reason, UserAccount actor) {
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessRuleException("Deletion reason is required");
+        }
+        SportClass sportClass = findClass(id);
+        LocalDate today = LocalDate.now(clock);
+        LocalTime timeNow = LocalTime.now(clock);
+
+        long bookings = bookingRepository.countUpcomingByClass(
+                id, BookingStatus.CONFIRMED, UPCOMING_SESSION_STATUSES, today, timeNow);
+        if (bookings > 0) {
+            throw new BusinessRuleException("Cannot delete a class that has " + bookings
+                    + " confirmed booking(s) on upcoming sessions. Cancel or complete those sessions first.");
+        }
+
+        sportClass.setIsActive(false);
+        SportClass saved = sportClassRepository.saveAndFlush(sportClass);
+
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("status", "SUCCESS");
+        details.put("reason", reason.trim());
+        details.put("code", saved.getCode());
+        details.put("name", saved.getName());
+
+        auditService.record(AuditEvent.builder()
+                .actor(actor)
+                .action(AuditAction.CLASS_DELETED)
+                .entityType(ENTITY_TYPE)
+                .entityId(saved.getId())
+                .entityCode(saved.getCode())
+                .summary(truncate("Class '" + saved.getName() + "' deleted: " + reason.trim()))
+                .details(details)
+                .build());
+    }
+
     // =====================================================================
     // Validation helpers
     // =====================================================================

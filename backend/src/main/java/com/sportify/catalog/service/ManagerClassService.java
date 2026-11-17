@@ -25,4 +25,6 @@ public interface ManagerClassService {
      * sessions that have not started yet is rejected with a business rule error (HTTP 400).
      */
     ManagerClassResponse changeStatus(Long id, boolean active, UserAccount actor);
+
+    void deleteClass(Long id, String reason, UserAccount actor);
 }

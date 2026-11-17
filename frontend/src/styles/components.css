@@ -950,10 +950,11 @@
 }
 
 /* Spinner */
-.spinner {
+.spinner,
+[class*='spinner'] {
   display: inline-block;
   flex: none;
-  border-radius: 50%;
+  border-radius: 50% !important;
   border: 2px solid var(--color-primary-soft-hover);
   border-top-color: var(--color-primary);
   animation: spin 0.7s linear infinite;
