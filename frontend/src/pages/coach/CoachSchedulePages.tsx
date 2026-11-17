@@ -1,6 +1,6 @@
 import { formatDateTime } from '../../utils/format'
 import '../../styles/coachUi.css'
-import { CoachTimeGridSchedule } from './CoachTimeGridSchedule'
+import '../../styles/managerSchedule.css'
 import { parseSessionReference, sessionRouteReference } from '../../api/sessionIdentity'
 import { SessionContext } from '../../components/SessionContext'
 import { sessionIdText } from '../../api/sessionIdentity'
@@ -9,7 +9,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { coachScheduleApi, type CoachRosterRecord, type CoachSessionRecord } from '../../api/coachScheduleApi'
 import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, PageLoader, Select, StatusBadge } from '../../components/ui'
 import { useResource } from '../../hooks/useResource'
-import { browseAddDays, browseDate, browseMonday, browseToday, validBrowseDate } from '../member/memberScheduleDates'
+import { browseAddDays, browseDate, browseDay, browseMonday, browseToday, validBrowseDate } from '../member/memberScheduleDates'
 
 function displayTime(value: string): string {
   return value.slice(0, 5)
@@ -121,7 +121,16 @@ export function CoachTeachingSchedulePage() {
     ? sessions.find((session) => sessionRouteReference(session) === selection.sessionId)
     : undefined) ?? defaultSession
   const classCount = new Set(sessions.flatMap((session) => session.classId ? [session.classId] : [])).size
-  const dates = Array.from({ length: 7 }, (_, index) => browseAddDays(week, index))
+  const dates = useMemo(() => Array.from({ length: 7 }, (_, index) => browseAddDays(week, index)), [week])
+  const timeSlots = useMemo(() => Array.from(new Set(sessions.map((s) => displayTime(s.startTime)))).sort(), [sessions])
+  const sessionsByDateAndTime = useMemo(() => {
+    const map = new Map<string, CoachSessionRecord[]>()
+    for (const s of sessions) {
+      const key = `${s.sessionDate}|${displayTime(s.startTime)}`
+      map.set(key, [...(map.get(key) ?? []), s])
+    }
+    return map
+  }, [sessions])
 
   return <div className="page coach-schedule-page coach-ui">
     <PageHeader eyebrow="Coach workspace" title="Teaching Schedule" description="Review assigned sessions across the teaching week." />
@@ -151,14 +160,53 @@ export function CoachTeachingSchedulePage() {
             <strong>{browseDate(week)} - {browseDate(weekEnd)}</strong>
           </div>
           {sessions.length === 0 ? <div className="coach-schedule-empty"><EmptyState title="No assigned sessions this week" description="Your schedule will show sessions assigned to your coach account." /></div> : <>
-            <div className="coach-schedule-week-scroll" role="region" aria-label={`Sessions from ${browseDate(week)} to ${browseDate(weekEnd)}`} tabIndex={0}>
-              <CoachTimeGridSchedule
-                dates={dates}
-                sessions={sessions}
-                selectedSession={selectedSession}
-                onSelectSession={(session) => setSelection({ week, sessionId: sessionRouteReference(session) })}
-                today={today}
-              />
+            <p id="coach-schedule-grouping" className="f2-schedule-table__guidance">Sessions are grouped by start time. Each card shows its full time range; separate rows can overlap.</p>
+            <div className="f2-schedule-table-wrap" role="region" aria-label={`Sessions from ${browseDate(week)} to ${browseDate(weekEnd)}`} tabIndex={0}>
+              <table className="f2-schedule-table" aria-label="Coach teaching schedule" aria-describedby="coach-schedule-grouping">
+                <thead>
+                  <tr>
+                    <th className="f2-schedule-table__time-heading" scope="col">Starts at</th>
+                    {dates.map((date) => {
+                      const isToday = date === today
+                      return (
+                        <th className={isToday ? 'f2-schedule-table__today' : undefined} scope="col" key={date} aria-current={isToday ? 'date' : undefined}>
+                          <span>{browseDay(date)}</span>
+                          <time dateTime={date}>{browseDate(date)}</time>
+                        </th>
+                      )
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {timeSlots.map((time) => (
+                    <tr key={time}>
+                      <th scope="row">{time}</th>
+                      {dates.map((date) => {
+                        const cellSessions = sessionsByDateAndTime.get(`${date}|${time}`) ?? []
+                        const isToday = date === today
+                        return (
+                          <td className={isToday ? 'f2-schedule-table__today' : undefined} key={date}>
+                            {cellSessions.length ? (
+                              <div className="f2-schedule-table__entries">
+                                {cellSessions.map((s) => (
+                                  <CoachScheduleEntry
+                                    key={s.id}
+                                    session={s}
+                                    selected={selectedSession?.id === s.id}
+                                    onSelect={() => setSelection({ week, sessionId: sessionRouteReference(s) })}
+                                  />
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="f2-schedule-table__empty-cell" aria-label="No sessions">-</span>
+                            )}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
             <p className="coach-schedule-hint">Select a session to see its status, coach, facility and booking details.</p>
           </>}
@@ -185,6 +233,63 @@ export function CoachTeachingSchedulePage() {
       </div>
     </>}
   </div>
+}
+
+function CoachScheduleEntry({
+  session,
+  selected,
+  onSelect,
+}: {
+  session: CoachSessionRecord
+  selected: boolean
+  onSelect: () => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const isCancelled = session.status === 'CANCELLED'
+  const isCompleted = session.status === 'COMPLETED'
+  const stateClass = isCancelled ? ' f2-session--cancelled' : isCompleted ? ' f2-session--completed' : ''
+  const selectedClass = selected ? ' f2-session--selected' : ''
+
+  return (
+    <article
+      className={`f2-session${stateClass}${selectedClass}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`Session ${sessionTitle(session)}`}
+      onClick={() => {
+        setExpanded((prev) => !prev)
+        onSelect()
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          setExpanded((prev) => !prev)
+          onSelect()
+        }
+      }}
+    >
+      <div className="f2-session__header">
+        <span className="session-identity"><code>{sessionIdText(session.sessionId)}</code></span>
+      </div>
+      <strong className="f2-session__title">{sessionTitle(session)}</strong>
+      <div className="f2-session__timing">
+        <span>{displayTime(session.startTime)} - {displayTime(session.endTime)}</span>
+        <StatusBadge status={session.status} />
+      </div>
+      <p className="f2-session__meta f2-session__booked">
+        {session.bookedCount}{session.capacity ? ` / ${session.capacity}` : ''} booked
+      </p>
+
+      <div className={`f2-session__details ${expanded ? 'f2-session__details--expanded' : 'f2-session__details--collapsed'}`}>
+        <p className="f2-session__meta">Sport: {session.sportName}</p>
+        <p className="f2-session__meta">{session.coachName ? `Coach: ${session.coachName}` : 'No assigned coach'}</p>
+        <p className="f2-session__meta">Facility: {session.facilityName || 'Facility not provided'}</p>
+        {session.trainingType && (
+          <p className="f2-session__meta">Type: {session.trainingType === 'COACH_LED' ? 'Coach-led' : 'Self-training'}</p>
+        )}
+      </div>
+    </article>
+  )
 }
 
 function rosterBookedAt(value: string | null): string {
