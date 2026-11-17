@@ -7,7 +7,7 @@ import '../../styles/managerSchedule.css'
 import '../../styles/manager-concept-a.css'
 import { HOME_PHOTOS } from '../public/homeContent'
 import trainingGroundImage from '../../assets/home/hero.jpg'
-import { Button, CalendarDateField, Card, EmptyState, PageLoader, Select, StatusBadge, StatIcon } from '../../components/ui'
+import { Button, Card, EmptyState, PageLoader, Select, StatusBadge, StatIcon } from '../../components/ui'
 import { BrowseError } from './BrowseError'
 import { FindClassesPage } from './FindClassesPage'
 import { MemberBookingsPage } from './MemberBookingsPages'
@@ -196,12 +196,9 @@ function CenterSchedule() {
             <Button variant={from === browseMonday(today) ? 'primary' : 'secondary'} onClick={() => change('date', today)}>This week</Button>
             <Button variant="secondary" onClick={() => moveWeek(7)}>Next week</Button>
           </div>
-          <Button variant="ghost" onClick={reload}>Refresh schedule</Button>
-        {resource.status === 'ready' && <span className="browse-muted" role="status">{rows.length} sessions shown</span>}
-        <CalendarDateField label="Week containing" value={from} onChange={(value, valid) => { if (valid !== false) change('date', value) }} />
-        <div className="center-schedule__toolbar-actions" style={{ marginLeft: 'auto' }}>
-          <Link className="btn btn--secondary btn--md" to="/member/schedules?tab=find-classes">Find a class</Link>
-        </div>
+          <div className="center-schedule__toolbar-actions" style={{ marginLeft: 'auto' }}>
+            <Link className="btn btn--secondary btn--md" to="/member/schedules?tab=find-classes">Find a class</Link>
+          </div>
       </div>
       {sports.status === 'error' && <BrowseError error={sports.error} onRetry={retrySports} />}
       {resource.status === 'loading' ? <PageLoader label="Loading center schedule" /> : resource.status === 'error' ? <BrowseError error={resource.error} onRetry={reload} /> : rows.length === 0 ? (
