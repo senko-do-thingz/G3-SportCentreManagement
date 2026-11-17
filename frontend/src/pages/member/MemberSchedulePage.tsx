@@ -49,24 +49,25 @@ export function MemberSchedulePage({ embedded = false }: { embedded?: boolean })
         actions={<Link className={buttonClassName()} to={FIND_CLASSES}>Find Classes</Link>}
       />}
 
-      <Card title={`${browseDate(from)} - ${browseDate(to)}`}>
-        <div className="schedule-controls">
-          <Input
-            className="schedule-week-input"
-            label="Choose week"
-            type="week"
-            value={browseIsoWeek(from)}
-            onChange={(event) => {
-              const monday = browseMondayFromIsoWeek(event.target.value)
-              if (monday) changeWeek(monday)
-            }}
-          />
-          <div className="schedule-week-nav" role="group" aria-label="Week navigation">
-            <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, -7))}>Previous week</Button>
-            <Button variant={from === currentWeek ? 'primary' : 'secondary'} disabled={from === currentWeek} onClick={() => changeWeek(currentWeek)}>
-              This week
-            </Button>
-            <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, 7))}>Next week</Button>
+      <Card title="Weekly schedule">
+        <div className="manager-row-actions schedule-controls">
+          <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, -7))}>Previous week</Button>
+          <Button variant={from === currentWeek ? 'primary' : 'secondary'} disabled={from === currentWeek} onClick={() => changeWeek(currentWeek)}>
+            This week
+          </Button>
+          <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, 7))}>Next week</Button>
+          <strong>{browseDate(from)} - {browseDate(to)}</strong>
+          <div className="schedule-week-nav" role="group" aria-label="Week navigation" style={{ marginLeft: 'auto' }}>
+            <Input
+              className="schedule-week-input"
+              label="Choose week"
+              type="week"
+              value={browseIsoWeek(from)}
+              onChange={(event) => {
+                const monday = browseMondayFromIsoWeek(event.target.value)
+                if (monday) changeWeek(monday)
+              }}
+            />
           </div>
         </div>
 

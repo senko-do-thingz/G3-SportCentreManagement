@@ -144,30 +144,27 @@ function CenterSchedule() {
   function moveWeek(days: number) { change('date', browseAddDays(from, days)) }
 
   return (
-    <Card className="center-schedule" title={`${browseDate(from)} - ${browseDate(to)}`}>
-      <div className="center-schedule__toolbar">
-        <div className="center-schedule__week-group">
-          <div className="schedule-week-nav" role="group" aria-label="Center schedule week navigation">
-            <Button variant="secondary" onClick={() => moveWeek(-7)}>Previous week</Button>
-            <Button variant={from === browseMonday(today) ? 'primary' : 'secondary'} onClick={() => change('date', today)}>This week</Button>
-            <Button variant="secondary" onClick={() => moveWeek(7)}>Next week</Button>
-          </div>
-          <CalendarDateField label="Week containing" value={from} onChange={(value, valid) => { if (valid !== false) change('date', value) }} />
-        </div>
-        <div className="center-schedule__toolbar-actions">
-          <Link className="btn btn--primary btn--md" to="/member/schedules?tab=find-classes">Find a class</Link>
-        </div>
-      </div>
-      <div className="center-schedule__filters" aria-label="Center schedule filters">
+    <Card className="center-schedule" title="Weekly schedule">
+      <div className="manager-filters center-schedule__filters" aria-label="Center schedule filters">
         <Select label="Sport" placeholder="All sports" value={sportId ? String(sportId) : ''} options={sports.status === 'ready' ? sports.data.map((sport) => ({ value: String(sport.id), label: sport.name })) : []} onChange={(event) => change('sportId', event.target.value)} />
         <Select label="Training format" placeholder="All formats" value={format ?? ''} options={[{ value: 'COACH_LED', label: 'Coach-led' }, { value: 'SELF_TRAINING', label: 'Self-training' }]} onChange={(event) => change('format', event.target.value)} />
         <Select label="Availability" value={availability} options={[{ value: 'ALL', label: 'All availability' }, { value: 'AVAILABLE', label: 'Places available' }, { value: 'FULL', label: 'Full' }]} onChange={(event) => change('availability', event.target.value === 'ALL' ? '' : event.target.value)} />
         <Select label="Session status" value={status} options={[{ value: 'ALL', label: 'All visible statuses' }, { value: 'PUBLISHED', label: 'Published' }, { value: 'COMPLETED', label: 'Completed' }, { value: 'CANCELLED', label: 'Cancelled' }]} onChange={(event) => change('status', event.target.value === 'ALL' ? '' : event.target.value)} />
       </div>
-      <div className="browse-actions center-schedule__actions">
+      <div className="manager-row-actions center-schedule__toolbar">
+        <div className="schedule-week-nav" role="group" aria-label="Center schedule week navigation">
+          <Button variant="secondary" onClick={() => moveWeek(-7)}>Previous week</Button>
+          <Button variant={from === browseMonday(today) ? 'primary' : 'secondary'} onClick={() => change('date', today)}>This week</Button>
+          <Button variant="secondary" onClick={() => moveWeek(7)}>Next week</Button>
+        </div>
+        <strong>{browseDate(from)} - {browseDate(to)}</strong>
         <Button variant="secondary" onClick={() => setParams({ tab: 'center', date: today })}>Clear filters</Button>
         <Button variant="ghost" onClick={reload}>Refresh schedule</Button>
         {resource.status === 'ready' && <span className="browse-muted" role="status">{rows.length} sessions shown</span>}
+        <CalendarDateField label="Week containing" value={from} onChange={(value, valid) => { if (valid !== false) change('date', value) }} />
+        <div className="center-schedule__toolbar-actions" style={{ marginLeft: 'auto' }}>
+          <Link className="btn btn--secondary btn--md" to="/member/schedules?tab=find-classes">Find a class</Link>
+        </div>
       </div>
       {sports.status === 'error' && <BrowseError error={sports.error} onRetry={retrySports} />}
       {resource.status === 'loading' ? <PageLoader label="Loading center schedule" /> : resource.status === 'error' ? <BrowseError error={resource.error} onRetry={reload} /> : rows.length === 0 ? (

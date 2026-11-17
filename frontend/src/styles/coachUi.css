@@ -365,6 +365,13 @@
   gap: var(--space-3);
 }
 
+.coach-ui .coach-schedule-metrics.concept-stats {
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  border: none;
+  background: transparent;
+}
+
 .coach-ui .coach-schedule-metric {
   display: flex;
   align-items: center;
@@ -374,6 +381,54 @@
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--coach-rule);
   background: var(--coach-surface);
+}
+
+.coach-ui .coach-schedule-metric.concept-stat {
+  min-height: 104px;
+  padding: var(--space-5);
+  gap: var(--space-4);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  border-radius: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.coach-ui .coach-schedule-metric.concept-stat:hover {
+  border-color: var(--color-primary-soft-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.coach-ui.coach-schedule-page .coach-schedule-metric.concept-stat .coach-schedule-metric__icon {
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 6px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary-soft-hover);
+  border-radius: 0;
+  box-sizing: border-box;
+}
+
+.coach-ui .coach-schedule-metric.concept-stat strong {
+  font-size: var(--text-3xl);
+  line-height: 1.1;
+  font-weight: 900;
+  color: var(--color-navy);
+  letter-spacing: -0.02em;
+  display: block;
+}
+
+.coach-ui .coach-schedule-metric.concept-stat small {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin-top: 2px;
+  display: block;
 }
 
 .coach-ui .coach-schedule-metric__mark {
@@ -419,27 +474,26 @@
   line-height: 1.35;
 }
 
-/* Bo cuc lich tuan (3 cot) va thong tin tong quan ca day (1 cot) khop voi 4 the chi so phia tren */
+/* Coach schedule layout: full-width timetable matching Manager schedule view */
 .coach-ui .coach-schedule-layout {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  align-items: start;
-  gap: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
   min-width: 0;
+  width: 100%;
 }
 
 .coach-ui .coach-schedule-weekly {
-  grid-column: span 3;
+  width: 100%;
   min-width: 0;
   padding: 0;
 }
 
 .coach-ui .coach-schedule-overview {
-  grid-column: span 1;
+  width: 100%;
   min-width: 0;
   padding: 0;
-  position: sticky;
-  top: var(--space-4);
+  position: static;
 }
 
 .coach-ui .coach-schedule-weekly .card__header,
@@ -655,7 +709,8 @@
 
 .coach-ui .coach-schedule-overview__facts {
   display: grid;
-  gap: 0;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3) var(--space-4);
   margin-block: var(--space-3) var(--space-4);
 }
 
@@ -665,8 +720,10 @@
   justify-content: space-between;
   gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--coach-rule);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-muted);
 }
 
 .coach-ui .coach-schedule-overview__facts dt,

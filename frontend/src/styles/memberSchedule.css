@@ -12,17 +12,17 @@
 .schedule-scroll-hint { display: none; margin: 0 0 8px; color: var(--color-text-muted); font-size: 12px; }
 .schedule-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: 10px; overscroll-behavior-x: contain; }
 .schedule-table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
-.schedule-table th, .schedule-table td { padding: 12px; border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); vertical-align: top; }
+.schedule-table th, .schedule-table td { padding: 6px 4px; border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); vertical-align: top; }
 .schedule-table tr > :last-child { border-right: 0; }
 .schedule-table tbody tr:last-child > * { border-bottom: 0; }
-.schedule-table thead th { background: var(--color-surface-muted); color: var(--color-text); font-size: 13px; text-align: center; }
-.schedule-table thead th:first-child, .schedule-table tbody th { width: 88px; }
+.schedule-table thead th { background: var(--color-surface-muted); color: var(--color-text); font-size: 12px; text-align: center; }
+.schedule-table thead th:first-child, .schedule-table tbody th { width: 60px; }
 .schedule-table thead th > span, .schedule-table thead th > time { display: block; }
-.schedule-table thead th > time { margin-top: 4px; color: var(--color-text-muted); font-size: 12px; font-weight: 400; }
-.schedule-table tbody th { background: var(--color-surface-muted); color: var(--color-text-muted); font-size: 13px; font-weight: 700; text-align: center; }
+.schedule-table thead th > time { margin-top: 3px; color: var(--color-text-muted); font-size: 11px; font-weight: 400; }
+.schedule-table tbody th { background: var(--color-surface-muted); color: var(--color-text-muted); font-size: 12px; font-weight: 700; text-align: center; }
 .schedule-table__today { background: var(--color-primary-soft); }
 .schedule-table__empty-cell { color: var(--color-text-muted); }
-.schedule-table__entries { display: grid; gap: 8px; }
+.schedule-table__entries { display: grid; gap: 6px; }
 .schedule-entry { display: grid; gap: 7px; min-width: 0; padding: 10px; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-surface); overflow-wrap: anywhere; }
 .schedule-entry__title { color: var(--color-primary); font-size: 13px; font-weight: 700; line-height: 1.4; }
 .schedule-entry__meta { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.45; }
