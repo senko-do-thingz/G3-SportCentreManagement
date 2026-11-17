@@ -6,8 +6,8 @@ import { CAMERA_MESSAGES, SAME_CODE_COOLDOWN_MS, cameraErrorMessage } from './ca
 type ScannerState = { status: 'starting' } | { status: 'scanning' } | { status: 'error'; message: string }
 
 interface CameraQrScannerProps {
-  /** Goi endpoint check-in hien co; scanner tam dung nhan dien cho den khi promise ket thuc. */
-  onScan: (code: string) => Promise<void>
+  /** Returns true only when the backend saved the check-in. */
+  onScan: (code: string) => Promise<boolean>
   onClose: () => void
   /** Ket qua check-in moi nhat tu camera, hien ngay duoi khung camera. */
   result?: ReactNode
@@ -21,6 +21,10 @@ export function CameraQrScanner({ onScan, onClose, result }: CameraQrScannerProp
   const videoRef = useRef<HTMLVideoElement>(null)
   const [state, setState] = useState<ScannerState>({ status: 'starting' })
   const [busy, setBusy] = useState(false)
+  const [retryCode, setRetryCode] = useState('')
+  const retryCodeRef = useRef('')
+  const lastCodeRef = useRef('')
+  const lastAtRef = useRef(0)
   const onScanRef = useRef(onScan)
   useEffect(() => {
     onScanRef.current = onScan
@@ -31,8 +35,6 @@ export function CameraQrScanner({ onScan, onClose, result }: CameraQrScannerProp
     let stream: MediaStream | null = null
     let controls: IScannerControls | null = null
     let inFlight = false
-    let lastCode = ''
-    let lastAt = 0
 
     const release = () => {
       controls?.stop()
@@ -46,15 +48,27 @@ export function CameraQrScanner({ onScan, onClose, result }: CameraQrScannerProp
       const code = raw.trim()
       const now = Date.now()
       if (!code || inFlight || cancelled) return
-      if (code === lastCode && now - lastAt < SAME_CODE_COOLDOWN_MS) return
+      // A failed request stays paused until staff explicitly retries, avoiding a request on every
+      // decode frame while the same QR remains in view.
+      if (code === retryCodeRef.current) return
+      if (code === lastCodeRef.current && now - lastAtRef.current < SAME_CODE_COOLDOWN_MS) return
       inFlight = true
-      lastCode = code
+      retryCodeRef.current = ''
+      if (!cancelled) setRetryCode('')
       setBusy(true)
       try {
-        await onScanRef.current(code)
+        const saved = await onScanRef.current(code)
+        if (saved) {
+          lastCodeRef.current = code
+          lastAtRef.current = Date.now()
+        } else {
+          retryCodeRef.current = code
+          if (!cancelled) setRetryCode(code)
+        }
+      } catch {
+        retryCodeRef.current = code
+        if (!cancelled) setRetryCode(code)
       } finally {
-        // Tinh thoi gian cho tu luc co ket qua, de cung mot QR van nam truoc camera khong bi gui lai ngay.
-        lastAt = Date.now()
         inFlight = false
         if (!cancelled) setBusy(false)
       }
@@ -95,6 +109,13 @@ export function CameraQrScanner({ onScan, onClose, result }: CameraQrScannerProp
     }
   }, [])
 
+  const retry = () => {
+    retryCodeRef.current = ''
+    lastCodeRef.current = ''
+    lastAtRef.current = 0
+    setRetryCode('')
+  }
+
   return (
     <section className="reception-camera-scanner" aria-label="Camera QR scanner">
       <div className="reception-camera-scanner__header">
@@ -121,8 +142,15 @@ export function CameraQrScanner({ onScan, onClose, result }: CameraQrScannerProp
               ? 'Starting camera...'
               : busy
                 ? 'Checking in...'
+                : retryCode
+                  ? 'No check-in was saved for this QR. Check the result below, then retry or enter the member code.'
                 : 'Hold the member QR in front of the camera.'}
           </p>
+          {retryCode && (
+            <Button type="button" variant="secondary" size="sm" onClick={retry}>
+              Retry this QR
+            </Button>
+          )}
         </>
       )}
       {result}
