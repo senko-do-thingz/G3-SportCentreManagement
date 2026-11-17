@@ -132,12 +132,17 @@ export function CheckInPage() {
   }
 
   const scan = useCallback(
-    async (code: string) => {
+    async (code: string): Promise<boolean> => {
       // Ma tu QR da duoc trim; dung chung khoa voi form nhap tay de khong gui hai yeu cau cung luc.
-      if (inFlight.current || validateIdentifier(code)) return
+      if (inFlight.current) return false
+      if (validateIdentifier(code)) {
+        setLast(null)
+        setRequestError(null)
+        return false
+      }
       inFlight.current = true
       try {
-        await recordArrival(code, 'camera', null)
+        return await recordArrival(code, 'camera', null)
       } finally {
         inFlight.current = false
       }
