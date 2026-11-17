@@ -21,7 +21,7 @@ export function SessionPackageRecommendations({ session, memberId, returnTo }: {
 
   return <div className="booking-recommendations">
     <h3>Selected Session</h3>
-    <p>{session.sportName} — {trainingFormatLabel(session.trainingFormat)} — {bookingDate(session.sessionDate)}</p>
+    <p>{session.sportName} - {trainingFormatLabel(session.trainingFormat)} - {bookingDate(session.sessionDate)}</p>
     <h3>Recommended Sport Packages</h3>
     {catalog.status === 'loading' ? <PageLoader label="Loading matching sport packages" />
       : catalog.status === 'error' ? <ErrorState title="Packages could not be loaded" error={catalog.error} onRetry={reload} />
@@ -35,7 +35,7 @@ export function SessionPackageRecommendations({ session, memberId, returnTo }: {
               ? `/reception/register?${new URLSearchParams({ tab: 'package', memberId: String(memberId), packageId: String(pkg.id), sessionId: sessionReference, week: session.sessionDate })}`
               : `/member/packages/${pkg.id}?${new URLSearchParams({ sport: String(session.sportId), format: session.trainingFormat, sessionId: sessionReference, sessionDate: session.sessionDate, ...(returnTo ? { returnTo } : {}) })}`
             return <div className="booking-package" key={pkg.id}><span className="booking-package__body">
-              <strong>{pkg.name}</strong><span>{pkg.sportName} — {trainingFormatLabel(pkg.trainingFormat)}</span>
+              <strong>{pkg.name}</strong><span>{pkg.sportName} - {trainingFormatLabel(pkg.trainingFormat)}</span>
               <span>{sessionsLabel(pkg.sessionCount)} · {durationLabel(pkg.durationDays)}</span>
               <span>Catalog price {formatMoney(pkg.priceAmount)}</span>
               <Link className={buttonClassName('secondary', 'md')} to={destination}>{memberId ? 'Register this package' : 'View matching package'}</Link>
