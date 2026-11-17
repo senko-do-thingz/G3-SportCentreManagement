@@ -77,41 +77,50 @@ try {
 
     $webhookRegistered = $false
     $registerScript = Join-Path $PSScriptRoot 'Register-PayOsWebhook.ps1'
-    & $cloudflaredPath tunnel --url "http://127.0.0.1:$proxyPort" 2>&1 | ForEach-Object {
-        $line = [string]$_
-        Write-Host $line
+    $scriptErrorActionPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell 5.1 turns native stderr into PowerShell errors. cloudflared
+        # writes normal INFO logs to stderr, so Stop would abort before the URL appears.
+        $ErrorActionPreference = 'Continue'
+        & $cloudflaredPath tunnel --url "http://127.0.0.1:$proxyPort" 2>&1 | ForEach-Object {
+            $line = [string]$_
+            Write-Host $line
 
-        if (-not $webhookRegistered -and $line -match '(?i)https://[a-z0-9-]+\.trycloudflare\.com') {
-            $origin = $Matches[0].TrimEnd('/')
-            $webhookUrl = "$origin/api/v1/payments/payos/webhook"
-            Write-Host "Registering PayOS webhook at $webhookUrl"
+            if (-not $webhookRegistered -and $line -match '(?i)https://[a-z0-9-]+\.trycloudflare\.com') {
+                $origin = $Matches[0].TrimEnd('/')
+                $webhookUrl = "$origin/api/v1/payments/payos/webhook"
+                Write-Host "Registering PayOS webhook at $webhookUrl"
 
-            $registered = $false
-            for ($registrationAttempt = 1; $registrationAttempt -le 4; $registrationAttempt++) {
-                try {
-                    & $registerScript -WebhookUrl $webhookUrl
-                    $registered = $true
-                    break
-                } catch {
-                    if ($registrationAttempt -eq 4) { break }
-                    Write-Warning 'PayOS has not confirmed the temporary URL yet; retrying in 3 seconds.'
-                    Start-Sleep -Seconds 3
+                $registered = $false
+                for ($registrationAttempt = 1; $registrationAttempt -le 4; $registrationAttempt++) {
+                    try {
+                        & $registerScript -WebhookUrl $webhookUrl
+                        $registered = $true
+                        break
+                    } catch {
+                        if ($registrationAttempt -eq 4) { break }
+                        Write-Warning 'PayOS has not confirmed the temporary URL yet; retrying in 3 seconds.'
+                        Start-Sleep -Seconds 3
+                    }
                 }
-            }
 
-            if (-not $registered) {
-                throw 'PayOS webhook registration failed after four attempts. Check the PayOS credentials and backend logs.'
-            }
+                if (-not $registered) {
+                    throw 'PayOS webhook registration failed after four attempts. Check the PayOS credentials and backend logs.'
+                }
 
-            $webhookRegistered = $true
+                $webhookRegistered = $true
+            }
         }
+        $cloudflaredExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $scriptErrorActionPreference
     }
 
     if (-not $webhookRegistered) {
         throw 'cloudflared exited before publishing a trycloudflare.com URL, so PayOS could not be configured.'
     }
-    if ($LASTEXITCODE -ne 0) {
-        throw "cloudflared exited with code $LASTEXITCODE. Restart the tunnel and register the new URL."
+    if ($cloudflaredExitCode -ne 0) {
+        throw "cloudflared exited with code $cloudflaredExitCode. Restart the tunnel and register the new URL."
     }
 } finally {
     if ($proxy -and -not $proxy.HasExited) {
