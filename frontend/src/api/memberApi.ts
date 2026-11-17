@@ -163,4 +163,8 @@ export const memberApi = {
   changePassword(request: ChangePasswordRequest): Promise<void> {
     return api.put<void>('/users/me/password', request, { authFailure: 'refresh-then-throw' })
   },
+
+  deleteAccount(password: string): Promise<void> {
+    return api.post<void>('/users/me/delete', { password }, { authFailure: 'refresh-then-throw' })
+  },
 }

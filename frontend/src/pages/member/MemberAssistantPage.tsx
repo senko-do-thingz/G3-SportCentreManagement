@@ -4,7 +4,7 @@ import { type Consultation } from '../../api/trainingGuidanceApi'
 import { sporiApi, type ChatMessageItem, type ChatSession } from '../../api/sporiApi'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { safeMemberReturnTo } from './assistantNavigation'
+import { safeAssistantReturnTo } from './assistantNavigation'
 import { SporiAiBadge, SporiAvatar, SporiComposer, SporiCopyButton, SporiHandoff, SporiIcon, SporiSources, SporiText, SporiTyping } from './sporiChat'
 import { formatTime, useSporiChat, useSporiScroll } from './useSporiChat'
 import './sporiChat.css'
@@ -97,9 +97,13 @@ export function MemberAssistantPage() {
 }
 
 function CenterConsultationWorkspace() {
+  const auth = useContext(AuthContext)
+  const role = auth?.role ?? 'MEMBER'
+  const isMember = role === 'MEMBER'
+  const defaultFallback = role === 'MANAGER' ? '/manager' : role === 'COACH' ? '/coach' : role === 'RECEPTIONIST' ? '/reception' : '/member'
   const [params] = useSearchParams()
   const location = useLocation()
-  const returnTo = safeMemberReturnTo(params.get('returnTo'))
+  const returnTo = safeAssistantReturnTo(params.get('returnTo'), defaultFallback)
   const chat = useSporiChat('Spori could not load an answer. Please try again.')
   const [question, setQuestion] = useState(() => {
     const routeQuestion = (location.state as { assistantQuestion?: unknown } | null)?.assistantQuestion
@@ -548,12 +552,14 @@ function CenterConsultationWorkspace() {
         </section>
       </div>
 
-      <nav aria-label="Need help from a person?" className="spori-page__handoff">
-        <span>Need a person?</span>
-        <Link to="/member/training/questions">Ask your human coach</Link>
-        <Link to="/member/support">Contact reception</Link>
-        <Link to="/member/support#my-requests">My support requests</Link>
-      </nav>
+      {isMember && (
+        <nav aria-label="Need help from a person?" className="spori-page__handoff">
+          <span>Need a person?</span>
+          <Link to="/member/training/questions">Ask your human coach</Link>
+          <Link to="/member/support">Contact reception</Link>
+          <Link to="/member/support#my-requests">My support requests</Link>
+        </nav>
+      )}
     </div>
   )
 }

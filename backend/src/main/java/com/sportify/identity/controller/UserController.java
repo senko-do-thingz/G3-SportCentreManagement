@@ -4,6 +4,7 @@ import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.identity.dto.UserProfileResponse;
 import com.sportify.identity.dto.UpdateProfileRequest;
 import com.sportify.identity.dto.ChangePasswordRequest;
+import com.sportify.identity.dto.DeleteAccountRequest;
 import com.sportify.identity.repository.UserAvatarStore;
 import com.sportify.identity.security.CustomUserDetails;
 import com.sportify.identity.service.UserService;
@@ -74,6 +75,22 @@ public class UserController {
     @DeleteMapping("/me/avatar")
     public ResponseEntity<Void> deleteCurrentUserAvatar(@AuthenticationPrincipal CustomUserDetails userDetails) {
         userService.deleteCurrentUserAvatar(userDetails);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteCurrentUser(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody DeleteAccountRequest request) {
+        userService.deleteCurrentUserAccount(userDetails, request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/me/delete")
+    public ResponseEntity<Void> deleteCurrentUserPost(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody DeleteAccountRequest request) {
+        userService.deleteCurrentUserAccount(userDetails, request);
         return ResponseEntity.noContent().build();
     }
 }
