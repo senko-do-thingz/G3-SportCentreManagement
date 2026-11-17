@@ -16,6 +16,6 @@ export const managerPackagesApi = {
     return api.put(`/packages/${id}`, request)
   },
   delete(id: number, reason?: string): Promise<void> {
-    return api.delete(`/packages/${id}`, { body: reason ? { reason } : undefined, query: reason ? { reason } : undefined })
+    return api.delete(`/packages/${id}`, { query: reason ? { reason } : undefined })
   },
 }
