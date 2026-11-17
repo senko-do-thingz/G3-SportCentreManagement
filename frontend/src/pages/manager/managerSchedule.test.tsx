@@ -228,11 +228,11 @@ describe('FE-07 schedule', () => {
     region.focus()
     expect(region).toHaveFocus()
     await user.tab()
-    expect(screen.getAllByRole('button', { name: 'Show full details' })[0]).toHaveFocus()
+    expect(screen.getAllByRole('button', { name: /Badminton foundations/ })[0]).toHaveFocus()
     await user.tab()
     expect(screen.getByRole('button', { name: 'Edit' })).toHaveFocus()
     await user.tab({ shift: true })
-    expect(screen.getAllByRole('button', { name: 'Show full details' })[0]).toHaveFocus()
+    expect(screen.getAllByRole('button', { name: /Badminton foundations/ })[0]).toHaveFocus()
     await user.tab({ shift: true })
     expect(region).toHaveFocus()
   })
@@ -454,7 +454,7 @@ describe('FE-07 schedule', () => {
     expect(within(dialog).getByLabelText('Rescheduling reason (optional)')).toHaveValue('Member availability')
     expect(screen.queryByText('Schedule updated')).not.toBeInTheDocument()
   })
-  it('displays concise booked count and toggles full session details on click', async () => {
+  it('displays concise booked count and toggles full session details on clicking the session card', async () => {
     const user = userEvent.setup()
     backend(false, false, [{ ...session, bookedCount: 0, capacity: 8, trainingType: 'SELF_TRAINING', coach: null, facility: { id: 2, name: 'Indoor Pool' } }])
     renderApp(`/manager/schedule?week=${monday(date)}`)
@@ -463,16 +463,16 @@ describe('FE-07 schedule', () => {
     expect(bookedText).toBeInTheDocument()
     expect(screen.queryByText(/0 \/ 8 booked -/)).not.toBeInTheDocument()
 
-    const toggleBtn = screen.getByRole('button', { name: 'Show full details' })
-    expect(toggleBtn).toHaveAttribute('aria-expanded', 'false')
+    const sessionCard = screen.getByRole('button', { name: /Badminton foundations/ })
+    expect(sessionCard).toHaveAttribute('aria-expanded', 'false')
 
-    await user.click(toggleBtn)
-    expect(toggleBtn).toHaveAttribute('aria-expanded', 'true')
+    await user.click(sessionCard)
+    expect(sessionCard).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByText('Self-training - No assigned coach')).toBeInTheDocument()
     expect(screen.getByText('Facility: Indoor Pool')).toBeInTheDocument()
 
-    await user.click(toggleBtn)
-    expect(toggleBtn).toHaveAttribute('aria-expanded', 'false')
+    await user.click(sessionCard)
+    expect(sessionCard).toHaveAttribute('aria-expanded', 'false')
   })
 
 })

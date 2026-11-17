@@ -17,6 +17,7 @@ public interface SportPackageService {
     List<SportPackageResponse> getManagerPackages(Long sportId, TrainingFormat format, Boolean active);
     SportPackageResponse createPackage(SportPackageCreateRequest request, UserAccount manager);
     SportPackageResponse updatePackage(Long id, SportPackageUpdateRequest request, UserAccount actor);
+    void deletePackage(Long id, String reason, UserAccount manager);
     PackageRegistrationResponse registerPackage(PackageRegistrationRequest request, UserAccount actor);
     PackageRegistrationResponse activateRegistration(Long registrationId, UserAccount actor);
     PackageRegistrationResponse activateRegistration(Long registrationId, UserAccount actor, PaymentMethod actualMethod);

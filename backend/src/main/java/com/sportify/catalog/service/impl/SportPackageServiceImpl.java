@@ -27,6 +27,7 @@ import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.common.SecurityUtils;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ConflictException;
+import com.sportify.core.exception.FieldValidationException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
@@ -159,12 +160,17 @@ public class SportPackageServiceImpl implements SportPackageService {
     @Override
     @Transactional
     public SportPackageResponse createPackage(SportPackageCreateRequest request, UserAccount manager) {
+        String trimmedCode = request.getCode() != null ? request.getCode().trim() : "";
+        if (sportPackageRepository.findByCode(trimmedCode).isPresent()) {
+            throw new FieldValidationException("code", "Package code '" + trimmedCode + "' is already in use. Please enter a unique code.");
+        }
+
         Sport sport = sportRepository.findById(request.getSportId())
                 .orElseThrow(() -> new ResourceNotFoundException("Sport not found for id: " + request.getSportId()));
 
         SportPackage pkg = SportPackage.builder()
-                .code(request.getCode())
-                .name(request.getName())
+                .code(trimmedCode)
+                .name(request.getName() != null ? request.getName().trim() : "")
                 .sport(sport)
                 .trainingFormat(request.getTrainingFormat())
                 .durationDays(request.getDurationDays())
@@ -176,7 +182,44 @@ public class SportPackageServiceImpl implements SportPackageService {
                 .build();
 
         pkg = sportPackageRepository.save(pkg);
+        auditService.record(AuditEvent.builder()
+                .actor(manager)
+                .action(AuditAction.PACKAGE_CREATED)
+                .entityType("SPORT_PACKAGE")
+                .entityId(pkg.getId())
+                .entityCode(pkg.getCode())
+                .summary("Sport package '" + pkg.getName() + "' created")
+                .build());
         return mapToPackageResponse(pkg);
+    }
+
+    @Override
+    @Transactional
+    public void deletePackage(Long id, String reason, UserAccount manager) {
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessRuleException("Deletion reason is required");
+        }
+        SportPackage pkg = sportPackageRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Sport package not found for id: " + id));
+
+        String finalReason = reason.trim();
+        long registrationCount = registrationRepository.countBySportPackageId(id);
+        if (registrationCount == 0) {
+            sportPackageRepository.delete(pkg);
+        } else {
+            pkg.setIsActive(false);
+            sportPackageRepository.saveAndFlush(pkg);
+        }
+
+        auditService.record(AuditEvent.builder()
+                .actor(manager)
+                .action(AuditAction.PACKAGE_DELETED)
+                .entityType("SPORT_PACKAGE")
+                .entityId(pkg.getId())
+                .entityCode(pkg.getCode())
+                .summary("Sport package '" + pkg.getName() + "' deleted: " + finalReason)
+                .details(Map.of("reason", finalReason, "registrations", registrationCount, "hardDeleted", registrationCount == 0))
+                .build());
     }
 
     @Override
