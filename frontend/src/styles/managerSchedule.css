@@ -1,8 +1,8 @@
 .f2-editor-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 24px; align-items: start; }
 @media (max-width: 900px) { .f2-editor-layout { grid-template-columns: minmax(0, 1fr); } }
-.f2-schedule-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: 10px; overscroll-behavior-x: contain; }
+.f2-schedule-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: 0; overscroll-behavior-x: contain; }
 .f2-schedule-table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
-.workflow-surface .f2-schedule-table-wrap { max-height: 70vh; overflow: auto; border-radius: 8px; scrollbar-gutter: stable; }
+.workflow-surface .f2-schedule-table-wrap { max-height: 70vh; overflow: auto; border-radius: 0; scrollbar-gutter: stable; }
 .workflow-surface .f2-schedule-table { min-width: 0; width: 100%; }
 .workflow-surface .f2-session .session-identity code { white-space: nowrap; }
 .workflow-surface .f2-schedule-table thead th { position: sticky; top: 0; z-index: 2; }
@@ -59,6 +59,10 @@
 .f2-session--completed { border-color: var(--color-border); background: var(--color-surface-muted); }
 .f2-weekdays { display: flex; flex-wrap: wrap; gap: 14px; padding: 12px 0; }
 .f2-conflict { border: 1px solid var(--color-warning-border); border-left: 4px solid var(--color-warning); border-radius: 8px; padding: 14px; margin: 12px 0; background: var(--color-warning-soft); }
+.manager-schedule-page .card,
+.coach-schedule-page .coach-schedule-weekly,
+.member-schedule-theme .card,
+.member-schedule-theme .center-schedule { border-radius: 0; }
 .manager-schedule-page .card > .card__header,
 .member-schedule-theme .card > .card__header,
 .member-schedule-theme .center-schedule > .card__header,

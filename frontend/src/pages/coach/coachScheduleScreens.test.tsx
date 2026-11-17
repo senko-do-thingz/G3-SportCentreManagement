@@ -76,7 +76,7 @@ describe('FE-10 coach schedule and roster screens', () => {
     await user.click(await screen.findByRole('button', { name: 'Next week' }))
 
     await waitFor(() => expect(calls.some((call) => call.path === '/coach/sessions?from=2026-10-26&to=2026-11-01')).toBe(true))
-    expect(screen.getAllByText('26/10/2026 - 01/11/2026')).toHaveLength(2)
+    expect(screen.getByText('26/10/2026 - 01/11/2026')).toBeInTheDocument()
   })
 
   it('loads only the selected owned session roster, hides phone numbers and prints the roster', async () => {

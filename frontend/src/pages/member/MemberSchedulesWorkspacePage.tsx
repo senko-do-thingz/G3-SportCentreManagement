@@ -150,6 +150,9 @@ function CenterSchedule() {
         <Select label="Training format" placeholder="All formats" value={format ?? ''} options={[{ value: 'COACH_LED', label: 'Coach-led' }, { value: 'SELF_TRAINING', label: 'Self-training' }]} onChange={(event) => change('format', event.target.value)} />
         <Select label="Availability" value={availability} options={[{ value: 'ALL', label: 'All availability' }, { value: 'AVAILABLE', label: 'Places available' }, { value: 'FULL', label: 'Full' }]} onChange={(event) => change('availability', event.target.value === 'ALL' ? '' : event.target.value)} />
         <Select label="Session status" value={status} options={[{ value: 'ALL', label: 'All visible statuses' }, { value: 'PUBLISHED', label: 'Published' }, { value: 'COMPLETED', label: 'Completed' }, { value: 'CANCELLED', label: 'Cancelled' }]} onChange={(event) => change('status', event.target.value === 'ALL' ? '' : event.target.value)} />
+        <div className="center-schedule__clear-field">
+          <Button variant="secondary" onClick={() => setParams({ tab: 'center', date: today })}>Clear filters</Button>
+        </div>
       </div>
       <div className="manager-row-actions center-schedule__toolbar">
         <div className="schedule-week-nav" role="group" aria-label="Center schedule week navigation">
@@ -158,7 +161,6 @@ function CenterSchedule() {
           <Button variant="secondary" onClick={() => moveWeek(7)}>Next week</Button>
         </div>
         <strong>{browseDate(from)} - {browseDate(to)}</strong>
-        <Button variant="secondary" onClick={() => setParams({ tab: 'center', date: today })}>Clear filters</Button>
         <Button variant="ghost" onClick={reload}>Refresh schedule</Button>
         {resource.status === 'ready' && <span className="browse-muted" role="status">{rows.length} sessions shown</span>}
         <CalendarDateField label="Week containing" value={from} onChange={(value, valid) => { if (valid !== false) change('date', value) }} />

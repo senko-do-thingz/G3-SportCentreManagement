@@ -88,6 +88,7 @@ export function CoachTeachingSchedulePage() {
   const [selection, setSelection] = useState<{ week: string; sessionId: string } | null>(null)
   const week = sessionWeek(params)
   const weekEnd = browseAddDays(week, 6)
+  const isThisWeek = week === browseMonday(browseToday())
   const loader = useCallback((signal: AbortSignal) => coachScheduleApi.list(week, weekEnd, signal), [week, weekEnd])
   const [resource, reload] = useResource(loader)
   // Loai bo cac ban ghi ca day bi trung lap hoac xung dot gio tren cung mot ngay, chi giu lai ca som nhat
@@ -183,9 +184,8 @@ export function CoachTeachingSchedulePage() {
       <Card className="coach-schedule-weekly" title="Weekly schedule">
         <div className="manager-row-actions coach-schedule-week-nav" role="group" aria-label="Teaching week navigation">
           <Button variant="secondary" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, -7)))}>Previous week</Button>
-          <Button variant="secondary" onClick={() => setParams((current) => changeWeekParams(current, browseMonday(browseToday())))}>This week</Button>
+          <Button variant={isThisWeek ? 'primary' : 'secondary'} onClick={() => setParams((current) => changeWeekParams(current, browseMonday(browseToday())))}>This week</Button>
           <Button variant="secondary" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, 7)))}>Next week</Button>
-          <strong>{browseDate(week)} - {browseDate(weekEnd)}</strong>
         </div>
         {sessions.length === 0 ? <div className="coach-schedule-empty"><EmptyState title="No assigned sessions this week" description="Your schedule will show sessions assigned to your coach account." /></div> : <>
           <p id="coach-schedule-grouping" className="f2-schedule-table__guidance">Sessions are grouped by start time. Each card shows its full time range; separate rows can overlap.</p>
