@@ -3,8 +3,8 @@
 .browse-nav { margin-bottom: 12px; }
 .browse-tab { padding: 12px 24px; background: transparent; color: var(--color-text-muted); border-radius: 8px; font-size: 14px; font-weight: 700; text-align: center; transition: background-color 0.18s ease, color 0.18s ease; }
 .browse-tab:hover { background: var(--color-primary-soft); color: var(--color-primary); text-decoration: none; }
-.browse-tab--active { background: var(--color-navy) !important; color: #ffffff !important; box-shadow: inset 0 -3px var(--color-gold) !important; }
-.browse-tab--active:hover { background: var(--color-navy) !important; color: #ffffff !important; }
+.browse-tab--active { background: var(--color-navy) !important; color: var(--color-on-primary) !important; box-shadow: inset 0 -3px var(--color-gold) !important; }
+.browse-tab--active:hover { background: var(--color-navy) !important; color: var(--color-on-primary) !important; }
 .browse-tab--disabled { color: var(--color-text-muted); background: var(--color-neutral-soft); }
 .browse-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
 .browse-filters .field { min-width: 0; }
