@@ -1,5 +1,6 @@
 package com.sportify.identity.controller;
 
+import com.sportify.catalog.dto.DeletionReasonRequest;
 import com.sportify.catalog.dto.PageResponse;
 import com.sportify.identity.dto.ManagerUserResponse;
 import com.sportify.identity.dto.StaffAccountCreateRequest;
@@ -14,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -65,6 +67,24 @@ public class ManagerUserController {
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails principal) {
         managerUserService.resetMemberPassword(id, actor(principal));
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(
+            @PathVariable Long id,
+            @Valid @RequestBody DeletionReasonRequest request,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        managerUserService.deleteUser(id, request.reason(), actor(principal));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/delete")
+    public ResponseEntity<Void> deleteUserPost(
+            @PathVariable Long id,
+            @Valid @RequestBody DeletionReasonRequest request,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        managerUserService.deleteUser(id, request.reason(), actor(principal));
         return ResponseEntity.noContent().build();
     }
 

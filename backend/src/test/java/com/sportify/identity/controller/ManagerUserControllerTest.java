@@ -39,6 +39,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -491,5 +492,27 @@ class ManagerUserControllerTest {
                         .content("{\"status\":\"ACTIVE\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("User not found"));
+    }
+
+    @Test
+    void deleteUser_asManager_withReason_shouldReturn204() throws Exception {
+        mockMvc.perform(delete(BASE_URL + "/7")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Duplicate staff record created by accident\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(managerUserService).deleteUser(eq(7L), eq("Duplicate staff record created by accident"), any(UserAccount.class));
+    }
+
+    @Test
+    void deleteUser_withBlankReason_shouldReturn400() throws Exception {
+        mockMvc.perform(delete(BASE_URL + "/7")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"   \"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(managerUserService);
     }
 }

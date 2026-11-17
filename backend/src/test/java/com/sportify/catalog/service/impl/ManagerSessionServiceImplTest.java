@@ -779,4 +779,47 @@ class ManagerSessionServiceImplTest {
         assertThrows(ConflictException.class, () -> service.createSessions(10L, single(), manager));
         verifyNoInteractions(sessions, audit);
     }
+
+    @Test
+    void deleteSession_whenCancelled_succeedsAndAudits() {
+        ClassSession session = existing(100L);
+        session.setStatus(SessionStatus.CANCELLED);
+        session.setCancelReason("Prior weather cancellation");
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
+        when(cancellations.cancelConfirmedBookings(eq(100L), any(), eq("Manager removed cancelled session"), any()))
+                .thenReturn(new SessionCancellationRepository.CancellationResult(0, List.of()));
+        when(sessions.saveAndFlush(session)).thenReturn(session);
+
+        service.deleteSession(100L, "Manager removed cancelled session", manager);
+
+        assertEquals(SessionStatus.CANCELLED, session.getStatus());
+        assertEquals("Manager removed cancelled session", session.getCancelReason());
+        var event = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(audit).record(event.capture());
+        assertEquals(AuditAction.SESSION_DELETED, event.getValue().getAction());
+    }
+
+    @Test
+    void deleteSession_whenCompleted_succeedsAndAudits() {
+        ClassSession session = existing(100L);
+        session.setStatus(SessionStatus.COMPLETED);
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
+        when(cancellations.cancelConfirmedBookings(eq(100L), any(), eq("Manager cleaned completed schedule"), any()))
+                .thenReturn(new SessionCancellationRepository.CancellationResult(0, List.of()));
+        when(sessions.saveAndFlush(session)).thenReturn(session);
+
+        service.deleteSession(100L, "Manager cleaned completed schedule", manager);
+
+        assertEquals(SessionStatus.CANCELLED, session.getStatus());
+        assertEquals("Manager cleaned completed schedule", session.getCancelReason());
+        var event = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(audit).record(event.capture());
+        assertEquals(AuditAction.SESSION_DELETED, event.getValue().getAction());
+    }
+
+    @Test
+    void deleteSession_blankReason_throwsException() {
+        assertThrows(BusinessRuleException.class, () -> service.deleteSession(100L, "   ", manager));
+        verifyNoInteractions(sessions, audit);
+    }
 }

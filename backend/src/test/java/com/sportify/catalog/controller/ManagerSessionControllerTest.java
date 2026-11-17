@@ -260,4 +260,40 @@ class ManagerSessionControllerTest {
                 .andExpect(jsonPath("$.details").doesNotExist());
         verifyNoInteractions(service);
     }
+
+    @Test
+    void deleteSession_asManager_withReason_returns204() throws Exception {
+        mvc.perform(delete(BASE + "/8")
+                        .with(user("manager").roles("MANAGER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Severe storm facility closure\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(service).deleteSession(eq(8L), eq("Severe storm facility closure"), any());
+    }
+
+    @Test
+    void deleteSession_withBlankReason_returns400() throws Exception {
+        mvc.perform(delete(BASE + "/8")
+                        .with(user("manager").roles("MANAGER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"  \"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void validateSchedule_returnsConflictValidationResponse() throws Exception {
+        when(service.validateConflicts(any())).thenReturn(SessionConflictValidationResponse.ok());
+
+        mvc.perform(post(BASE + "/validate")
+                        .with(user("manager").roles("MANAGER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2026-11-20\",\"startTime\":\"09:00:00\",\"endTime\":\"10:00:00\",\"coachId\":1,\"facilityId\":2}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasConflict").value(false));
+
+        verify(service).validateConflicts(any());
+    }
 }

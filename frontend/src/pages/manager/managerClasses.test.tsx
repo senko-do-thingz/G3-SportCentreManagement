@@ -85,6 +85,7 @@ describe('FE-07 class management', () => {
     await user.selectOptions(screen.getByLabelText(/^Age group/), '1')
     await screen.findByRole('option', { name: 'Quan Coach' })
     await user.selectOptions(screen.getByLabelText(/^Coach/), '3')
+    await user.type(screen.getByLabelText(/^Maximum members/), '20')
     await user.click(screen.getByRole('button', { name: 'Save & schedule' }))
     const dialog = await screen.findByRole('dialog', { name: 'Create session' })
     expect(dialog).toBeInTheDocument()

@@ -17,6 +17,9 @@ export const managerUsersApi = {
   changeStatus(id: number, status: AccountStatus): Promise<ManagerUser> {
     return api.patch(`/manager/users/${id}/status`, { status })
   },
+  delete(id: number, reason: string): Promise<void> {
+    return api.post(`/manager/users/${id}/delete`, { reason: reason.trim() })
+  },
   resetMemberPassword(id: number): Promise<void> {
     return api.post(`/manager/users/${id}/reset-password`)
   },

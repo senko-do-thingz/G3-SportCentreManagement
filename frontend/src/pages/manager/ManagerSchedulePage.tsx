@@ -8,7 +8,7 @@ import { managerClassesApi } from '../../api/managerClassesApi'
 import { managerSessionsApi, type ManagerSession } from '../../api/managerSessionsApi'
 import { facilitiesApi } from '../../api/facilitiesApi'
 import { Button, Card, EmptyState, Input, PageLoader, Select, StatusBadge, useToast, StatIcon } from '../../components/ui'
-import { ConfirmationModal, ManagerError, PreviewNotice } from './ManagerShared'
+import { ConfirmationModal, DeleteReasonModal, ManagerError, PreviewNotice } from './ManagerShared'
 import { useResource } from './useManagerTools'
 import { loadScheduleClasses } from './loadScheduleClasses'
 import { addDays, canManageSession, centerNow, compareScheduleSessions, displayDate, monday, WEEKDAYS } from './scheduleModel'
@@ -33,6 +33,7 @@ export function ManagerSchedulePage() {
   const [editing, setEditing] = useState<ManagerSession | 'new' | null>(params.get('create') === '1' ? 'new' : null)
   const [cancelling, setCancelling] = useState<ManagerSession | null>(null)
   const [publishing, setPublishing] = useState<ManagerSession | null>(null)
+  const [deleting, setDeleting] = useState<ManagerSession | null>(null)
   const toast = useToast()
   function query(key: string, value: string) { setParams((previous) => { const next = new URLSearchParams(previous); if (value) next.set(key, value); else next.delete(key); next.delete('create'); return next }) }
   function closeEditor() { setEditing(null); if (params.has('create')) query('create', '') }
@@ -66,7 +67,7 @@ export function ManagerSchedulePage() {
   const coachesCount = coaches.status === 'ready' ? String(coaches.data.length).padStart(2, '0') : '--'
   const facilitiesCount = facilities.status === 'ready' ? String(facilities.data.length).padStart(2, '0') : '--'
 
-  return <div className="page manager-page manager-concept-page">
+  return <div className="page manager-page manager-concept-page manager-schedule-page">
     <div className="concept-header">
       <div className="concept-header__main">
         <div className="concept-eyebrow">MANAGER WORKSPACE</div>
@@ -84,29 +85,29 @@ export function ManagerSchedulePage() {
       <Button variant="secondary" className="concept-btn concept-btn--gold" disabled={!available} onClick={() => setEditing('new')}>+ Create session</Button>
     </div>
 
-    <div className="concept-stats">
-      <div className="concept-stat">
+    <div className="concept-stats concept-stats--schedule">
+      <div className="concept-stat concept-stat--schedule">
         <StatIcon name="calendar" />
         <div>
           <strong>{weekSessionsCount}</strong>
           <small>Week sessions</small>
         </div>
       </div>
-      <div className="concept-stat">
+      <div className="concept-stat concept-stat--schedule">
         <StatIcon name="send" />
         <div>
           <strong>{publishedCount}</strong>
           <small>Published in week</small>
         </div>
       </div>
-      <div className="concept-stat">
+      <div className="concept-stat concept-stat--schedule">
         <StatIcon name="coach" />
         <div>
           <strong>{coachesCount}</strong>
           <small>Active coaches</small>
         </div>
       </div>
-      <div className="concept-stat">
+      <div className="concept-stat concept-stat--schedule">
         <StatIcon name="pin" />
         <div>
           <strong>{facilitiesCount}</strong>
@@ -163,6 +164,7 @@ export function ManagerSchedulePage() {
                             onEdit={() => setEditing(session)}
                             onCancel={() => setCancelling(session)}
                             onPublish={() => setPublishing(session)}
+                            onDelete={() => setDeleting(session)}
                           />)}
                         </div> : <span className="f2-schedule-table__empty-cell" aria-label="No sessions">-</span>}
                       </td>
@@ -179,6 +181,7 @@ export function ManagerSchedulePage() {
     {editing && classes.status === 'ready' && facilitiesUsable && <SessionEditorModal item={editing === 'new' ? undefined : editing} classes={classes.data} facilities={facilities.status === 'ready' ? facilities.data : []} manualFacility={manualFacility} classId={classId} onClose={closeEditor} onSuccess={sessionSaved} />}
     {cancelling && <CancelSessionModal item={cancelling} onClose={() => setCancelling(null)} onSuccess={saved} />}
     {publishing && <ConfirmationModal title="Publish session" description={`${publishing.class?.name ?? 'Session'} on ${displayDate(publishing.date)} at ${publishing.startTime.slice(0, 5)}: members will be able to find and book it.`} onClose={() => setPublishing(null)} save={() => managerSessionsApi.publish(publishing.id)} onSuccess={() => { setPublishing(null); reload(); toast.success(`Session ${sessionIdText(publishing.sessionId)} published`) }} confirmLabel="Publish session" />}
+    {deleting && <DeleteReasonModal title="Delete Session" entityName={`Session ${sessionIdText(deleting.sessionId)}: ${deleting.class?.name ?? 'Class'} on ${displayDate(deleting.date)}`} description="Deleting a session removes it from the schedule and records the action in the audit log. It will fail if there are active bookings." onClose={() => setDeleting(null)} onConfirm={async (reason) => { await managerSessionsApi.delete(deleting.id, reason) }} onSuccess={() => { setDeleting(null); reload(); toast.success('Session deleted', 'The session has been removed and audit log updated.') }} />}
   </div>
 }
 
@@ -189,6 +192,7 @@ function ManagerScheduleEntry({
   onEdit,
   onCancel,
   onPublish,
+  onDelete,
 }: {
   session: ManagerSession
   canManage: boolean
@@ -196,23 +200,59 @@ function ManagerScheduleEntry({
   onEdit: () => void
   onCancel: () => void
   onPublish: () => void
+  onDelete: () => void
 }) {
-  return <article className={`f2-session f2-session--${session.status.toLowerCase()}`}>
-    <span className="session-identity">Session ID <code>{sessionIdText(session.sessionId)}</code></span>
-    <strong className="f2-session__title">{session.class?.name ?? 'Unassigned class'}</strong>
-    <p className="f2-session__meta">{session.sportName}</p>
-    <div className="f2-session__timing">
-      <span>{session.startTime.slice(0, 5)} - {session.endTime.slice(0, 5)}</span>
-      <StatusBadge status={session.status} />
-    </div>
-    <p className="f2-session__meta">{session.trainingType === 'SELF_TRAINING' && !session.coach ? 'Self-training - No assigned coach' : `Coach: ${session.coach?.name ?? 'Coach not assigned'}`}</p>
-    <p className="f2-session__meta">Facility: {session.facility?.name ?? 'Not assigned'}</p>
-    <p className="f2-session__meta">{session.bookedCount} / {session.capacity} booked - {session.trainingType === 'COACH_LED' ? 'Coach-led' : 'Self-training'}</p>
-    {session.status === 'CANCELLED' && <p className="f2-session__meta f2-session__reason">Reason: {session.cancelReason || 'Not provided'}</p>}
-    {canManage && <div className="f2-session__actions">
-      {session.status === 'DRAFT' && <Button size="sm" onClick={onPublish}>Publish</Button>}
-      <Button size="sm" variant="secondary" disabled={editDisabled} onClick={onEdit}>Edit</Button>
-      <Button size="sm" variant="danger" aria-label="Cancel session" title="Cancel session" onClick={onCancel}>Cancel</Button>
-    </div>}
-  </article>
+  const [expanded, setExpanded] = useState(false)
+
+  const toggleExpanded = (event: React.MouseEvent | React.KeyboardEvent) => {
+    const target = event.target as HTMLElement
+    if (target.closest('button') || target.closest('a') || target.closest('input')) {
+      return
+    }
+    setExpanded((prev) => !prev)
+  }
+
+  return (
+    <article
+      className={`f2-session f2-session--${session.status.toLowerCase()}${expanded ? ' f2-session--expanded' : ' f2-session--collapsed'}`}
+      onClick={toggleExpanded}
+    >
+      <div className="f2-session__header">
+        <span className="session-identity"><code>{sessionIdText(session.sessionId)}</code></span>
+        <button
+          type="button"
+          className="f2-session__toggle-btn"
+          aria-expanded={expanded}
+          aria-label={expanded ? 'Hide full details' : 'Show full details'}
+          onClick={(e) => {
+            e.stopPropagation()
+            setExpanded((prev) => !prev)
+          }}
+        >
+          {expanded ? '▲ Less' : '▼ Details'}
+        </button>
+      </div>
+      <strong className="f2-session__title">{session.class?.name ?? 'Unassigned class'}</strong>
+      <div className="f2-session__timing">
+        <span>{session.startTime.slice(0, 5)} - {session.endTime.slice(0, 5)}</span>
+        <StatusBadge status={session.status} />
+      </div>
+      <p className="f2-session__meta f2-session__booked">{session.bookedCount} / {session.capacity} booked</p>
+
+      <div className={`f2-session__details ${expanded ? 'f2-session__details--expanded' : 'f2-session__details--collapsed'}`}>
+        <p className="f2-session__meta">Sport: {session.sportName}</p>
+        <p className="f2-session__meta">{session.trainingType === 'SELF_TRAINING' && !session.coach ? 'Self-training - No assigned coach' : `Coach: ${session.coach?.name ?? 'Coach not assigned'}`}</p>
+        <p className="f2-session__meta">Facility: {session.facility?.name ?? 'Not assigned'}</p>
+        <p className="f2-session__meta">Type: {session.trainingType === 'COACH_LED' ? 'Coach-led' : 'Self-training'}</p>
+        {session.status === 'CANCELLED' && <p className="f2-session__meta f2-session__reason">Reason: {session.cancelReason || 'Not provided'}</p>}
+      </div>
+
+      <div className="f2-session__actions" onClick={(e) => e.stopPropagation()}>
+        {session.status === 'DRAFT' && <Button size="sm" onClick={onPublish}>Publish</Button>}
+        {canManage && <Button size="sm" variant="secondary" disabled={editDisabled} onClick={onEdit}>Edit</Button>}
+        {canManage && session.status === 'PUBLISHED' && <Button size="sm" variant="danger" aria-label="Cancel session" title="Cancel session" onClick={onCancel}>Cancel</Button>}
+        <Button size="sm" variant="danger" aria-label="Delete session" title="Delete session" onClick={onDelete}>Delete</Button>
+      </div>
+    </article>
+  )
 }

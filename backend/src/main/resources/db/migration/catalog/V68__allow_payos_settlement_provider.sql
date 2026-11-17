@@ -1,6 +1,6 @@
 IF OBJECT_ID(N'dbo.payment', N'U') IS NULL
     OR OBJECT_ID(N'dbo.ck_payment_settlement_provider', N'C') IS NULL
-    THROW 51040, 'V67 requires the payment table and ck_payment_settlement_provider constraint.', 1;
+    THROW 51040, 'V68 requires the payment table and ck_payment_settlement_provider constraint.', 1;
 GO
 
 ALTER TABLE dbo.payment DROP CONSTRAINT ck_payment_settlement_provider;

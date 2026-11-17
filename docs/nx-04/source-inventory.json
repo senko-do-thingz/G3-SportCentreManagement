@@ -538,25 +538,32 @@
       "sha256_lf": "c2c86c81f1adbc838737afd627be41ae7b1a914e7e9aed658f2112a0f5371570"
     },
     {
-      "path": "backend/src/main/resources/db/migration/catalog/V66__add_payos_checkout_fields.sql",
+      "path": "backend/src/main/resources/db/migration/catalog/V66__set_basketball_and_pool_facility_capacity.sql",
       "version": 66,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "357c57f3bb919198051b0d215f1a6669fd932065f0900ab32fa30eea16e113a6"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V67__add_payos_checkout_fields.sql",
+      "version": 67,
       "creates": [],
       "drops": [],
       "sha256_lf": "01ec71ae174e1bb9da8786e30711e606c8f59f3e26d27fb996e797e410f5e5e4"
     },
     {
-      "path": "backend/src/main/resources/db/migration/catalog/V67__allow_payos_settlement_provider.sql",
-      "version": 67,
-      "creates": [],
-      "drops": [],
-      "sha256_lf": "1c906b5c78685939166f91642ad71393925bd3b7b32260aea4d0da0a297eed40"
-    },
-    {
-      "path": "backend/src/main/resources/db/migration/catalog/V68__use_unique_payos_order_codes.sql",
+      "path": "backend/src/main/resources/db/migration/catalog/V68__allow_payos_settlement_provider.sql",
       "version": 68,
       "creates": [],
       "drops": [],
-      "sha256_lf": "e7642374097d00960d1de50f732f8d09588400391611f8f9480c17c02e5f213e"
+      "sha256_lf": "1920d0044271a0ddc7e1a70c5bfa8aef29cce6a5d47f3e1f3c141b3b5066ecab"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V69__use_unique_payos_order_codes.sql",
+      "version": 69,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "245629d02fe452216b682e1e9c1fbe5f65ea5e3b74aada8da989a6b71ecc26ee"
     }
   ],
   "create_occurrences": 82,

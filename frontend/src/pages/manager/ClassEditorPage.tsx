@@ -4,7 +4,7 @@ import { api } from '../../api/client'
 import { managerClassesApi, type ClassLevel, type ManagerClass } from '../../api/managerClassesApi'
 import { packagesApi } from '../../api/packagesApi'
 import { Button, Card, Input, PageLoader, Select, useToast } from '../../components/ui'
-import { ManagerError, PreviewNotice } from './ManagerShared'
+import { DeleteReasonModal, ManagerError, PreviewNotice } from './ManagerShared'
 import { useManagerForm, useResource } from './useManagerTools'
 
 const loadLookups = async (signal: AbortSignal) => {
@@ -31,7 +31,8 @@ function ClassForm({ item, lookups }: { item: ManagerClass | null; lookups: Awai
   const toast = useToast()
   const ref = useRef<HTMLFormElement>(null)
   const savedId = useRef<number | null>(null)
-  const [draft, setDraft] = useState({ name: item?.name ?? '', sportId: item ? String(item.sportId) : '', ageGroupId: item ? String(item.ageGroupId) : '', level: item?.level ?? 'BEGINNER', coachId: item ? String(item.coachId) : '', maxMembers: String(item?.maxMembers ?? 20) })
+  const [deleting, setDeleting] = useState(false)
+  const [draft, setDraft] = useState({ name: item?.name ?? '', sportId: item ? String(item.sportId) : '', ageGroupId: item ? String(item.ageGroupId) : '', level: item?.level ?? 'BEGINNER', coachId: item ? String(item.coachId) : '', maxMembers: item ? String(item.maxMembers) : '' })
   const coachLoader = useCallback((signal: AbortSignal) => managerClassesApi.coaches(draft.sportId ? Number(draft.sportId) : undefined, signal), [draft.sportId])
   const [coaches, retryCoaches] = useResource(coachLoader)
   const profileLoader = useCallback((signal: AbortSignal) => draft.coachId ? api.get<CoachProfile>(`/coaches/${draft.coachId}`, { signal }) : Promise.resolve(null), [draft.coachId])
@@ -74,12 +75,32 @@ function ClassForm({ item, lookups }: { item: ManagerClass | null; lookups: Awai
           {coaches.status === 'error' && <ManagerError error={coaches.error} onRetry={retryCoaches} />}
           <Button variant="ghost" disabled={form.saving || coaches.status === 'loading'} onClick={retryCoaches}>Refresh coaches</Button>
           {draft.sportId && coaches.status === 'ready' && !coaches.data.length && <p className="notice notice--info">No qualified coaches are available. Check coach assignments in <Link to="/manager">User Management</Link>.</p>}
-          <div className="manager-form-actions"><Button type="submit" loading={form.saving}>{item ? 'Save class' : 'Save & schedule'}</Button><Button variant="secondary" disabled={form.saving} onClick={() => navigate('/manager/classes')}>Cancel</Button></div>
+          <div className="manager-form-actions">
+            <Button type="submit" loading={form.saving}>{item ? 'Save class' : 'Save & schedule'}</Button>
+            {item && <Button type="button" variant="danger" disabled={form.saving} onClick={() => setDeleting(true)}>Delete class</Button>}
+            <Button variant="secondary" disabled={form.saving} onClick={() => navigate('/manager/classes')}>Cancel</Button>
+          </div>
         </form>
       </Card>
       <Card title="Coach qualification">
         {!draft.coachId ? <p>Select a coach to view qualifications.</p> : profile.status === 'loading' ? <PageLoader label="Loading qualifications" /> : profile.status === 'error' ? <ManagerError error={profile.error} onRetry={retryProfile} /> : profile.data && <div className="manager-cell"><h3>{profile.data.name}</h3><p>{profile.data.headline || 'Coach profile'}</p><p>{profile.data.yearsExperience ?? 0} years of experience</p><p>{profile.data.specialties || 'No specialties listed.'}</p><p>Sports: {profile.data.sports.map((sport) => sport.name).join(', ') || 'None listed'}</p><h4>Certifications</h4>{profile.data.certifications.length ? profile.data.certifications.map((certificate) => <p key={certificate.id}>{certificate.name} - {certificate.issuer} ({certificate.verified ? 'Verified' : 'Not verified'})</p>) : <p>No certifications listed.</p>}</div>}
       </Card>
     </div>
+    {deleting && item && (
+      <DeleteReasonModal
+        title="Delete Class"
+        entityName={`${item.name} (${item.code})`}
+        description="Deleting a class deactivates it and cancels upcoming unbooked sessions. It will fail if there are active bookings."
+        onClose={() => setDeleting(false)}
+        onConfirm={async (reason) => {
+          await managerClassesApi.delete(item.id, reason)
+        }}
+        onSuccess={() => {
+          setDeleting(false)
+          toast.success('Class deleted', 'The class has been removed and audit log updated.')
+          navigate('/manager/classes')
+        }}
+      />
+    )}
   </div>
 }

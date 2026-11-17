@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router-dom'
 import { AccountSwitchNotice } from '../components/AccountSwitchNotice'
 import { useAuth } from '../auth/useAuth'
-import { itemHref, pageTitle, STAFF_AREAS } from './navigation'
+import { areaItems, itemHref, pageTitle, STAFF_AREAS } from './navigation'
 import { PaymentWorkspaceHeader } from './PaymentWorkspaceHeader'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import { WorkflowSurface } from '../components/WorkflowSurface'
@@ -24,6 +24,7 @@ export function StaffLayout() {
 
   // RequireRole guarantees a staff role here; fall back to the manager menu for type safety only.
   const area = role && role !== 'MEMBER' ? STAFF_AREAS[role] : STAFF_AREAS.MANAGER
+  const allItems = areaItems(area)
   const menuId = 'staff-menu'
 
   const breadcrumb = (
@@ -48,17 +49,22 @@ export function StaffLayout() {
           {area.sections.map((section, sectionIndex) => (
             <div className="sidebar__section" key={section.heading ?? sectionIndex}>
               {section.heading && <p className="sidebar__heading">{section.heading}</p>}
-              {section.items.map((item) => (
-                <NavLink
-                  key={item.label}
-                  to={itemHref(area, item)}
-                  end={item.path === ''}
-                  onClick={() => setMenuOpen(false)}
-                  className={({ isActive }) => 'sidebar__link' + (isActive ? ' sidebar__link--active' : '')}
-                >
-                  {item.label}
-                </NavLink>
-              ))}
+              {section.items.map((item) => {
+                const hasChildMenuItem = allItems.some(
+                  (other) => other !== item && other.path.length > 0 && other.path.startsWith(`${item.path}/`),
+                )
+                return (
+                  <NavLink
+                    key={item.label}
+                    to={itemHref(area, item)}
+                    end={item.path === '' || hasChildMenuItem}
+                    onClick={() => setMenuOpen(false)}
+                    className={({ isActive }) => 'sidebar__link' + (isActive ? ' sidebar__link--active' : '')}
+                  >
+                    {item.label}
+                  </NavLink>
+                )
+              })}
             </div>
           ))}
         </nav>

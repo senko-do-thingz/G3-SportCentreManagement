@@ -1,6 +1,6 @@
 IF OBJECT_ID(N'dbo.payment', N'U') IS NULL
     OR COL_LENGTH(N'dbo.payment', N'payos_payment_link_id') IS NULL
-    THROW 51041, 'V68 requires the PayOS payment-link columns.', 1;
+    THROW 51041, 'V69 requires the PayOS payment-link columns.', 1;
 GO
 
 ALTER TABLE dbo.payment ADD payos_order_code BIGINT NULL;

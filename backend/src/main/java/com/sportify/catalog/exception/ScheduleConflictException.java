@@ -7,8 +7,15 @@ import java.util.List;
 import java.util.Map;
 
 public class ScheduleConflictException extends ConflictException {
+    private final List<SessionConflictResponse> conflicts;
+
     public ScheduleConflictException(List<SessionConflictResponse> conflicts) {
         super("The selected coach, facility or time conflicts with existing sessions. Choose another coach, facility or time.",
                 Map.of("conflicts", List.copyOf(conflicts)));
+        this.conflicts = List.copyOf(conflicts);
+    }
+
+    public List<SessionConflictResponse> getConflicts() {
+        return conflicts;
     }
 }

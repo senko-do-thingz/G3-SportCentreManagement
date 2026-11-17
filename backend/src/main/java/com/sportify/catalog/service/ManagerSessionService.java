@@ -2,6 +2,8 @@ package com.sportify.catalog.service;
 
 import com.sportify.catalog.dto.ManagerSessionResponse;
 import com.sportify.catalog.dto.SessionCancelRequest;
+import com.sportify.catalog.dto.SessionConflictValidationRequest;
+import com.sportify.catalog.dto.SessionConflictValidationResponse;
 import com.sportify.catalog.dto.SessionCreateRequest;
 import com.sportify.catalog.dto.SessionUpdateRequest;
 import com.sportify.identity.entity.UserAccount;
@@ -16,4 +18,6 @@ public interface ManagerSessionService {
     ManagerSessionResponse updateSession(Long id, SessionUpdateRequest request, UserAccount actor);
     ManagerSessionResponse cancelSession(Long id, SessionCancelRequest request, UserAccount actor);
     ManagerSessionResponse publishSession(Long id, UserAccount actor);
+    SessionConflictValidationResponse validateConflicts(SessionConflictValidationRequest request);
+    void deleteSession(Long id, String reason, UserAccount actor);
 }

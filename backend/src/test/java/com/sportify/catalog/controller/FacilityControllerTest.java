@@ -43,13 +43,14 @@ class FacilityControllerTest {
 
     @Test
     void manager_receivesOnlyFrontendFieldsIncludingInactiveFacilities() throws Exception {
-        when(service.getFacilities()).thenReturn(List.of(new FacilityResponse(12L, "Court A", true),
-                new FacilityResponse(20L, "Old pool", false)));
+        when(service.getFacilities()).thenReturn(List.of(
+                new FacilityResponse(12L, "Court A", true, 1L, 20),
+                new FacilityResponse(20L, "Old pool", false, null, null)));
         mvc.perform(get(URL).with(user("manager").roles("MANAGER")))
                 .andExpect(status().isOk())
                 .andExpect(content().json("""
-                        [{"id":12,"name":"Court A","active":true},
-                         {"id":20,"name":"Old pool","active":false}]
+                        [{"id":12,"name":"Court A","active":true,"sportId":1,"capacity":20},
+                         {"id":20,"name":"Old pool","active":false,"sportId":null,"capacity":null}]
                         """, org.springframework.test.json.JsonCompareMode.STRICT));
     }
 
