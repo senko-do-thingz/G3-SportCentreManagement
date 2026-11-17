@@ -116,9 +116,14 @@ PayOS does not provide a sandbox. It uses its production payment API, so scannin
 
 1. Set `PAYOS_ENABLED=true`, `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`, and `PAYOS_FRONTEND_BASE_URL=http://localhost:5173` privately in `backend/.env`; never commit those values. Restart the backend so Flyway applies V67 through V69.
 2. Start the frontend and backend. Members can create a PayOS QR and return to the local status page without a tunnel; on return, Sportify verifies the order directly with PayOS.
-3. To receive PayOS webhooks while the app is local (including when a payer does not return to the browser), install `cloudflared` (the Cloudflare One Client/WARP app alone is not enough), then run `npm run payos:tunnel` from `frontend/`. The temporary public tunnel exposes only `POST /api/v1/payments/payos/webhook`, not the rest of the backend.
-4. Copy the `https://*.trycloudflare.com` origin printed by cloudflared. In a second PowerShell window run `scripts/payment/Register-PayOsWebhook.ps1 -WebhookUrl 'https://<origin>/api/v1/payments/payos/webhook'`. PayOS sends a sample event to validate the route; the app acknowledges it without settling an order.
-5. Keep the tunnel terminal open while testing. The hostname changes when the quick tunnel restarts, so register the new URL each time. A verified PayOS webhook updates any matching member payment and activates its package/card automatically; reception does not confirm PayOS payments. The browser-return verification is a fallback if a webhook cannot reach the local app.
+3. To receive PayOS webhooks while the app is local (including when a payer does not return to the browser), install `cloudflared` (the Cloudflare One Client/WARP app alone is not enough). From the repository root, run this single PowerShell script:
+
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\payment\Start-PayOsTunnel.ps1
+   ```
+
+   It checks that the backend and PayOS settings are ready, starts the restricted webhook proxy and temporary Cloudflare Quick Tunnel, detects its HTTPS URL, then registers the webhook with PayOS automatically. The tunnel exposes only `POST /api/v1/payments/payos/webhook`, not the rest of the backend. `npm run payos:tunnel` from `frontend/` runs the same script.
+4. Keep the tunnel terminal open while testing. The hostname changes when the quick tunnel restarts, so run the script again to register the new URL. PayOS sends a sample event to validate the route; the app acknowledges it without settling an order. A verified webhook updates a matching member payment and activates its package/card automatically; reception does not confirm PayOS payments. Browser-return verification remains a fallback if a webhook cannot reach the local app.
 
 Each developer keeps credentials in their own ignored `backend/.env`. A PayOS channel has one active webhook URL, so only the computer currently running the registered tunnel receives callbacks; use the browser-return verification when each teammate is testing on a separate local backend. For a shared deployment, register that backend's stable HTTPS webhook URL once.
 
