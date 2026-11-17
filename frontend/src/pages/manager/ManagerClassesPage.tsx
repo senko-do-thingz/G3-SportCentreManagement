@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { managerClassesApi, type ClassLevel, type ManagerClass } from '../../api/managerClassesApi'
 import { packagesApi } from '../../api/packagesApi'
 import { Button, Card, Input, Select, StatusBadge, Table, useToast, type TableColumn, StatIcon } from '../../components/ui'
-import { ConfirmationModal, ManagerError, PreviewNotice } from './ManagerShared'
+import { ConfirmationModal, DeleteReasonModal, ManagerError, PreviewNotice } from './ManagerShared'
 import { useDebounced, useResource } from './useManagerTools'
 
 const sportsLoader = (signal: AbortSignal) => packagesApi.sports({ signal })
@@ -21,6 +21,7 @@ export function ManagerClassesPage() {
   const [active, setActive] = useState('')
   const [page, setPage] = useState(0)
   const [changing, setChanging] = useState<ManagerClass | null>(null)
+  const [deleting, setDeleting] = useState<ManagerClass | null>(null)
   const [sports, retrySports] = useResource(sportsLoader)
   const [coaches, retryCoaches] = useResource(coachesLoader)
   const loader = useCallback((signal: AbortSignal) => managerClassesApi.list({ search: debounced.trim(), sportId: sportId ? Number(sportId) : undefined, coachId: coachId ? Number(coachId) : undefined, level: level as ClassLevel || undefined, active: active ? active === 'true' : undefined, page, size: 20 }, signal), [debounced, sportId, coachId, level, active, page])
@@ -38,7 +39,7 @@ export function ManagerClassesPage() {
     { key: 'coachName', header: 'Coach', render: (row) => row.coachName },
     { key: 'maxMembers', header: 'Capacity', render: (row) => `${row.maxMembers} members` },
     { key: 'active', header: 'Status', render: (row) => <StatusBadge status={row.active ? 'ACTIVE' : 'INACTIVE'} /> },
-    { key: 'actions', header: 'Actions', render: (row) => <div className="manager-row-actions"><Button size="sm" variant="secondary" onClick={() => navigate(`/manager/classes/${row.id}/edit`)}>Edit</Button><Button size="sm" variant="secondary" onClick={() => navigate(`/manager/schedule?classId=${row.id}`)}>Schedule</Button><Button size="sm" variant={row.active ? 'danger' : 'secondary'} onClick={() => setChanging(row)}>{row.active ? 'Deactivate' : 'Activate'}</Button></div> },
+    { key: 'actions', header: 'Actions', render: (row) => <div className="manager-row-actions"><Button size="sm" variant="secondary" onClick={() => navigate(`/manager/classes/${row.id}/edit`)}>Edit</Button><Button size="sm" variant="secondary" onClick={() => navigate(`/manager/schedule?classId=${row.id}`)}>Schedule</Button><Button size="sm" variant={row.active ? 'danger' : 'secondary'} onClick={() => setChanging(row)}>{row.active ? 'Deactivate' : 'Activate'}</Button><Button size="sm" variant="danger" onClick={() => setDeleting(row)}>Delete</Button></div> },
   ]
   return <div className="page manager-page manager-concept-page">
     <div className="concept-header">
@@ -104,5 +105,6 @@ export function ManagerClassesPage() {
       {classes.status === 'error' ? <ManagerError error={classes.error} onRetry={reload} /> : <Table caption="Classes" columns={columns} rows={classes.status === 'ready' ? classes.data.content : []} rowKey={(row) => row.id} loading={classes.status === 'loading'} emptyTitle="No matching classes" emptyDescription="Clear filters or create a class to get started." pagination={classes.status === 'ready' ? { page: classes.data.page, pageSize: classes.data.size, totalItems: classes.data.totalElements, onPageChange: setPage } : undefined} />}
     </Card>
     {changing && <ConfirmationModal title={changing.active ? 'Deactivate class' : 'Activate class'} description={`${changing.name}: ${changing.active ? 'Upcoming bookings may prevent deactivation.' : 'Make this class available for scheduling.'}`} onClose={() => setChanging(null)} save={() => managerClassesApi.setActive(changing.id, !changing.active)} onSuccess={() => { setChanging(null); reload(); toast.success('Class status updated') }} confirmLabel={changing.active ? 'Deactivate class' : 'Activate class'} danger={changing.active} />}
+    {deleting && <DeleteReasonModal title="Delete Class" entityName={`${deleting.name} (${deleting.code})`} description="Deleting a class deactivates it and cancels upcoming unbooked sessions. It will fail if there are active bookings." onClose={() => setDeleting(null)} onConfirm={async (reason) => { await managerClassesApi.delete(deleting.id, reason) }} onSuccess={() => { setDeleting(null); reload(); toast.success('Class deleted', 'The class has been removed and audit log updated.') }} />}
   </div>
 }

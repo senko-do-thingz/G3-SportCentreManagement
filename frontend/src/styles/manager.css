@@ -116,3 +116,23 @@
 /* Attendance overview filters: dates, class search, class and coach on one row at 1280px and up. */
 .training-form-grid.attendance-overview-filters { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-3); }
 .attendance-overview-filters + p { margin-top: var(--space-4); }
+
+/* Attendance overview side-by-side layout (Session attendance on left, Attendance details on right) */
+.attendance-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.attendance-overview-grid .table-scroll,
+.attendance-overview-grid .card {
+  min-width: 0;
+}
+.attendance-row--selected {
+  background: var(--color-primary-soft) !important;
+}
+@media (max-width: 1100px) {
+  .attendance-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}

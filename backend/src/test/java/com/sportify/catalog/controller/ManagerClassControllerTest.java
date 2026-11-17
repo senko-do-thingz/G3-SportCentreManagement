@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -374,5 +375,27 @@ class ManagerClassControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"active\": false}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deleteClass_asManager_withReason_shouldReturn204() throws Exception {
+        mockMvc.perform(delete(BASE_URL + "/100")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"Sport schedule reorganized for new semester\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(managerClassService).deleteClass(eq(100L), eq("Sport schedule reorganized for new semester"), any());
+    }
+
+    @Test
+    void deleteClass_withBlankReason_shouldReturn400() throws Exception {
+        mockMvc.perform(delete(BASE_URL + "/100")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\": \"   \"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(managerClassService);
     }
 }

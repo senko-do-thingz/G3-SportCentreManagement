@@ -77,6 +77,9 @@ class CatalogSchemaIntegrationTest extends AbstractIntegrationTest {
         // V6 reference fixtures exist; real facility inventory is not universally one facility per sport.
         assertThat(jdbc.queryForList("SELECT code FROM facility", String.class))
                 .contains("BB_COURT_A", "BB_COURT_B", "INDOOR_POOL");
+        assertThat(jdbc.queryForObject("SELECT capacity FROM facility WHERE code = 'BB_COURT_A'", Integer.class)).isEqualTo(10);
+        assertThat(jdbc.queryForObject("SELECT capacity FROM facility WHERE code = 'BB_COURT_B'", Integer.class)).isEqualTo(10);
+        assertThat(jdbc.queryForObject("SELECT capacity FROM facility WHERE code = 'INDOOR_POOL'", Integer.class)).isEqualTo(15);
     }
 
     private int poolSize(String planCode) {

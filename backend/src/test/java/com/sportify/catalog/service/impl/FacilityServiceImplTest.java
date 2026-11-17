@@ -27,10 +27,12 @@ class FacilityServiceImplTest {
 
     @Test
     void directory_keepsPersistedIdentifiersNamesAndInactiveStateUsingStableDatabaseOrder() {
+        Sport badminton = new Sport();
+        badminton.setId(2L);
         when(repository.findAll(Sort.by("name", "id"))).thenReturn(List.of(
-                Facility.builder().id(50L).name("Court A").isActive(false).build(),
+                Facility.builder().id(50L).name("Court A").isActive(false).sport(badminton).capacity(12).build(),
                 Facility.builder().id(70L).name("Court A").isActive(true).build()));
-        assertEquals(List.of(new FacilityResponse(50L, "Court A", false),
+        assertEquals(List.of(new FacilityResponse(50L, "Court A", false, 2L, 12),
                 new FacilityResponse(70L, "Court A", true)), service.getFacilities());
         verify(repository).findAll(Sort.by("name", "id"));
         verifyNoMoreInteractions(repository);

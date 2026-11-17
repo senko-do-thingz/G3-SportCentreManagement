@@ -114,6 +114,7 @@ docs/audit/*_AI_Audit_Log.md
 
 # Local frontend plans
 /plans/
+.worktrees/
 
 docs/audit/*AI-Audit-Log*.docx
 docs/audit/*AI-Audit-Log*.md

@@ -1,6 +1,6 @@
 import { SessionContext } from '../../components/SessionContext'
 import { sessionIdText } from '../../api/sessionIdentity'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Facility } from '../../api/facilitiesApi'
 import { managerClassesApi, type ManagerClass } from '../../api/managerClassesApi'
 import { managerSessionsApi, scheduleConflicts, type DayOfWeek, type ManagerSession, type ScheduleConflict, type SessionCreate, type TrainingType } from '../../api/managerSessionsApi'
@@ -15,10 +15,12 @@ export function SessionEditorModal({ item, classes, facilities, manualFacility =
   const savedSession = useRef<ManagerSession | undefined>(undefined)
   const today = centerNow().date
   const initialClass = classes.find((entry) => entry.id === (item?.class?.id ?? classId))
-  const [draft, setDraft] = useState({ classId: String(initialClass?.id ?? ''), date: item?.date ?? addDays(today, 1), rescheduleReason: '', startTime: item?.startTime.slice(0, 5) ?? '09:00', endTime: item?.endTime.slice(0, 5) ?? '10:00', facilityId: String(item?.facility?.id ?? ''), coachId: String(item?.coach?.id ?? initialClass?.coachId ?? ''), capacity: String(item?.capacity ?? initialClass?.maxMembers ?? 20), trainingType: item?.trainingType ?? 'COACH_LED', fromDate: addDays(today, 1), toDate: addDays(today, 7) })
+  const [draft, setDraft] = useState({ classId: String(initialClass?.id ?? ''), date: item?.date ?? addDays(today, 1), rescheduleReason: '', startTime: item?.startTime.slice(0, 5) ?? '09:00', endTime: item?.endTime.slice(0, 5) ?? '10:00', facilityId: String(item?.facility?.id ?? ''), coachId: String(item?.coach?.id ?? initialClass?.coachId ?? ''), capacity: item ? String(item.capacity) : initialClass?.maxMembers != null ? String(initialClass.maxMembers) : '', trainingType: item?.trainingType ?? 'COACH_LED', fromDate: addDays(today, 1), toDate: addDays(today, 7) })
   const [weekly, setWeekly] = useState(false)
   const [days, setDays] = useState<DayOfWeek[]>([])
   const [conflicts, setConflicts] = useState<ScheduleConflict[]>([])
+  const [liveConflicts, setLiveConflicts] = useState<ScheduleConflict[]>([])
+  const [checkingConflict, setCheckingConflict] = useState(false)
   const selectedClass = classes.find((entry) => entry.id === Number(draft.classId))
   const selectedFacility = manualFacility ? undefined : facilities.find((entry) => entry.id === Number(draft.facilityId) && entry.active !== false)
   const facilityMax = selectedFacility?.capacity != null && Number.isInteger(selectedFacility.capacity) && selectedFacility.capacity > 0
@@ -29,7 +31,49 @@ export function SessionEditorModal({ item, classes, facilities, manualFacility =
   const bookedMinimum = Math.max(1, item?.bookedCount ?? 0)
   const coachLoader = useCallback((signal: AbortSignal) => selectedClass ? managerClassesApi.coaches(selectedClass.sportId, signal) : Promise.resolve([]), [selectedClass])
   const [coaches, retryCoaches] = useResource(coachLoader)
-  const dates = weekly ? repeatDates(draft.fromDate, draft.toDate, days) : [draft.date]
+  const dates = useMemo(() => weekly ? repeatDates(draft.fromDate, draft.toDate, days) : [draft.date], [weekly, draft.fromDate, draft.toDate, days, draft.date])
+
+  useEffect(() => {
+    const validTimes = /^([01]\d|2[0-3]):[0-5]\d$/.test(draft.startTime) &&
+      /^([01]\d|2[0-3]):[0-5]\d$/.test(draft.endTime) &&
+      draft.endTime > draft.startTime
+    const facilityNum = Number(draft.facilityId) > 0 ? Number(draft.facilityId) : null
+    const coachNum = draft.trainingType === 'COACH_LED' && Number(draft.coachId) > 0 ? Number(draft.coachId) : null
+    const validDatesList = weekly ? (dates.length > 0 && dates.length <= 100 ? dates : []) : (validDate(draft.date) ? [draft.date] : [])
+
+    const controller = new AbortController()
+    const timer = setTimeout(async () => {
+      if (!validTimes || (!facilityNum && !coachNum) || validDatesList.length === 0) {
+        setLiveConflicts([])
+        setCheckingConflict(false)
+        return
+      }
+      setCheckingConflict(true)
+      try {
+        const res = await managerSessionsApi.validate({
+          dates: validDatesList,
+          startTime: `${draft.startTime.slice(0, 5)}:00`,
+          endTime: `${draft.endTime.slice(0, 5)}:00`,
+          coachId: coachNum,
+          facilityId: facilityNum,
+          excludeSessionId: item?.id ?? null,
+        }, controller.signal)
+        setLiveConflicts(res.conflicts || [])
+      } catch {
+        // Silently ignore aborted or transient errors during typing
+      } finally {
+        if (!controller.signal.aborted) {
+          setCheckingConflict(false)
+        }
+      }
+    }, 350)
+
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+  }, [draft.date, draft.startTime, draft.endTime, draft.facilityId, draft.coachId, draft.trainingType, weekly, draft.fromDate, draft.toDate, days, dates, item?.id])
+
   const form = useManagerForm(ref, FIELDS, () => {
     const errors: Record<string, string> = {}
     if (!selectedClass || (!item && !selectedClass.active)) errors.classId = 'Choose an active class.'
@@ -47,7 +91,8 @@ export function SessionEditorModal({ item, classes, facilities, manualFacility =
     if (draft.trainingType === 'COACH_LED' && (coaches.status !== 'ready' || !coaches.data.some((entry) => entry.id === Number(draft.coachId)))) errors.coachId = 'Choose a coach qualified for this sport.'
     const capacity = Number(draft.capacity)
     if (bookedMinimum > allowedMax) errors.capacity = `The selected facility/class cannot accommodate ${bookedMinimum} existing bookings. Choose a facility with more space.`
-    else if (!Number.isInteger(capacity) || capacity < bookedMinimum || capacity > allowedMax) errors.capacity = `Capacity must be a whole number from ${bookedMinimum} to ${allowedMax}.`
+    else if (!draft.capacity || !Number.isInteger(capacity) || capacity < bookedMinimum || capacity > allowedMax) errors.capacity = `Capacity must be a whole number from ${bookedMinimum} to ${allowedMax}.`
+    if (liveConflicts.length > 0) errors.startTime = 'Schedule conflict detected. Please adjust time slot, coach, or facility.'
     return errors
   }, async () => {
     setConflicts([])
@@ -66,14 +111,14 @@ export function SessionEditorModal({ item, classes, facilities, manualFacility =
       const nextClass = key === 'classId' ? classes.find((entry) => entry.id === Number(value)) : undefined
       if (key === 'classId') {
         // A new class can have a different sport; never silently keep the old court.
-        return { ...previous, classId: value, facilityId: '', coachId: String(nextClass?.coachId ?? ''), capacity: String(nextClass?.maxMembers ?? 20) }
+        return { ...previous, classId: value, facilityId: '', coachId: String(nextClass?.coachId ?? ''), capacity: nextClass?.maxMembers != null ? String(nextClass.maxMembers) : '' }
       }
       if (key === 'facilityId' && !manualFacility) {
         const court = facilities.find((entry) => entry.id === Number(value))
         const limit = classes.find((entry) => entry.id === Number(previous.classId))?.maxMembers ?? 100
         const physical = court?.capacity != null && Number.isInteger(court.capacity) && court.capacity > 0 ? court.capacity : limit
         const effective = value ? Math.min(limit, physical) : limit
-        const nextCapacity = item ? Math.min(Number(previous.capacity), effective) : effective
+        const nextCapacity = item ? Math.min(Number(previous.capacity), effective) : (previous.capacity ? Math.min(Number(previous.capacity), effective) : effective)
         return { ...previous, facilityId: value, capacity: String(nextCapacity) }
       }
       return { ...previous, [key]: value }
@@ -96,10 +141,24 @@ export function SessionEditorModal({ item, classes, facilities, manualFacility =
           {manualFacility ? <Input label="Facility ID" name="facilityId" type="number" min="1" step="1" value={draft.facilityId} onChange={(event) => change('facilityId', event.target.value)} error={form.errors.facilityId} hint={item?.facility ? `Current facility: ${item.facility.name}. The backend validates availability.` : 'Enter a known facility ID from your center. The backend validates availability.'} required /> : <Select label="Facility" name="facilityId" placeholder="Choose a facility" value={draft.facilityId} options={facilities.filter((entry) => entry.active !== false).map((entry) => ({ value: String(entry.id), label: entry.capacity != null ? `${entry.name} - max ${entry.capacity} members` : `${entry.name} - capacity unavailable` }))} onChange={(event) => change('facilityId', event.target.value)} error={form.errors.facilityId} hint={selectedFacility ? facilityMax !== null ? `Physical facility capacity: ${facilityMax} members.` : 'Facility capacity is unavailable; the backend will validate it.' : 'Select a court to see its maximum physical capacity.'} required />}
           <Select label="Coach" name="coachId" placeholder="Choose a qualified coach" disabled={draft.trainingType !== 'COACH_LED' || coaches.status !== 'ready'} value={draft.trainingType === 'COACH_LED' ? draft.coachId : ''} options={coaches.status === 'ready' ? coaches.data.map((entry) => ({ value: String(entry.id), label: entry.fullName })) : []} onChange={(event) => change('coachId', event.target.value)} error={form.errors.coachId} required={draft.trainingType === 'COACH_LED'} />
           {item && draft.date !== item.date && <Input label="Rescheduling reason (optional)" name="rescheduleReason" maxLength={500} value={draft.rescheduleReason} onChange={(event) => change('rescheduleReason', event.target.value)} hint="Recorded in the audit history. Maximum 500 characters." />}
-          <Input label="Capacity" name="capacity" type="number" min={bookedMinimum} max={allowedMax} step="1" value={draft.capacity} onChange={(event) => change('capacity', event.target.value)} error={form.errors.capacity} hint={`Class maximum: ${classMax} members. ${facilityMax === null ? 'Choose a facility to see its physical limit.' : `Facility maximum: ${facilityMax} members.`} Allowed session maximum: ${allowedMax} members.`} required />
+          <Input label="Capacity" name="capacity" type="number" min={bookedMinimum} max={allowedMax} step="1" value={draft.capacity} onChange={(event) => change('capacity', event.target.value)} error={form.errors.capacity || (draft.capacity && Number(draft.capacity) > allowedMax ? `Capacity exceeds maximum allowed (${allowedMax}).` : undefined)} hint={`Class maximum: ${classMax} members. ${facilityMax === null ? 'Choose a facility to see its physical limit.' : `Facility maximum: ${facilityMax} members.`} Allowed session maximum: ${allowedMax} members.`} required />
           {!item && <Checkbox label="Repeat weekly" checked={weekly} onChange={(event) => setWeekly(event.target.checked)} />}
           {weekly && <><CalendarDateField label="From date" name="fromDate" min={today} value={draft.fromDate} onChange={(value) => change('fromDate', value)} error={form.errors.fromDate} required /><CalendarDateField label="To date" name="toDate" min={draft.fromDate} value={draft.toDate} onChange={(value) => change('toDate', value)} error={form.errors.toDate} required /><div className="manager-form-full"><fieldset><legend>Repeat on</legend><div className="f2-weekdays">{WEEKDAYS.map((day) => <Checkbox key={day} label={day.slice(0, 3)} checked={days.includes(day)} onChange={(event) => { setDays((previous) => event.target.checked ? [...previous, day] : previous.filter((entry) => entry !== day)); form.clear('daysOfWeek') }} />)}</div></fieldset>{form.errors.daysOfWeek && <p role="alert" className="field__error">{form.errors.daysOfWeek}</p>}<p>{dates.length > 100 ? 'More than 100 sessions - shorten the date range.' : `${dates.length} sessions will be created.`}</p></div></>}
         </fieldset>
+        {checkingConflict && <p className="notice notice--info mb-2 text-xs">Checking schedule availability...</p>}
+        {liveConflicts.length > 0 && (
+          <div className="notice notice--danger mb-4" role="alert">
+            <strong>Schedule conflict detected ({liveConflicts.length} {liveConflicts.length === 1 ? 'conflict' : 'conflicts'}):</strong>
+            <ul style={{ margin: '0.5rem 0 0.5rem 1.25rem', listStyleType: 'disc' }}>
+              {liveConflicts.map((c, i) => (
+                <li key={i}>
+                  {c.date} ({c.startTime.slice(0, 5)} - {c.endTime.slice(0, 5)}): {c.conflictType === 'BOTH' ? 'Coach and facility overlap' : c.conflictType === 'COACH' ? 'Coach overlap' : 'Facility overlap'} with {c.class?.name || 'existing session'} ({c.coach?.name ? `Coach: ${c.coach.name}` : ''}{c.facility?.name ? ` | Facility: ${c.facility.name}` : ''})
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs">Please change the time, coach, or facility to avoid this overlap.</p>
+          </div>
+        )}
         {coaches.status === 'error' && draft.trainingType === 'COACH_LED' && <ManagerError error={coaches.error} onRetry={retryCoaches} />}
         <p className="notice notice--info">{selectedClass?.name ?? 'Choose a class'} - Class maximum: {selectedClass?.maxMembers ?? '-'} members. {facilityMax === null ? 'Select a facility to view its maximum capacity.' : `Selected court maximum: ${facilityMax} members. Allowed session maximum: ${allowedMax} members.`} Sessions are published when created.</p>
         <div className="manager-form-actions"><Button type="submit" loading={form.saving}>{item ? 'Save session' : 'Create schedule'}</Button><Button variant="secondary" disabled={form.saving} onClick={onClose}>Close</Button></div>

@@ -62,6 +62,7 @@ export const managerClassesApi = {
   get: (id: number, signal?: AbortSignal) => api.get<ManagerClass>(`/manager/classes/${id}`, { signal }),
   create: (body: ClassRequest) => api.post<ManagerClass>('/manager/classes', body),
   update: (id: number, body: ClassRequest) => api.put<ManagerClass>(`/manager/classes/${id}`, body),
+  delete: (id: number, reason: string) => api.post<void>(`/manager/classes/${id}/delete`, { reason: reason.trim() }),
   setActive: (id: number, active: boolean) => api.patch<ManagerClass>(`/manager/classes/${id}/status`, { active }),
   ageGroups: (signal?: AbortSignal) => api.get<AgeGroup[]>('/age-groups', { signal }),
   coaches: (sportId?: number, signal?: AbortSignal) => api.get<CoachSummary[]>('/coaches', { query: { sportId }, signal }),

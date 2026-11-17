@@ -536,6 +536,13 @@
       "creates": [],
       "drops": [],
       "sha256_lf": "c2c86c81f1adbc838737afd627be41ae7b1a914e7e9aed658f2112a0f5371570"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V66__set_basketball_and_pool_facility_capacity.sql",
+      "version": 66,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "357c57f3bb919198051b0d215f1a6669fd932065f0900ab32fa30eea16e113a6"
     }
   ],
   "create_occurrences": 82,

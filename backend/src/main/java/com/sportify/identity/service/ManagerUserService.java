@@ -37,4 +37,6 @@ public interface ManagerUserService {
     ManagerUserResponse changeStatus(Long userId, UserStatus status, UserAccount actor);
 
     void resetMemberPassword(Long userId, UserAccount actor);
+
+    void deleteUser(Long userId, String reason, UserAccount actor);
 }

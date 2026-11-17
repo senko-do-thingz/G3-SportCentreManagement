@@ -7,7 +7,7 @@ import type { ManagerUser } from '../../types/manager'
 import { formatManagerDateTime } from './managerFormat'
 import { AddStaffAccountModal } from './AddStaffAccountModal'
 import { EditCoachProfileModal } from './EditCoachProfileModal'
-import { ConfirmationModal, DetailList, ManagerError, PreviewNotice } from './ManagerShared'
+import { ConfirmationModal, DeleteReasonModal, DetailList, ManagerError, PreviewNotice } from './ManagerShared'
 import { useDebounced, useResource } from './useManagerTools'
 
 export function UserManagementPage() {
@@ -23,6 +23,7 @@ export function UserManagementPage() {
   const [changing, setChanging] = useState<ManagerUser | null>(null)
   const [resetting, setResetting] = useState<ManagerUser | null>(null)
   const [editingCoach, setEditingCoach] = useState<ManagerUser | null>(null)
+  const [deleting, setDeleting] = useState<ManagerUser | null>(null)
   const load = useCallback((signal: AbortSignal) => managerUsersApi.list({ page, size: 20, role, status, search: debounced.trim() }, signal), [page, role, status, debounced])
   const [resource, reload] = useResource(load)
   const ready = resource.status === 'ready' && search === debounced
@@ -43,6 +44,7 @@ export function UserManagementPage() {
       {row.role === 'MEMBER' && <Button variant="secondary" size="sm" onClick={() => setResetting(row)}>Reset Password</Button>}
       {row.role === 'COACH' && <Button variant="secondary" size="sm" aria-label={`Edit coach profile of ${row.fullName}`} onClick={() => setEditingCoach(row)}>Edit coach profile</Button>}
       <Button variant={row.status === 'ACTIVE' ? 'danger' : 'secondary'} size="sm" disabled={row.id === user?.id && row.status === 'ACTIVE'} title={row.id === user?.id ? 'You cannot deactivate your own account.' : undefined} onClick={() => setChanging(row)}>{row.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}</Button>
+      {row.id !== user?.id && <Button variant="danger" size="sm" onClick={() => setDeleting(row)}>Delete</Button>}
     </div> },
   ]
 
@@ -111,6 +113,7 @@ export function UserManagementPage() {
     {adding && <AddStaffAccountModal onClose={() => setAdding(false)} onSuccess={() => { setAdding(false); toast.success('Staff account created', 'The account is active. Your current filters have been preserved.'); reload() }} />}
     {changing && <ConfirmationModal title={changing.status === 'ACTIVE' ? 'Deactivate account' : 'Activate account'} description={`${changing.status === 'ACTIVE' ? 'Deactivate' : 'Activate'} ${changing.fullName}'s account? ${changing.status === 'ACTIVE' ? 'They will no longer be able to log in.' : 'They will be able to log in again.'}`} onClose={() => setChanging(null)} save={() => managerUsersApi.changeStatus(changing.id, changing.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE')} onSuccess={changed} confirmLabel={changing.status === 'ACTIVE' ? 'Deactivate account' : 'Activate account'} danger={changing.status === 'ACTIVE'} />}
     {resetting && <ConfirmationModal title="Reset Member password" description={`Reset ${resetting.fullName}'s password?`} onClose={() => setResetting(null)} save={() => managerUsersApi.resetMemberPassword(resetting.id)} onSuccess={() => { setResetting(null); toast.success('Password reset successfully. New password: SportifyDemo2026!') }} confirmLabel="Reset Password" />}
+    {deleting && <DeleteReasonModal title="Delete User Account" entityName={`${deleting.fullName} (${deleting.email})`} description="Deleting an account will deactivate it immediately and record the action in the audit log." onClose={() => setDeleting(null)} onConfirm={async (reason) => { await managerUsersApi.delete(deleting.id, reason) }} onSuccess={() => { setDeleting(null); toast.success('Account deleted', 'The account has been removed and audit log updated.'); reload() }} />}
     {editingCoach && <EditCoachProfileModal userId={editingCoach.id} name={editingCoach.fullName} onClose={() => setEditingCoach(null)} onSuccess={() => { setEditingCoach(null); toast.success('Coach profile updated', 'The Home page shows the new photo and details.') }} />}
     {selected && <Modal open title="Account profile" description="Account information from the current user list." onClose={() => setSelected(null)} footer={<Button variant="secondary" onClick={() => setSelected(null)}>Close</Button>}><DetailList items={[{ label: 'Full name', value: selected.fullName }, { label: 'Email', value: selected.email }, { label: 'Phone', value: selected.phone }, { label: 'Role', value: ROLE_LABELS[selected.role as keyof typeof ROLE_LABELS] ?? selected.role }, { label: 'Status', value: <StatusBadge status={selected.status} /> }, { label: 'Created', value: formatManagerDateTime(selected.createdAt) }]} /></Modal>}
   </div>
