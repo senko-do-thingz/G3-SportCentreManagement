@@ -539,6 +539,37 @@ describe('FE-06 packages and membership cards', () => {
     expect(screen.queryByText('No matching packages')).not.toBeInTheDocument()
     expect(screen.queryByText('Package 21')).not.toBeInTheDocument()
   })
+  it('pre-fills next package code, warns on duplicate code, and deletes with mandatory reason', async () => {
+    authOnly()
+    vi.spyOn(packagesApi, 'sports').mockResolvedValue(sports)
+    vi.spyOn(managerPackagesApi, 'list').mockResolvedValue([sportPackage])
+    const del = vi.spyOn(managerPackagesApi, 'delete').mockResolvedValue()
+    const user = userEvent.setup()
+    renderApp('/manager/packages')
+    await screen.findByText('Football 30-day package')
+
+    // Test Delete
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    const deleteModal = within(screen.getByRole('dialog'))
+    expect(deleteModal.getByText(/You are about to delete/)).toBeInTheDocument()
+    const reasonInput = deleteModal.getByPlaceholderText(/Enter the justification/)
+    await user.type(reasonInput, 'Discontinued promo')
+    await user.click(deleteModal.getByRole('button', { name: 'Delete package' }))
+    await waitFor(() => expect(del).toHaveBeenCalledWith(sportPackage.id, 'Discontinued promo'))
+
+    // Test Create with next code pre-filled and duplicate check
+    await user.click(screen.getByRole('button', { name: '+ Create package' }))
+    const createModal = within(screen.getByRole('dialog'))
+    expect(createModal.getByLabelText(/Package code/)).toHaveValue('PK-002')
+    // Enter duplicate code
+    await user.clear(createModal.getByLabelText(/Package code/))
+    await user.type(createModal.getByLabelText(/Package code/), 'PK-001')
+    await user.type(createModal.getByLabelText(/Package name/), 'Duplicate test')
+    await user.selectOptions(createModal.getByLabelText(/Sport/, { exact: false }), '1')
+    await user.type(createModal.getByLabelText(/Price/), '500000')
+    await user.click(createModal.getByRole('button', { name: 'Save package' }))
+    expect(createModal.getByText(/Package code 'PK-001' is already in use/)).toBeInTheDocument()
+  })
   it('rejects BE-03 package limits and maps price and active server errors to the displayed fields', async () => {
     authOnly()
     vi.spyOn(packagesApi, 'sports').mockResolvedValue(sports)

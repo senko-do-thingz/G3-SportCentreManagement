@@ -8,10 +8,22 @@ import { useManagerForm } from './useManagerTools'
 
 const FIELDS = ['code', 'name', 'sportId', 'trainingFormat', 'durationDays', 'sessionCount', 'sessionMinutes', 'priceAmount', 'price', 'description', 'isActive', 'active'] as const
 
-export function PackageEditorModal({ item, sports, onClose, onSuccess }: { item?: ManagerPackage; sports: Sport[]; onClose: () => void; onSuccess: () => void }) {
+function nextPackageCode(existing: ManagerPackage[]): string {
+  let max = 0
+  for (const pkg of existing) {
+    const match = pkg.code.match(/PK-(\d+)/i)
+    if (match) {
+      const num = parseInt(match[1], 10)
+      if (num > max) max = num
+    }
+  }
+  return `PK-${String(max + 1).padStart(3, '0')}`
+}
+
+export function PackageEditorModal({ item, sports, existingPackages = [], onClose, onSuccess }: { item?: ManagerPackage; sports: Sport[]; existingPackages?: ManagerPackage[]; onClose: () => void; onSuccess: () => void }) {
   const formRef = useRef<HTMLFormElement>(null)
   const [draft, setDraft] = useState(() => ({
-    code: item?.code ?? '', name: item?.name ?? '', sportId: item ? String(item.sportId) : '',
+    code: item?.code ?? (existingPackages.length ? nextPackageCode(existingPackages) : ''), name: item?.name ?? '', sportId: item ? String(item.sportId) : '',
     trainingFormat: item?.trainingFormat ?? 'SELF_TRAINING', durationDays: String(item?.durationDays ?? 30),
     sessionCount: String(item?.sessionCount ?? 8), sessionMinutes: String(item?.sessionMinutes ?? 60),
     priceAmount: item ? String(item.priceAmount) : '', description: item?.description ?? '', isActive: item ? item.isActive : true,
@@ -21,7 +33,11 @@ export function PackageEditorModal({ item, sports, onClose, onSuccess }: { item?
     if (!draft.name.trim()) errors.name = 'Package name is required.'
     else if (draft.name.trim().length > 100) errors.name = 'Package name must be at most 100 characters.'
     if (!item) {
-      if (!draft.code.trim()) errors.code = 'Package code is required.'
+      const trimmedCode = draft.code.trim().toUpperCase()
+      if (!trimmedCode) errors.code = 'Package code is required.'
+      else if (existingPackages.some((p) => p.code.toUpperCase() === trimmedCode)) {
+        errors.code = `Package code '${draft.code.trim()}' is already in use. Next available: ${nextPackageCode(existingPackages)}.`
+      }
       if (!sports.some((sport) => sport.id === Number(draft.sportId))) errors.sportId = 'Choose an available sport.'
       if (!['SELF_TRAINING', 'COACH_LED'].includes(draft.trainingFormat)) errors.trainingFormat = 'Choose a training type.'
     }
@@ -54,7 +70,7 @@ export function PackageEditorModal({ item, sports, onClose, onSuccess }: { item?
       <p className="manager-catalog-form__note">Prices can be 0 VND or more. A 0 VND package can only be sold at the desk; Members cannot order it online. Session length is set to 60 or 90 minutes.</p>
       {item?.isActive === null && <p className="manager-catalog-form__note">Package status is not provided. Choose a status before saving.</p>}
       <fieldset className="manager-form-grid" disabled={form.saving}>
-        <Input label="Package code" name="code" value={draft.code} readOnly={Boolean(item)} onChange={(event) => change('code', event.target.value)} error={form.errors.code} required />
+        <Input label="Package code" name="code" value={draft.code} readOnly={Boolean(item)} onChange={(event) => change('code', event.target.value)} error={form.errors.code} hint={!item ? `Next suggested: ${nextPackageCode(existingPackages)}` : undefined} required />
         <Input label="Package name" name="name" maxLength={100} value={draft.name} onChange={(event) => change('name', event.target.value)} error={form.errors.name} required />
         {item ? <Input label="Sport" value={item.sportName} readOnly /> : <Select label="Sport" name="sportId" placeholder="Choose a sport" value={draft.sportId} options={sports.map((sport) => ({ value: String(sport.id), label: sport.name }))} onChange={(event) => change('sportId', event.target.value)} error={form.errors.sportId} required />}
         {item ? <Input label="Training type" value={item.trainingFormat === 'COACH_LED' ? 'Coach-led' : 'Self-training'} readOnly /> : <Select label="Training type" name="trainingFormat" options={[{ value: 'SELF_TRAINING', label: 'Self-training' }, { value: 'COACH_LED', label: 'Coach-led' }]} value={draft.trainingFormat} onChange={(event) => change('trainingFormat', event.target.value)} error={form.errors.trainingFormat} required />}

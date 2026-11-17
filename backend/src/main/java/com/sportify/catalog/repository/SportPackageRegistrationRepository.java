@@ -128,4 +128,6 @@ public interface SportPackageRegistrationRepository extends JpaRepository<SportP
     List<SportPackageRegistration> findPendingOnlineOrders(@Param("memberId") Long memberId,
                                                           @Param("packageId") Long packageId,
                                                           @Param("startDate") LocalDate startDate);
+
+    long countBySportPackageId(Long sportPackageId);
 }
