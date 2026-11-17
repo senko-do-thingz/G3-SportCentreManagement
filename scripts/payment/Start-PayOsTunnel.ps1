@@ -86,8 +86,8 @@ try {
             $line = [string]$_
             Write-Host $line
 
-            if (-not $webhookRegistered -and $line -match '(?i)https://[a-z0-9-]+\.trycloudflare\.com') {
-                $origin = $Matches[0].TrimEnd('/')
+            if (-not $webhookRegistered -and $line -match '(?i)https://(?<host>(?!api\.)[a-z0-9-]+\.trycloudflare\.com)(?=[/:?#\s]|$)') {
+                $origin = "https://$($Matches['host'])"
                 $webhookUrl = "$origin/api/v1/payments/payos/webhook"
                 Write-Host "Registering PayOS webhook at $webhookUrl"
 
@@ -117,6 +117,9 @@ try {
     }
 
     if (-not $webhookRegistered) {
+        if ($cloudflaredExitCode -ne 0) {
+            throw "cloudflared exited with code $cloudflaredExitCode before creating a public URL. Quick Tunnels need outbound HTTPS access to api.trycloudflare.com:443; a VPN/WARP, proxy, firewall, or network may be resetting the connection."
+        }
         throw 'cloudflared exited before publishing a trycloudflare.com URL, so PayOS could not be configured.'
     }
     if ($cloudflaredExitCode -ne 0) {

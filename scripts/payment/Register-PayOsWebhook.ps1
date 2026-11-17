@@ -32,6 +32,7 @@ $webhookUri = $null
 $validUri = [Uri]::TryCreate($WebhookUrl, [UriKind]::Absolute, [ref] $webhookUri)
 $invalidUrl = (-not $validUri) -or ($webhookUri.Scheme -ne 'https') `
     -or ($webhookUri.AbsolutePath -ne '/api/v1/payments/payos/webhook') `
+    -or ($webhookUri.Host -eq 'api.trycloudflare.com') `
     -or [bool]$webhookUri.Query -or [bool]$webhookUri.Fragment -or [bool]$webhookUri.UserInfo
 if ($invalidUrl) {
     throw 'Use an HTTPS webhook URL ending exactly in /api/v1/payments/payos/webhook.'
