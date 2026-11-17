@@ -157,11 +157,7 @@ function BookingOptionsContent({ sessionId, returnTo }: { sessionId: number | Se
         <Card title="Choose a package">
           {!canContinue ? (
             <div className="booking-empty">
-              <p>
-                {status === 'SYNTHETIC_OPERATION_DENIED'
-                  ? 'Operational booking is unavailable for synthetic or demo member accounts.'
-                  : 'No eligible package registration is available for this session.'}
-              </p>
+              <p>No eligible package registration is available for this session.</p>
               {PACKAGE_RECOVERY_REASONS.some((reason) => reason === status) && <SessionPackageRecommendations session={detail.session} returnTo={returnTo} />}
               {status === 'ALREADY_BOOKED' && <Link className={buttonClassName('secondary')} to="/member/bookings">View my booking</Link>}
               {status === 'CAPACITY_UNAVAILABLE' && <Button variant="secondary" onClick={reload}>Refresh availability</Button>}

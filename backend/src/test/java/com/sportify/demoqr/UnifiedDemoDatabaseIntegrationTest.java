@@ -162,142 +162,98 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
                 """, session, realRegistration);
     }
 
-    @Test void syntheticSettlementCannotConsumeRealCapacityOrWriteOperationalRecords() throws Exception {
-        String synthetic = login("ops@unified-demo.invalid"), real = login("live@example.test");
-        String reception = login("lan.reception@example.com"), coach = login("quan.coach@example.com");
-        var simulated = purchase(synthetic); var actual = purchase(real);
-        long owner = jdbcTemplate.queryForObject("SELECT id FROM user_account WHERE email='ops@unified-demo.invalid'", Long.class);
-        var amount = jdbcTemplate.queryForObject("SELECT amount FROM payment WHERE id=?", java.math.BigDecimal.class, actual.getPaymentId());
-        assertThat(write("/api/v1/payments/" + actual.getPaymentId() + "/confirm", HttpMethod.PUT,
+    @Test void everyActiveMemberCanBookWithACompletedLocalPayment() throws Exception {
+        String member = login("ops@unified-demo.invalid"), real = login("live@example.test");
+        String reception = login("lan.reception@example.com");
+        var localRegistration = purchase(member); var actualRegistration = purchase(real);
+        java.math.BigDecimal amount = jdbcTemplate.queryForObject("SELECT amount FROM payment WHERE id=?", java.math.BigDecimal.class, actualRegistration.getPaymentId());
+        assertThat(write("/api/v1/payments/" + actualRegistration.getPaymentId() + "/confirm", HttpMethod.PUT,
                 Map.of("method", "BANK_TRANSFER", "referenceCode", "UNIFY-REAL-PAID", "amountReceived", amount), reception).getStatusCode()).isEqualTo(HttpStatus.OK);
-        // A normal operational class with one seat, a real receipt and paid entitlement in the same database.
-        jdbcTemplate.update("INSERT facility(code,name,sport_id,facility_type,is_active) SELECT 'UNIFY-OPS','Operational fixture court',sport_id,'COURT',1 FROM sport_package WHERE id=(SELECT package_id FROM sport_package_registration WHERE id=?)", actual.getId());
-        long sport=jdbcTemplate.queryForObject("SELECT p.sport_id FROM sport_package p JOIN sport_package_registration r ON r.package_id=p.id WHERE r.id=?",Long.class,actual.getId());
-        var date=jdbcTemplate.queryForObject("SELECT CAST(DATEADD(day,7,GETDATE()) AS date)",java.sql.Date.class);
-        String code=com.sportify.support.SessionIdentityFixtures.reserve(jdbcTemplate,date.toLocalDate(),sport);
+        long sport = jdbcTemplate.queryForObject("SELECT p.sport_id FROM sport_package p JOIN sport_package_registration r ON r.package_id=p.id WHERE r.id=?", Long.class, actualRegistration.getId());
+        var date = jdbcTemplate.queryForObject("SELECT CAST(DATEADD(day,7,GETDATE()) AS date)", java.sql.Date.class);
+        String sessionCode = com.sportify.support.SessionIdentityFixtures.reserve(jdbcTemplate, date.toLocalDate(), sport);
+        jdbcTemplate.update("INSERT facility(code,name,sport_id,facility_type,is_active) SELECT 'UNIFY-OPS','Operational fixture court',sport_id,'COURT',1 FROM sport_package WHERE id=(SELECT package_id FROM sport_package_registration WHERE id=?)", actualRegistration.getId());
         jdbcTemplate.update("""
                 INSERT class_session(class_id,sport_id,session_date,start_time,end_time,facility_id,coach_id,training_type,capacity,booked_count,status,session_code)
                 SELECT TOP 1 s.class_id,s.sport_id,?,'04:00','05:00',
                   (SELECT id FROM facility WHERE code='UNIFY-OPS'),s.coach_id,s.training_type,1,0,'PUBLISHED',?
                 FROM class_session s JOIN sport_package p ON p.sport_id=s.sport_id AND p.training_format=s.training_type
                 WHERE p.id=(SELECT package_id FROM sport_package_registration WHERE id=?) AND s.coach_id=(SELECT id FROM user_account WHERE email='quan.coach@example.com') ORDER BY s.id
-                """, date, code, actual.getId());
+                """, date, sessionCode, actualRegistration.getId());
         long session = jdbcTemplate.queryForObject("SELECT id FROM class_session WHERE facility_id=(SELECT id FROM facility WHERE code='UNIFY-OPS')", Long.class);
-        var baseline = operationalSnapshot(session, actual.getId());
-        assertThat(confirm(simulated.getPaymentId(), "ops@unified-demo.invalid").getStatusCode()).isEqualTo(HttpStatus.OK);
-        for (String path : java.util.List.of("/api/v1/sessions/" + session, "/api/v1/sessions/by-code/" + code)) {
-            var detail = restTemplate.exchange(path, HttpMethod.GET, new HttpEntity<>(authHeaders(synthetic)), String.class);
-            assertThat(detail.getStatusCode()).isEqualTo(HttpStatus.OK);
-            var json = new com.fasterxml.jackson.databind.ObjectMapper().readTree(detail.getBody());
-            assertThat(json.path("eligible").asBoolean()).isFalse();
-            assertThat(json.path("reason").asText()).isEqualTo("SYNTHETIC_OPERATION_DENIED");
-            assertThat(json.path("suitableRegistrations")).isEmpty();
-        }
-        var staffEligibility = restTemplate.exchange("/api/v1/sessions/" + session + "/eligibility?memberId=" + owner,
+        assertThat(confirm(localRegistration.getPaymentId(), "ops@unified-demo.invalid").getStatusCode()).isEqualTo(HttpStatus.OK);
+        int localSessionsBefore = jdbcTemplate.queryForObject("SELECT remaining_sessions FROM sport_package_registration WHERE id=?", Integer.class, localRegistration.getId());
+
+        var memberEligibility = restTemplate.exchange("/api/v1/sessions/" + session, HttpMethod.GET, new HttpEntity<>(authHeaders(member)), String.class);
+        assertThat(memberEligibility.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var memberJson = new com.fasterxml.jackson.databind.ObjectMapper().readTree(memberEligibility.getBody());
+        assertThat(memberJson.path("eligible").asBoolean()).isTrue();
+        assertThat(memberJson.path("reason").isNull()).isTrue();
+        assertThat(memberJson.path("suitableRegistrations")).isNotEmpty();
+        var staffEligibility = restTemplate.exchange("/api/v1/sessions/" + session + "/eligibility?memberId=" + jdbcTemplate.queryForObject("SELECT id FROM user_account WHERE email='ops@unified-demo.invalid'", Long.class),
                 HttpMethod.GET, new HttpEntity<>(authHeaders(reception)), String.class);
         assertThat(staffEligibility.getStatusCode()).isEqualTo(HttpStatus.OK);
-        var staffJson = new com.fasterxml.jackson.databind.ObjectMapper().readTree(staffEligibility.getBody());
-        assertThat(staffJson.path("eligible").asBoolean()).isFalse();
-        assertThat(staffJson.path("reason").asText()).isEqualTo("SYNTHETIC_OPERATION_DENIED");
-        assertThat(staffJson.path("suitableRegistrations")).isEmpty();
-        Map<String,Object> syntheticBooking = Map.of("sessionId",session,"packageRegistrationId",simulated.getId());
-        for (var attempt : new Object[][]{{syntheticBooking,synthetic},
-                {Map.of("sessionId",session,"packageRegistrationId",simulated.getId(),"memberId",owner),reception}}) {
-            var denied = write("/api/v1/bookings", HttpMethod.POST, attempt[0], (String)attempt[1]);
-            assertThat(denied.getBody()).contains("SYNTHETIC_OPERATION_DENIED");
-            assertThat(denied.getStatusCode().is4xxClientError()).isTrue();
-        }
-        assertThat(write("/api/v1/check-ins",HttpMethod.POST,Map.of("identifier",Long.toString(owner)),reception).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
-        assertThat(operationalSnapshot(session, actual.getId())).isEqualTo(baseline);
-        // A historical contaminated booking is not authority for attendance or result creation.
-        jdbcTemplate.update("INSERT booking(booking_code,session_id,member_id,package_registration_id,status) VALUES ('UNIFY-HISTORIC',?,?,?,'CONFIRMED')",session,owner,simulated.getId());
-        long historic = jdbcTemplate.queryForObject("SELECT id FROM booking WHERE booking_code='UNIFY-HISTORIC'",Long.class);
-        var historicalBaseline = operationalSnapshot(session,actual.getId());
-        assertThat(write("/api/v1/reception/training/attendance",HttpMethod.POST,Map.of("bookingId",historic,"status","PRESENT"),reception).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(write("/api/v1/coach/training/attendance",HttpMethod.POST,Map.of("bookingId",historic,"status","PRESENT"),coach).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
-        assertThat(write("/api/v1/bookings/self-training/attendance",HttpMethod.POST,Map.of("bookingId",historic),reception).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
-        assertThat(write("/api/v1/coach/training/results",HttpMethod.POST,Map.of("sessionId",session,"memberId",owner,"notes","Historical bypass attempt","scores",java.util.List.of()),coach).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
-        assertThat(operationalSnapshot(session,actual.getId())).isEqualTo(historicalBaseline);
-        long classId=jdbcTemplate.queryForObject("SELECT class_id FROM class_session WHERE id=?",Long.class,session);
-        assertThat(write("/api/v1/coach/training/plans",HttpMethod.POST,
-                Map.of("classId",classId,"memberId",owner,"bookingId",historic,"title","Synthetic plan attempt",
-                        "steps",java.util.List.of(Map.of("title","Warmup","durationMinutes",5))),coach).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
-        jdbcTemplate.update("INSERT attendance_record(session_id,member_id,booking_id,status,marked_at,marked_by) VALUES (?,?,?,'PRESENT',GETDATE(),(SELECT id FROM user_account WHERE email='lan.reception@example.com'))",session,owner,historic);
-        long attendance=jdbcTemplate.queryForObject("SELECT id FROM attendance_record WHERE booking_id=?",Long.class,historic);
-        assertThat(write("/api/v1/reception/training/attendance/"+attendance,HttpMethod.PUT,
-                Map.of("status","LATE","reason","Synthetic correction attempt"),reception).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(write("/api/v1/coach/training/attendance/"+attendance,HttpMethod.PUT,
-                Map.of("status","LATE","reason","Synthetic correction attempt"),coach).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
-        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM attendance_correction WHERE attendance_record_id=?",Integer.class,attendance)).isZero();
-        assertThat(jdbcTemplate.queryForObject("SELECT status FROM attendance_record WHERE id=?",String.class,attendance)).isEqualTo("PRESENT");
-        // Profile/flag changes and an email rename cannot launder persisted simulator provenance.
-        jdbcTemplate.update("UPDATE user_account SET email='renamed-ops@example.test' WHERE id=?",owner);
-        var disabledPolicy = new com.sportify.catalog.service.OperationalMemberPolicy(jdbcTemplate,
-                new org.springframework.mock.env.MockEnvironment().withProperty("app.payment.unified-demo.enabled","false"));
-        assertThatThrownBy(() -> disabledPolicy.requireRealMember(owner)).hasMessageContaining("Synthetic");
-        long realOwner = jdbcTemplate.queryForObject("SELECT id FROM user_account WHERE email='live@example.test'",Long.class);
-        disabledPolicy.requireRealMember(realOwner);
-        // Cancel the retained historical booking via the official flow; this releases its seat.
-        // E2E-BUG-02 (PROVISIONAL D3): PRESENT/LATE attendance now blocks ordinary cancellation; ABSENT stays cancellable.
-        jdbcTemplate.update("UPDATE attendance_record SET status='ABSENT' WHERE id=?",attendance);
-        jdbcTemplate.update("UPDATE class_session SET booked_count=1 WHERE id=?",session);
-        assertThat(write("/api/v1/bookings/"+historic,HttpMethod.DELETE,null,reception).getStatusCode()).isEqualTo(HttpStatus.OK);
-        var booked = write("/api/v1/bookings",HttpMethod.POST,Map.of("sessionId",session,"packageRegistrationId",actual.getId()),real);
+        assertThat(new com.fasterxml.jackson.databind.ObjectMapper().readTree(staffEligibility.getBody()).path("eligible").asBoolean()).isTrue();
+
+        Map<String,Object> request = Map.of("sessionId", session, "packageRegistrationId", localRegistration.getId());
+        var booked = write("/api/v1/bookings", HttpMethod.POST, request, member);
         assertThat(booked.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        long booking = new com.fasterxml.jackson.databind.ObjectMapper().readTree(booked.getBody()).get("id").asLong();
-        assertThat(jdbcTemplate.queryForObject("SELECT booked_count FROM class_session WHERE id=?",Integer.class,session)).isEqualTo(1);
-        assertThat(write("/api/v1/bookings/"+booking,HttpMethod.DELETE,null,real).getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(jdbcTemplate.queryForObject("SELECT remaining_sessions FROM sport_package_registration WHERE id=?",Integer.class,actual.getId())).isEqualTo(baseline.get("remaining_sessions"));
-        assertPaidMemberImpactWithSimulationDisabled(session, actual, real, reception);
+        long booking = new com.fasterxml.jackson.databind.ObjectMapper().readTree(booked.getBody()).path("id").asLong();
+        assertThat(booking).isPositive();
+        assertThat(jdbcTemplate.queryForObject("SELECT booked_count FROM class_session WHERE id=?", Integer.class, session)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT remaining_sessions FROM sport_package_registration WHERE id=?", Integer.class, localRegistration.getId())).isEqualTo(localSessionsBefore - 1);
+        assertThat(write("/api/v1/bookings", HttpMethod.POST, request, member).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(jdbcTemplate.queryForObject("SELECT booked_count FROM class_session WHERE id=?", Integer.class, session)).isEqualTo(1);
+        assertThat(write("/api/v1/bookings/" + booking, HttpMethod.DELETE, null, member).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(jdbcTemplate.queryForObject("SELECT booked_count FROM class_session WHERE id=?", Integer.class, session)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT remaining_sessions FROM sport_package_registration WHERE id=?", Integer.class, localRegistration.getId())).isEqualTo(localSessionsBefore);
+        assertPaidMemberImpactWithSimulationDisabled(session, actualRegistration, real);
     }
 
     private void assertPaidMemberImpactWithSimulationDisabled(long session,
-            com.sportify.catalog.dto.PackageRegistrationResponse actual, String real, String reception) throws Exception {
+            com.sportify.catalog.dto.PackageRegistrationResponse actual, String real) throws Exception {
         var realEligible = restTemplate.exchange("/api/v1/sessions/" + session, HttpMethod.GET, new HttpEntity<>(authHeaders(real)), String.class);
         assertThat(realEligible.getStatusCode()).isEqualTo(HttpStatus.OK);
         var realBeforeJson = new com.fasterxml.jackson.databind.ObjectMapper().readTree(realEligible.getBody());
         assertThat(realBeforeJson.path("eligible").asBoolean()).isTrue();
         assertThat(realBeforeJson.path("reason").isNull()).isTrue();
         assertThat(realBeforeJson.path("suitableRegistrations")).isNotEmpty();
-        String control=login("control@example.test"); var controlRegistration=purchase(control);
-        var amount=jdbcTemplate.queryForObject("SELECT amount FROM payment WHERE id=?",java.math.BigDecimal.class,controlRegistration.getPaymentId());
-        assertThat(write("/api/v1/payments/"+controlRegistration.getPaymentId()+"/confirm",HttpMethod.PUT,
-                Map.of("method","BANK_TRANSFER","referenceCode","R03-CONTROL-PAID","amountReceived",amount),reception).getStatusCode()).isEqualTo(HttpStatus.OK);
-        var before=operationalSnapshot(session,actual.getId());
-        // Deliberately model a legitimate account acquiring legacy simulated history, not a new unified purchase.
-        long historical=pending("live@example.test","CASH");
-        var store=context.getBean(com.sportify.demoqr.service.SqlQrStore.class);
+        var before = operationalSnapshot(session, actual.getId());
+        long historical = pending("live@example.test", "CASH");
+        var store = context.getBean(com.sportify.demoqr.service.SqlQrStore.class);
         store.transaction(() -> {
-            var actor=context.getBean(com.sportify.identity.repository.UserRepository.class).findByEmailIgnoreCase("live@example.test").orElseThrow();
-            var id=store.insert(historical,actor.getId(),new java.math.BigDecimal("100"),com.sportify.demoqr.service.DemoQrService.Bank.VIETCOMBANK_DEMO,
-                    java.util.UUID.randomUUID().toString().replace("-","")+java.util.UUID.randomUUID().toString().replace("-",""),java.util.UUID.randomUUID(),300);
-            var s=store.findId(id,actor.getId());var tx=store.insertSettlement(s);
-            context.getBean(com.sportify.demoqr.service.DemoPaymentReader.class).settle(historical,actor,"VIETCOMBANK_DEMO",tx.id(),tx.transactionCode());
-            store.settle(s);return null;
+            var actor = context.getBean(com.sportify.identity.repository.UserRepository.class).findByEmailIgnoreCase("live@example.test").orElseThrow();
+            var id = store.insert(historical, actor.getId(), new java.math.BigDecimal("100"), com.sportify.demoqr.service.DemoQrService.Bank.VIETCOMBANK_DEMO,
+                    java.util.UUID.randomUUID().toString().replace("-", "") + java.util.UUID.randomUUID().toString().replace("-", ""), java.util.UUID.randomUUID(), 300);
+            var s = store.findId(id, actor.getId()); var tx = store.insertSettlement(s);
+            context.getBean(com.sportify.demoqr.service.DemoPaymentReader.class).settle(historical, actor, "VIETCOMBANK_DEMO", tx.id(), tx.transactionCode());
+            store.settle(s); return null;
         });
-        var env=(org.springframework.core.env.ConfigurableEnvironment)context.getEnvironment();
+        var afterSimulation = operationalSnapshot(session, actual.getId());
+        assertThat(afterSimulation.get("remaining_sessions")).isEqualTo(before.get("remaining_sessions"));
+        assertThat(afterSimulation.get("real_entitlement_checksum")).isEqualTo(before.get("real_entitlement_checksum"));
+        var env = (org.springframework.core.env.ConfigurableEnvironment) context.getEnvironment();
         env.getPropertySources().addFirst(new org.springframework.core.env.MapPropertySource("r03-disabled-impact",
-                Map.of("app.payment.unified-demo.enabled","false")));
+                Map.of("app.payment.unified-demo.enabled", "false")));
         try {
             assertThat(context.getBean(com.sportify.demoqr.service.LocalDemoPaymentService.class).isEnabled()).isFalse();
             var realAfter = restTemplate.exchange("/api/v1/sessions/" + session, HttpMethod.GET, new HttpEntity<>(authHeaders(real)), String.class);
             assertThat(realAfter.getStatusCode()).isEqualTo(HttpStatus.OK);
             var realAfterJson = new com.fasterxml.jackson.databind.ObjectMapper().readTree(realAfter.getBody());
-            assertThat(realAfterJson.path("eligible").asBoolean()).isFalse();
-            assertThat(realAfterJson.path("reason").asText()).isEqualTo("SYNTHETIC_OPERATION_DENIED");
-            assertThat(realAfterJson.path("suitableRegistrations")).isEmpty();
-            assertThat(write("/api/v1/bookings",HttpMethod.POST,Map.of("sessionId",session,"packageRegistrationId",actual.getId()),real).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
-            assertThat(operationalSnapshot(session,actual.getId())).isEqualTo(before);
-            long invoice=jdbcTemplate.queryForObject("SELECT id FROM invoice WHERE payment_id=?",Long.class,actual.getPaymentId());
-            assertThat(restTemplate.exchange("/api/v1/invoices/"+invoice,HttpMethod.GET,new HttpEntity<>(authHeaders(real)),String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
-            var booked=write("/api/v1/bookings",HttpMethod.POST,Map.of("sessionId",session,"packageRegistrationId",controlRegistration.getId()),control);
+            assertThat(realAfterJson.path("eligible").asBoolean()).isTrue();
+            assertThat(realAfterJson.path("reason").isNull()).isTrue();
+            assertThat(realAfterJson.path("suitableRegistrations")).isNotEmpty();
+            long invoice = jdbcTemplate.queryForObject("SELECT id FROM invoice WHERE payment_id=?", Long.class, actual.getPaymentId());
+            assertThat(restTemplate.exchange("/api/v1/invoices/" + invoice, HttpMethod.GET, new HttpEntity<>(authHeaders(real)), String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+            var booked = write("/api/v1/bookings", HttpMethod.POST, Map.of("sessionId", session, "packageRegistrationId", actual.getId()), real);
             assertThat(booked.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-            long id=jdbcTemplate.queryForObject("SELECT id FROM booking WHERE package_registration_id=? AND status='CONFIRMED'",Long.class,controlRegistration.getId());
-            assertThat(write("/api/v1/bookings/"+id,HttpMethod.DELETE,null,control).getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(operationalSnapshot(session,actual.getId()).get("real_entitlement_checksum")).isEqualTo(before.get("real_entitlement_checksum"));
+            long id = new com.fasterxml.jackson.databind.ObjectMapper().readTree(booked.getBody()).path("id").asLong();
+            assertThat(write("/api/v1/bookings/" + id, HttpMethod.DELETE, null, real).getStatusCode()).isEqualTo(HttpStatus.OK);
+            var after = operationalSnapshot(session, actual.getId());
+            assertThat(after.get("booked_count")).isEqualTo(before.get("booked_count"));
+            assertThat(after.get("remaining_sessions")).isEqualTo(before.get("remaining_sessions"));
         } finally { env.getPropertySources().remove("r03-disabled-impact"); }
     }
-
     @ParameterizedTest @CsvSource({"0,CARD,PENDING_PAYMENT","1,CARD,CANCELLED","2,CARD,EXPIRED","3,CARD,REPLACED",
             "4,PACKAGE,PENDING_PAYMENT","5,PACKAGE,CANCELLED","6,PACKAGE,EXPIRED","7,PACKAGE,REFUNDED","8,PACKAGE,NO_ACTIVATION"})
     void unsupportedOrInconsistentEntitlementReplayIsDeniedWithoutRepair(int fixtureId,String type,String state) {

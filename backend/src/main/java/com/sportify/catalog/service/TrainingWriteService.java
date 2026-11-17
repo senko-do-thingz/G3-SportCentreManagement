@@ -32,7 +32,6 @@ public class TrainingWriteService {
     private final Clock clock;
     private final AuditService audit;
     private final jakarta.persistence.EntityManager entityManager;
-    private final OperationalMemberPolicy operationalMemberPolicy;
 
     private static final String PLAN_SELECT = """
         SELECT p.id, p.title, p.description, p.class_id, c.name class_name, p.member_id,
@@ -97,7 +96,6 @@ public class TrainingWriteService {
             """,(rs,row)->new LearnerProfile(rs.getLong("user_id"),rs.getString("member_code"),
                 rs.getString("full_name"),rs.getString("main_goal"),rs.getString("current_level")),memberId,classId,coachId,coachId);
         if(profiles.isEmpty()) throw new ResourceNotFoundException("Assigned learner not found");
-        operationalMemberPolicy.requireRealMember(memberId);
         return profiles.getFirst();
     }
 
@@ -127,13 +125,6 @@ public class TrainingWriteService {
         // Same message for every miss so a Coach cannot probe other Coaches' bookings or account states.
         if(context.isEmpty())throw new ResourceNotFoundException("Assigned member booking not found");
         var current=context.getFirst();
-        try {
-            operationalMemberPolicy.requireRealMember(current.memberId());
-        } catch(BusinessRuleException synthetic) {
-            // This read-only preview reports a quarantined synthetic Member like any other denied booking,
-            // so the account state is not revealed. The shared policy keeps its own error for write paths.
-            throw new ResourceNotFoundException("Assigned member booking not found");
-        }
         var feedback=jdbc.query("""
             SELECT TOP(1) f.areas_for_improvement FROM coach_feedback f JOIN session_plan p ON p.id=f.plan_id
             WHERE f.coach_id=? AND f.member_id=? AND p.class_id=? ORDER BY f.created_at DESC,f.id DESC
@@ -174,15 +165,11 @@ public class TrainingWriteService {
         var members=new java.util.ArrayList<>(jdbc.query("""
             SELECT m.user_id,m.current_level,m.main_goal FROM member_profile m JOIN user_account u ON u.id=m.user_id
             JOIN role r ON r.id=u.role_id AND r.code='MEMBER'
-            WHERE u.status='ACTIVE' AND LOWER(u.email) NOT LIKE '%@unified-demo.invalid'
+            WHERE u.status='ACTIVE'
                 AND m.user_id IN (SELECT b.member_id FROM booking b JOIN class_session s ON s.id=b.session_id
                     WHERE s.class_id=? AND s.coach_id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED'
                         AND s.training_type='COACH_LED')
             """,(rs,row)->new ClassMember(rs.getLong("user_id"),rs.getString("current_level"),rs.getString("main_goal")),classId,coachId));
-        members.removeIf(member -> {
-            try { operationalMemberPolicy.requireRealMember(member.id()); return false; }
-            catch(BusinessRuleException synthetic) { return true; }
-        });
         List<DrillGenerator.MetricAverage> averages=List.of();
         if(members.size()>=3 && members.size()<=2000) {
             String placeholders=String.join(",",java.util.Collections.nCopies(members.size(),"?"));
@@ -321,7 +308,6 @@ public class TrainingWriteService {
     @Transactional
     public Created feedback(long coachId, long planId, TrainingWriteRequest.Feedback request) {
         var plan = coachPlan(coachId, planId).plan();
-        operationalMemberPolicy.requireRealMember(plan.memberId());
         long id = insert("INSERT INTO coach_feedback(plan_id, session_id, member_id, coach_id, rating, comments, strengths, areas_for_improvement, created_at) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)",
             planId, plan.memberId(), coachId, request.rating(), request.comments().trim(), request.strengths(), request.areasForImprovement(), now());
         audit(coachId, "TRAINING_FEEDBACK_CREATED", "COACH_FEEDBACK", id, Map.of("planId", planId, "memberId", plan.memberId()));
@@ -392,7 +378,6 @@ public class TrainingWriteService {
             (rs, row) -> new AttendanceBooking(rs.getLong("session_id"), rs.getLong("member_id"), rs.getString("status"), rs.getString("training_type")), request.bookingId());
         if (rows.isEmpty() || !rows.getFirst().status().equals("CONFIRMED")) throw new BusinessRuleException("A confirmed booking for a non-cancelled session is required");
         var booking = rows.getFirst();
-        operationalMemberPolicy.requireRealMember(booking.memberId());
         if (selfOnly && !booking.trainingType().equals("SELF_TRAINING")) throw new BusinessRuleException("Booking is not for self-training");
         requireAttendanceDate(booking.sessionId(), selfOnly);
         // Within an eligible day attendance time stays flexible; results wait until session end.
@@ -413,10 +398,6 @@ public class TrainingWriteService {
             throw new BusinessRuleException("Provide a meaningful correction reason of at least 3 characters");
         var sessionIds = jdbc.query("SELECT session_id FROM attendance_record WHERE id = ?", (rs, row) -> rs.getLong("session_id"), id);
         if (sessionIds.isEmpty()) throw new ResourceNotFoundException("Attendance not found");
-        jdbc.queryForList("SELECT member_id FROM attendance_record WHERE id=?", Long.class, id)
-                .forEach(operationalMemberPolicy::requireRealMember);
-        jdbc.queryForList("SELECT booking_id FROM attendance_record WHERE id=? AND booking_id IS NOT NULL", Long.class, id)
-                .forEach(operationalMemberPolicy::requireRealBooking);
         // Match result creation/cancellation: session first, then participation row.
         lockSession(sessionIds.getFirst());
         if (!exists("SELECT COUNT(*) FROM attendance_record a JOIN booking b ON b.id=a.booking_id JOIN class_session s ON s.id=a.session_id WHERE a.id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED'", id))
@@ -464,13 +445,11 @@ public class TrainingWriteService {
     }
 
     private void lockSessionBooking(long sessionId, long memberId) {
-        operationalMemberPolicy.requireRealMember(memberId);
         lockSession(sessionId);
         if (jdbc.update("UPDATE booking SET status = status WHERE session_id = ? AND member_id = ? AND status = 'CONFIRMED'", sessionId, memberId) == 0)
             throw new BusinessRuleException("Member does not have a confirmed booking for this session");
     }
     private void lockBooking(long bookingId) {
-        operationalMemberPolicy.requireRealBooking(bookingId);
         var sessions = jdbc.query("SELECT session_id FROM booking WHERE id = ?", (rs, row) -> rs.getLong("session_id"), bookingId);
         if (sessions.isEmpty()) throw new ResourceNotFoundException("Booking not found");
         lockSession(sessions.getFirst());
