@@ -265,8 +265,8 @@ function CenterScheduleEntry({ session, returnTo }: { session: BrowseSession; re
         <p className="f2-session__meta">Type: {self ? 'Self-training' : 'Coach-led'}</p>
       </div>
 
-      <div className="f2-session__actions" onClick={(e) => e.stopPropagation()}>
-        <Link className="btn btn--secondary btn--sm" to={details}>
+      <div className="f2-session__actions f2-session__actions--member" onClick={(e) => e.stopPropagation()}>
+        <Link className="btn btn--secondary btn--md f2-session__view-btn" to={details}>
           View session
         </Link>
       </div>

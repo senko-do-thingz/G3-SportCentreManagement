@@ -158,7 +158,7 @@ def run():
         except Exception as e:
             record_check("Schedule workspace checks", False, str(e))
 
-        print("\n--- Check 5: Spori AI — sports catalog dynamic answer & NO_ANSWER receptionist handoff ---", flush=True)
+        print("\n--- Check 5: Spori AI - sports catalog dynamic answer & NO_ANSWER receptionist handoff ---", flush=True)
         try:
             assistant_link = page.locator('a:has-text("Open center assistant")')
             if assistant_link.count() > 0:

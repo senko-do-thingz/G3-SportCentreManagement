@@ -86,6 +86,7 @@ function ScheduleMetricIcon({ name }: { name: ScheduleMetricIconName }) {
 export function CoachTeachingSchedulePage() {
   const [params, setParams] = useSearchParams()
   const [selection, setSelection] = useState<{ week: string; sessionId: string } | null>(null)
+  const [overviewOpen, setOverviewOpen] = useState(true)
   const week = sessionWeek(params)
   const weekEnd = browseAddDays(week, 6)
   const loader = useCallback((signal: AbortSignal) => coachScheduleApi.list(week, weekEnd, signal), [week, weekEnd])
@@ -180,7 +181,7 @@ export function CoachTeachingSchedulePage() {
           </div>
         </div>
       </section>
-      <div className="coach-schedule-layout">
+      <div className={`coach-schedule-layout${overviewOpen ? ' coach-schedule-layout--with-overview' : ' coach-schedule-layout--collapsed'}`}>
         <Card className="coach-schedule-weekly" title="Weekly schedule">
           <div className="manager-row-actions coach-schedule-week-nav" role="group" aria-label="Teaching week navigation">
             <Button variant="secondary" onClick={() => setParams((current) => changeWeekParams(current, browseAddDays(week, -7)))}>Previous week</Button>
@@ -222,7 +223,10 @@ export function CoachTeachingSchedulePage() {
                                     key={s.id}
                                     session={s}
                                     selected={selectedSession?.id === s.id}
-                                    onSelect={() => setSelection({ week, sessionId: sessionRouteReference(s) })}
+                                    onSelect={() => {
+                                      setSelection({ week, sessionId: sessionRouteReference(s) })
+                                      setOverviewOpen(true)
+                                    }}
                                   />
                                 ))}
                               </div>
@@ -240,7 +244,11 @@ export function CoachTeachingSchedulePage() {
             <p className="coach-schedule-hint">Select a session to see its status, coach, facility and booking details.</p>
           </>}
         </Card>
-        <Card className="coach-schedule-overview" title="Session overview">
+        <Card
+          className={`coach-schedule-overview${overviewOpen ? ' coach-schedule-overview--open' : ' coach-schedule-overview--collapsed'}`}
+          title="Session overview"
+          actions={<Button variant="ghost" size="sm" aria-label="Toggle session overview" onClick={() => setOverviewOpen((prev) => !prev)}>{overviewOpen ? 'Hide' : 'Show'}</Button>}
+        >
           {selectedSession ? <>
             <div className="coach-schedule-overview__feature">
               <p>{selectedSession === nextSession ? 'Next visible session' : 'Selected session'}</p>
