@@ -110,8 +110,8 @@ describe('FloatingSporiChat', () => {
     expect(await screen.findByText('Previous conversation')).toBeInTheDocument()
   })
 
-  it('shows expand link to role-specific assistant for staff roles', () => {
-    const fakeAuth: AuthContextValue = {
+  it('shows expand link for members but not for staff roles', () => {
+    const fakeStaffAuth: AuthContextValue = {
       user: { id: 1, email: 'mgr@sportify.test', fullName: 'Manager User' },
       role: 'MANAGER',
       status: 'authenticated',
@@ -127,8 +127,27 @@ describe('FloatingSporiChat', () => {
       refreshProfile: vi.fn(),
     }
 
+    const { unmount } = render(
+      <AuthContext.Provider value={fakeStaffAuth}>
+        <MemoryRouter>
+          <FloatingSporiChat isDesktop={true} />
+        </MemoryRouter>
+      </AuthContext.Provider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Ask Spori AI/i }))
+    expect(screen.queryByRole('link', { name: 'Open full assistant' })).not.toBeInTheDocument()
+
+    unmount()
+
+    const fakeMemberAuth: AuthContextValue = {
+      ...fakeStaffAuth,
+      role: 'MEMBER',
+      user: { id: 2, email: 'member@sportify.test', fullName: 'Member User' },
+    }
+
     render(
-      <AuthContext.Provider value={fakeAuth}>
+      <AuthContext.Provider value={fakeMemberAuth}>
         <MemoryRouter>
           <FloatingSporiChat isDesktop={true} />
         </MemoryRouter>
@@ -138,6 +157,6 @@ describe('FloatingSporiChat', () => {
     fireEvent.click(screen.getByRole('button', { name: /Ask Spori AI/i }))
     const expandLink = screen.getByRole('link', { name: 'Open full assistant' })
     expect(expandLink).toBeInTheDocument()
-    expect(expandLink.getAttribute('href')).toContain('/manager/assistant')
+    expect(expandLink.getAttribute('href')).toContain('/member/assistant')
   })
 })

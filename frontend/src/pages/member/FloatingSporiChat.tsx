@@ -107,7 +107,7 @@ export function FloatingSporiChat({ isDesktop = true }: { isDesktop?: boolean })
     if (!open) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    dialog.current?.querySelector<HTMLButtonElement>('button')?.focus()
+    dialog.current?.querySelector<HTMLButtonElement>('.spori-panel__close')?.focus()
     const handleKeyboard = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -357,11 +357,13 @@ export function FloatingSporiChat({ isDesktop = true }: { isDesktop?: boolean })
                 </svg>
               )}
             </button>
-            <Link className="spori-icon-button" to={assistantHref} onClick={close} aria-label="Open full assistant" title="Open full assistant">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5" />
-              </svg>
-            </Link>
+            {member && (
+              <Link className="spori-icon-button" to={assistantHref} onClick={close} aria-label="Open full assistant" title="Open full assistant">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5" />
+                </svg>
+              </Link>
+            )}
             <button type="button" className="spori-icon-button spori-panel__close" aria-label="Close Spori AI" title="Close" onClick={close}>
               <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
             </button>
