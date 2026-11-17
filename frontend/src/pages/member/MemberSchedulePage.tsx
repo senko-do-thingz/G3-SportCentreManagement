@@ -5,10 +5,10 @@ import '../../styles/manager-concept-a.css'
 import { useCallback, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { memberBookingsApi, type MemberBookingRecord } from '../../api/memberBookingsApi'
-import { Badge, Button, Card, EmptyState, Input, PageHeader, PageLoader, StatIcon, buttonClassName } from '../../components/ui'
+import { Badge, Button, Card, EmptyState, PageHeader, PageLoader, StatIcon, buttonClassName } from '../../components/ui'
 import { BrowseError } from './BrowseError'
 import { MemberScheduleNav } from './MemberScheduleNav'
-import { browseAddDays, browseDate, browseDay, browseIsoWeek, browseMonday, browseMondayFromIsoWeek, browseToday, validBrowseDate } from './memberScheduleDates'
+import { browseAddDays, browseDate, browseDay, browseMonday, browseToday, validBrowseDate } from './memberScheduleDates'
 import { useMemberResource } from './useMemberResource'
 
 export const NO_SCHEDULE_YET = "You don't have any scheduled sessions yet."
@@ -96,18 +96,6 @@ export function MemberSchedulePage({ embedded = false }: { embedded?: boolean })
               This week
             </Button>
             <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, 7))}>Next week</Button>
-          </div>
-          <div className="schedule-week-picker" role="group" aria-label="Week navigation" style={{ marginLeft: 'auto' }}>
-            <Input
-              className="schedule-week-input"
-              label="Choose week"
-              type="week"
-              value={browseIsoWeek(from)}
-              onChange={(event) => {
-                const monday = browseMondayFromIsoWeek(event.target.value)
-                if (monday) changeWeek(monday)
-              }}
-            />
           </div>
         </div>
 
