@@ -6,7 +6,7 @@ import { sessionIdText, sessionRouteReference } from '../../api/sessionIdentity'
 import '../../styles/managerSchedule.css'
 import { HOME_PHOTOS } from '../public/homeContent'
 import trainingGroundImage from '../../assets/home/hero.jpg'
-import { Button, CalendarDateField, Card, EmptyState, PageLoader, Select, StatusBadge } from '../../components/ui'
+import { Button, CalendarDateField, Card, EmptyState, PageLoader, Select, StatusBadge, StatIcon } from '../../components/ui'
 import { BrowseError } from './BrowseError'
 import { FindClassesPage } from './FindClassesPage'
 import { MemberBookingsPage } from './MemberBookingsPages'
@@ -143,25 +143,59 @@ function CenterSchedule() {
 
   function moveWeek(days: number) { change('date', browseAddDays(from, days)) }
 
+  const weekSessionsCount = resource.status === 'ready' ? String(rows.length).padStart(2, '0') : '--'
+  const sportsCount = resource.status === 'ready' ? String(new Set(rows.map((r) => r.sportName).filter(Boolean)).size).padStart(2, '0') : '--'
+  const coachesCount = resource.status === 'ready' ? String(new Set(rows.map((r) => r.coachName).filter(Boolean)).size).padStart(2, '0') : '--'
+
   return (
-    <Card className="center-schedule" title="Weekly schedule">
-      <div className="manager-filters center-schedule__filters" aria-label="Center schedule filters">
-        <Select label="Sport" placeholder="All sports" value={sportId ? String(sportId) : ''} options={sports.status === 'ready' ? sports.data.map((sport) => ({ value: String(sport.id), label: sport.name })) : []} onChange={(event) => change('sportId', event.target.value)} />
-        <Select label="Training format" placeholder="All formats" value={format ?? ''} options={[{ value: 'COACH_LED', label: 'Coach-led' }, { value: 'SELF_TRAINING', label: 'Self-training' }]} onChange={(event) => change('format', event.target.value)} />
-        <Select label="Availability" value={availability} options={[{ value: 'ALL', label: 'All availability' }, { value: 'AVAILABLE', label: 'Places available' }, { value: 'FULL', label: 'Full' }]} onChange={(event) => change('availability', event.target.value === 'ALL' ? '' : event.target.value)} />
-        <Select label="Session status" value={status} options={[{ value: 'ALL', label: 'All visible statuses' }, { value: 'PUBLISHED', label: 'Published' }, { value: 'COMPLETED', label: 'Completed' }, { value: 'CANCELLED', label: 'Cancelled' }]} onChange={(event) => change('status', event.target.value === 'ALL' ? '' : event.target.value)} />
-        <div className="center-schedule__clear-field">
-          <Button variant="secondary" onClick={() => setParams({ tab: 'center', date: today })}>Clear filters</Button>
+    <>
+      <div className="concept-stats concept-stats--schedule">
+        <div className="concept-stat concept-stat--schedule">
+          <StatIcon name="calendar" />
+          <div>
+            <strong>{weekSessionsCount}</strong>
+            <small>Week sessions</small>
+          </div>
+        </div>
+        <div className="concept-stat concept-stat--schedule">
+          <StatIcon name="sports" />
+          <div>
+            <strong>{sportsCount}</strong>
+            <small>Active sports</small>
+          </div>
+        </div>
+        <div className="concept-stat concept-stat--schedule">
+          <StatIcon name="coach" />
+          <div>
+            <strong>{coachesCount}</strong>
+            <small>Active coaches</small>
+          </div>
+        </div>
+        <div className="concept-stat concept-stat--schedule">
+          <StatIcon name="calendar" />
+          <div>
+            <strong>{browseDate(from)} - {browseDate(to)}</strong>
+            <small>Week in view</small>
+          </div>
         </div>
       </div>
-      <div className="manager-row-actions center-schedule__toolbar">
-        <div className="schedule-week-nav" role="group" aria-label="Center schedule week navigation">
-          <Button variant="secondary" onClick={() => moveWeek(-7)}>Previous week</Button>
-          <Button variant={from === browseMonday(today) ? 'primary' : 'secondary'} onClick={() => change('date', today)}>This week</Button>
-          <Button variant="secondary" onClick={() => moveWeek(7)}>Next week</Button>
+      <Card className="center-schedule" title="Weekly schedule">
+        <div className="manager-filters center-schedule__filters" aria-label="Center schedule filters">
+          <Select label="Sport" placeholder="All sports" value={sportId ? String(sportId) : ''} options={sports.status === 'ready' ? sports.data.map((sport) => ({ value: String(sport.id), label: sport.name })) : []} onChange={(event) => change('sportId', event.target.value)} />
+          <Select label="Training format" placeholder="All formats" value={format ?? ''} options={[{ value: 'COACH_LED', label: 'Coach-led' }, { value: 'SELF_TRAINING', label: 'Self-training' }]} onChange={(event) => change('format', event.target.value)} />
+          <Select label="Availability" value={availability} options={[{ value: 'ALL', label: 'All availability' }, { value: 'AVAILABLE', label: 'Places available' }, { value: 'FULL', label: 'Full' }]} onChange={(event) => change('availability', event.target.value === 'ALL' ? '' : event.target.value)} />
+          <Select label="Session status" value={status} options={[{ value: 'ALL', label: 'All visible statuses' }, { value: 'PUBLISHED', label: 'Published' }, { value: 'COMPLETED', label: 'Completed' }, { value: 'CANCELLED', label: 'Cancelled' }]} onChange={(event) => change('status', event.target.value === 'ALL' ? '' : event.target.value)} />
+          <div className="center-schedule__clear-field">
+            <Button variant="secondary" onClick={() => setParams({ tab: 'center', date: today })}>Clear filters</Button>
+          </div>
         </div>
-        <strong>{browseDate(from)} - {browseDate(to)}</strong>
-        <Button variant="ghost" onClick={reload}>Refresh schedule</Button>
+        <div className="manager-row-actions center-schedule__toolbar">
+          <div className="schedule-week-nav" role="group" aria-label="Center schedule week navigation">
+            <Button variant="secondary" onClick={() => moveWeek(-7)}>Previous week</Button>
+            <Button variant={from === browseMonday(today) ? 'primary' : 'secondary'} onClick={() => change('date', today)}>This week</Button>
+            <Button variant="secondary" onClick={() => moveWeek(7)}>Next week</Button>
+          </div>
+          <Button variant="ghost" onClick={reload}>Refresh schedule</Button>
         {resource.status === 'ready' && <span className="browse-muted" role="status">{rows.length} sessions shown</span>}
         <CalendarDateField label="Week containing" value={from} onChange={(value, valid) => { if (valid !== false) change('date', value) }} />
         <div className="center-schedule__toolbar-actions" style={{ marginLeft: 'auto' }}>
@@ -223,6 +257,7 @@ function CenterSchedule() {
         </>
       )}
     </Card>
+    </>
   )
 }
 

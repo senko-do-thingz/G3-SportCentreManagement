@@ -179,13 +179,7 @@
 }
 
 .member-schedule-theme > .card > .card__header::after {
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  width: 58px;
-  height: 3px;
-  background: var(--schedule-gold);
-  content: '';
+  display: none;
 }
 
 .member-schedule-theme .schedule-week-input .field__label {
@@ -335,8 +329,8 @@
 .member-schedule-theme .schedule-skeleton__cell > i {
   width: min(100%, 112px);
   height: 38px;
-  border-left: 3px solid var(--schedule-gold);
-  border-radius: 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
   background: var(--schedule-band);
 }
 
@@ -400,18 +394,16 @@
 }
 
 .member-schedule-theme .schedule-entry {
-  border-color: var(--schedule-border);
-  border-left: 3px solid var(--schedule-gold);
-  border-radius: 8px;
-  background: var(--schedule-surface);
-  box-shadow: 0 3px 10px rgba(14, 26, 51, 0.04);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-xs);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .member-schedule-theme .schedule-entry:hover {
-  border-color: var(--schedule-primary);
-  border-left-color: var(--schedule-gold);
-  box-shadow: 0 8px 18px rgba(14, 26, 51, 0.1);
+  border-color: var(--color-primary-soft-hover);
+  box-shadow: var(--shadow-sm);
   transform: translateY(-1px);
 }
 
