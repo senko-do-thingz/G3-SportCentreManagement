@@ -36,6 +36,7 @@ public final class AuditAction {
     
     public static final String PACKAGE_CREATED = "PACKAGE_CREATED";
     public static final String PACKAGE_UPDATED = "PACKAGE_UPDATED";
+    public static final String PACKAGE_DELETED = "PACKAGE_DELETED";
     public static final String CARD_TIER_UPDATED = "CARD_TIER_UPDATED";
 
     public static final String CLASS_CREATED = "CLASS_CREATED";

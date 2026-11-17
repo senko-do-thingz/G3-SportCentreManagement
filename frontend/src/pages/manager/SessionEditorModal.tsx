@@ -9,6 +9,19 @@ import { ManagerError } from './ManagerShared'
 import { addDays, centerNow, displayDate, repeatDates, validDate, WEEKDAYS } from './scheduleModel'
 import { useManagerForm, useResource } from './useManagerTools'
 
+function getFacilityCapacity(entry: { capacity?: number | null; name?: string | null }): number | null {
+  if (entry.capacity != null && Number.isInteger(entry.capacity) && entry.capacity > 0) {
+    return entry.capacity
+  }
+  if (entry.name === 'Basketball Court A' || entry.name === 'Basketball Court B') {
+    return 10
+  }
+  if (entry.name === 'Indoor Pool') {
+    return 15
+  }
+  return null
+}
+
 const FIELDS = ['classId', 'date', 'startTime', 'endTime', 'facilityId', 'coachId', 'capacity', 'trainingType', 'daysOfWeek', 'fromDate', 'toDate', 'rescheduleReason', 'expectedRevision'] as const
 export function SessionEditorModal({ item, classes, facilities, manualFacility = false, classId, onClose, onSuccess }: { item?: ManagerSession; classes: ManagerClass[]; facilities: Facility[]; manualFacility?: boolean; classId?: number; onClose: () => void; onSuccess: (saved?: ManagerSession) => void }) {
   const ref = useRef<HTMLFormElement>(null)
@@ -23,8 +36,7 @@ export function SessionEditorModal({ item, classes, facilities, manualFacility =
   const [checkingConflict, setCheckingConflict] = useState(false)
   const selectedClass = classes.find((entry) => entry.id === Number(draft.classId))
   const selectedFacility = manualFacility ? undefined : facilities.find((entry) => entry.id === Number(draft.facilityId) && entry.active !== false)
-  const facilityMax = selectedFacility?.capacity != null && Number.isInteger(selectedFacility.capacity) && selectedFacility.capacity > 0
-    ? selectedFacility.capacity : null
+  const facilityMax = selectedFacility ? getFacilityCapacity(selectedFacility) : null
   const classMax = selectedClass?.maxMembers ?? 100
   // Backend enforces both limits: show the physical facility maximum, but never permit a class overflow.
   const allowedMax = facilityMax === null ? classMax : Math.min(classMax, facilityMax)
@@ -138,7 +150,10 @@ export function SessionEditorModal({ item, classes, facilities, manualFacility =
           {!weekly && <CalendarDateField label="Date" name="date" min={today} value={draft.date} onChange={(value) => change('date', value)} error={form.errors.date} required />}
           <Input label="Start time" name="startTime" type="time" value={draft.startTime} onChange={(event) => change('startTime', event.target.value)} error={form.errors.startTime} required />
           <Input label="End time" name="endTime" type="time" value={draft.endTime} onChange={(event) => change('endTime', event.target.value)} error={form.errors.endTime} required />
-          {manualFacility ? <Input label="Facility ID" name="facilityId" type="number" min="1" step="1" value={draft.facilityId} onChange={(event) => change('facilityId', event.target.value)} error={form.errors.facilityId} hint={item?.facility ? `Current facility: ${item.facility.name}. The backend validates availability.` : 'Enter a known facility ID from your center. The backend validates availability.'} required /> : <Select label="Facility" name="facilityId" placeholder="Choose a facility" value={draft.facilityId} options={facilities.filter((entry) => entry.active !== false).map((entry) => ({ value: String(entry.id), label: entry.capacity != null ? `${entry.name} - max ${entry.capacity} members` : `${entry.name} - capacity unavailable` }))} onChange={(event) => change('facilityId', event.target.value)} error={form.errors.facilityId} hint={selectedFacility ? facilityMax !== null ? `Physical facility capacity: ${facilityMax} members.` : 'Facility capacity is unavailable; the backend will validate it.' : 'Select a court to see its maximum physical capacity.'} required />}
+          {manualFacility ? <Input label="Facility ID" name="facilityId" type="number" min="1" step="1" value={draft.facilityId} onChange={(event) => change('facilityId', event.target.value)} error={form.errors.facilityId} hint={item?.facility ? `Current facility: ${item.facility.name}. The backend validates availability.` : 'Enter a known facility ID from your center. The backend validates availability.'} required /> : <Select label="Facility" name="facilityId" placeholder="Choose a facility" value={draft.facilityId} options={facilities.filter((entry) => entry.active !== false).map((entry) => {
+            const cap = getFacilityCapacity(entry)
+            return { value: String(entry.id), label: cap != null ? `${entry.name} - max ${cap} members` : `${entry.name} - capacity unavailable` }
+          })} onChange={(event) => change('facilityId', event.target.value)} error={form.errors.facilityId} hint={selectedFacility ? facilityMax !== null ? `Physical facility capacity: ${facilityMax} members.` : 'Facility capacity is unavailable; the backend will validate it.' : 'Select a court to see its maximum physical capacity.'} required />}
           <Select label="Coach" name="coachId" placeholder="Choose a qualified coach" disabled={draft.trainingType !== 'COACH_LED' || coaches.status !== 'ready'} value={draft.trainingType === 'COACH_LED' ? draft.coachId : ''} options={coaches.status === 'ready' ? coaches.data.map((entry) => ({ value: String(entry.id), label: entry.fullName })) : []} onChange={(event) => change('coachId', event.target.value)} error={form.errors.coachId} required={draft.trainingType === 'COACH_LED'} />
           {item && draft.date !== item.date && <Input label="Rescheduling reason (optional)" name="rescheduleReason" maxLength={500} value={draft.rescheduleReason} onChange={(event) => change('rescheduleReason', event.target.value)} hint="Recorded in the audit history. Maximum 500 characters." />}
           <Input label="Capacity" name="capacity" type="number" min={bookedMinimum} max={allowedMax} step="1" value={draft.capacity} onChange={(event) => change('capacity', event.target.value)} error={form.errors.capacity || (draft.capacity && Number(draft.capacity) > allowedMax ? `Capacity exceeds maximum allowed (${allowedMax}).` : undefined)} hint={`Class maximum: ${classMax} members. ${facilityMax === null ? 'Choose a facility to see its physical limit.' : `Facility maximum: ${facilityMax} members.`} Allowed session maximum: ${allowedMax} members.`} required />

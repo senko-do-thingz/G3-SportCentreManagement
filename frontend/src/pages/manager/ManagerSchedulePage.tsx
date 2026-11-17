@@ -216,21 +216,20 @@ function ManagerScheduleEntry({
     <article
       className={`f2-session f2-session--${session.status.toLowerCase()}${expanded ? ' f2-session--expanded' : ' f2-session--collapsed'}`}
       onClick={toggleExpanded}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          toggleExpanded(event)
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
+      aria-label={`${session.class?.name ?? 'Session'} (${sessionIdText(session.sessionId)})`}
+      title={expanded ? 'Click to collapse details' : 'Click to view full details'}
     >
       <div className="f2-session__header">
         <span className="session-identity"><code>{sessionIdText(session.sessionId)}</code></span>
-        <button
-          type="button"
-          className="f2-session__toggle-btn"
-          aria-expanded={expanded}
-          aria-label={expanded ? 'Hide full details' : 'Show full details'}
-          onClick={(e) => {
-            e.stopPropagation()
-            setExpanded((prev) => !prev)
-          }}
-        >
-          {expanded ? '▲ Less' : '▼ Details'}
-        </button>
       </div>
       <strong className="f2-session__title">{session.class?.name ?? 'Unassigned class'}</strong>
       <div className="f2-session__timing">

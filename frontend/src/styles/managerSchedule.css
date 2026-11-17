@@ -22,7 +22,7 @@
 .f2-schedule-table tbody th { background: var(--color-surface-muted); color: var(--color-text-muted); font-size: 12px; font-weight: 700; text-align: center; white-space: nowrap; }
 .f2-schedule-table thead th.f2-schedule-table__today,
 .f2-schedule-table tbody td.f2-schedule-table__today { background: var(--color-primary-soft); }
-.f2-schedule-table__guidance { margin: 0 0 8px; color: var(--color-text-muted); font-size: 12px; line-height: 1.4; }
+.f2-schedule-table__guidance { margin: 0 0 18px; color: var(--color-text-muted); font-size: 12px; line-height: 1.4; }
 .f2-schedule-table__empty-cell { display: block; color: var(--color-text-muted); font-size: 12px; text-align: center; }
 .f2-schedule-table__entries { display: grid; gap: 6px; }
 .f2-session { display: grid; gap: 4px; min-width: 0; margin: 0; padding: 6px 8px; border: 1px solid var(--color-border-strong); border-left: 3px solid var(--color-primary); border-radius: 8px; background: var(--color-surface); overflow-wrap: anywhere; cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
@@ -40,11 +40,11 @@
 .f2-session__details--expanded { display: grid; gap: 3px; padding-top: 4px; margin-top: 2px; border-top: 1px dashed var(--color-border); }
 .f2-session__reason { padding-top: 4px; border-top: 1px solid var(--color-border); }
 .f2-session__actions { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
-.f2-session__actions .btn { flex: 1 1 calc(50% - 3px); min-width: 0; height: 26px; min-height: 26px; padding: 2px 4px; font-size: 11px; line-height: 1.2; }
+.f2-session__actions .btn { flex: 1 1 calc(50% - 3px); min-width: 0; height: 22px; min-height: 22px; padding: 1px 4px; font-size: 10px; line-height: 1.15; border-radius: var(--radius-xs, 4px); }
 .f2-session--cancelled { border-color: var(--color-danger-border); border-left-color: var(--color-danger); background: var(--color-danger-soft); }
 .f2-session--cancelled .f2-session__title { text-decoration: line-through; }
 .f2-session--completed { border-color: var(--color-border); background: var(--color-surface-muted); }
 .f2-weekdays { display: flex; flex-wrap: wrap; gap: 14px; padding: 12px 0; }
 .f2-conflict { border: 1px solid var(--color-warning-border); border-left: 4px solid var(--color-warning); border-radius: 8px; padding: 14px; margin: 12px 0; background: var(--color-warning-soft); }
-@media (max-width: 900px) { .f2-schedule-table th, .f2-schedule-table td { padding: 4px 2px; } .f2-session { padding: 4px 6px; } .f2-session__actions .btn { padding-inline: 2px; font-size: 10px; } }
+@media (max-width: 900px) { .f2-schedule-table th, .f2-schedule-table td { padding: 4px 2px; } .f2-session { padding: 4px 6px; } .f2-session__actions .btn { height: 20px; min-height: 20px; padding-inline: 2px; font-size: 9.5px; } }
 @media (max-width: 768px) { .f2-schedule-table, .workflow-surface .f2-schedule-table { min-width: 640px; } }

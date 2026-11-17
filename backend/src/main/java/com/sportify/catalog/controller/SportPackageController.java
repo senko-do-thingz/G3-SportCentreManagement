@@ -1,6 +1,7 @@
 package com.sportify.catalog.controller;
 
 import com.sportify.catalog.dto.ActivatePaymentRequest;
+import com.sportify.catalog.dto.DeletionReasonRequest;
 import com.sportify.catalog.dto.PackageRegistrationRequest;
 import com.sportify.catalog.dto.PackageRegistrationResponse;
 import com.sportify.catalog.dto.SportPackageCreateRequest;
@@ -52,6 +53,31 @@ public class SportPackageController {
             @Valid @RequestBody SportPackageUpdateRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return sportPackageService.updatePackage(id, request, userDetails.getUserAccount());
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('MANAGER')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePackage(
+            @PathVariable Long id,
+            @RequestBody(required = false) DeletionReasonRequest request,
+            @RequestParam(required = false) String reason,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        String effectiveReason = request != null && request.reason() != null && !request.reason().isBlank()
+                ? request.reason()
+                : (reason != null && !reason.isBlank() ? reason : "Deleted by manager");
+        sportPackageService.deletePackage(id, effectiveReason, userDetails.getUserAccount());
+    }
+
+    @PostMapping("/{id}/delete")
+    @PreAuthorize("hasRole('MANAGER')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePackagePost(
+            @PathVariable Long id,
+            @RequestBody(required = false) DeletionReasonRequest request,
+            @RequestParam(required = false) String reason,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        deletePackage(id, request, reason, userDetails);
     }
 
     @PostMapping("/registrations")
