@@ -514,6 +514,38 @@
   box-shadow: none;
 }
 
+.spori-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.spori-panel__actions .spori-icon-button {
+  width: 30px;
+  height: 30px;
+}
+
+.spori-history-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px 12px;
+  gap: 8px;
+}
+
+.spori-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 4px;
+}
+
 .spori-panel__close {
   order: 3;
 }
