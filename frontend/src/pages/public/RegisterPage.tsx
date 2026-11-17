@@ -205,7 +205,18 @@ export function RegisterPage() {
           </div>
           <Checkbox
             name="acceptTerms"
-            label="I agree to the Terms of Use and Privacy Policy"
+            label={
+              <span>
+                I agree to the{' '}
+                <Link to="/terms" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                  Terms of Use
+                </Link>{' '}
+                and{' '}
+                <Link to="/terms#privacy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                  Privacy Policy
+                </Link>
+              </span>
+            }
             checked={form.acceptTerms}
             onChange={(event) => update('acceptTerms', event.target.checked)}
             error={fieldErrors.acceptTerms}

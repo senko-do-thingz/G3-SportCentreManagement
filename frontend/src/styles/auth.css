@@ -336,6 +336,24 @@
   accent-color: var(--color-primary);
 }
 
+.auth-stage .auth-tos-note {
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-xs, 12px);
+  color: var(--color-text-muted);
+  line-height: var(--leading-normal, 1.5);
+}
+
+.auth-stage .auth-tos-note a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  font-weight: var(--weight-medium, 500);
+}
+
+.auth-stage .auth-tos-note a:hover {
+  color: var(--color-primary-hover);
+}
+
 /* Tablets and phones: the photo becomes a band with the slogan, the card follows on the page color. */
 @media (max-width: 960px) {
   .public-layout:has(.auth-stage) {

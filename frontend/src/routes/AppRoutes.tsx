@@ -36,6 +36,7 @@ import { RefundDetailPage } from '../pages/reception/RefundDetailPage'
 import { RefundRequestsPage } from '../pages/reception/RefundRequestsPage'
 import { RegisterRenewPage } from '../pages/reception/RegisterRenewPage'
 import { CreditsPage } from '../pages/public/CreditsPage'
+import { TermsOfServicePage } from '../pages/public/TermsOfServicePage'
 import { ForbiddenPage } from '../pages/public/ForbiddenPage'
 import { HomePage } from '../pages/public/HomePage'
 import { LoginPage } from '../pages/public/LoginPage'
@@ -234,6 +235,9 @@ function ApplicationRoutes() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/credits" element={<CreditsPage />} />
+        <Route path="/terms" element={<TermsOfServicePage />} />
+        <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+        <Route path="/privacy" element={<TermsOfServicePage />} />
         <Route path="/demo/qr/confirm" element={<Suspense fallback={<PageLoader label="Loading demo confirmation" />}><DemoConfirmationPage /></Suspense>} />
 
         <Route element={<PublicLayout />}>

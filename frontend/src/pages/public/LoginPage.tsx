@@ -250,6 +250,12 @@ export function LoginPage() {
         </fieldset>
       </form>
 
+      <p className="auth-tos-note">
+        By logging in, you agree to our{' '}
+        <Link to="/terms">Terms of Service</Link> and{' '}
+        <Link to="/terms#privacy">Privacy Policy</Link>.
+      </p>
+
       <p className="auth-panel__footer">
         <span>Don't have an account?</span>
         <Link to="/register" state={loginReturnState(initialState)}>Sign up</Link>
