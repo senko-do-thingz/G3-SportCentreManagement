@@ -39,7 +39,7 @@ public class VietQrCheckoutService {
     private final Environment environment;
 
     public record Checkout(long paymentId, String paymentCode, boolean enabled, boolean sandbox,
-                           boolean localSandboxCompletion,
+                           boolean localSandboxCompletion, boolean sandboxCallbackEnabled,
                            String bankCode, String bankName, String accountNumber, String accountName,
                            BigDecimal amount, String currency, String orderId, String transferContent,
                            String qrCode, String qrLink, String notice) {}
@@ -54,7 +54,7 @@ public class VietQrCheckoutService {
         requireEligiblePayment(payment);
 
         if (!gateway.isEnabled()) {
-            return new Checkout(paymentId, payment.getPaymentCode(), false, gateway.isSandbox(), false, null,
+            return new Checkout(paymentId, payment.getPaymentCode(), false, gateway.isSandbox(), false, false, null,
                     null, null, null, payment.getAmount(), "VND", null, null, null, null,
                     "VietQR checkout is not configured. Ask reception for payment options.");
         }
@@ -89,7 +89,7 @@ public class VietQrCheckoutService {
         }
 
         return new Checkout(paymentId, payment.getPaymentCode(), true, gateway.isSandbox(),
-                gateway.isSandbox() && gateway.isLocalCallbackFallback(), bankCode,
+                localSandboxCompletionEnabled(), gateway.isSandbox() && localDemoEnabled(), bankCode,
                 beneficiary.getBank(), bankAccount, accountName, payment.getAmount(), "VND",
                 payment.getVietQrOrderId(), payment.getVietQrContent(), payment.getVietQrQrCode(),
                 payment.getVietQrQrLink(), gateway.isSandbox()
@@ -151,13 +151,20 @@ public class VietQrCheckoutService {
     }
 
     private void requireLocalSandbox() {
-        boolean enabled = environment.matchesProfiles("dev")
-                && "true".equalsIgnoreCase(environment.getProperty("app.payment.local-demo.enabled",
-                        environment.getProperty("PAYMENT_LOCAL_DEMO_ENABLED", "false")));
-        if (!gateway.isSandbox() || !enabled) {
+        if (!gateway.isSandbox() || !localDemoEnabled()) {
             throw new BusinessRuleException("Local sandbox settlement is disabled.", "VIETQR_SANDBOX_CALLBACK_DISABLED");
         }
         LocalDemoSafetyGuard.validateLocalDemoSafety(environment);
+    }
+
+    private boolean localSandboxCompletionEnabled() {
+        return gateway.isSandbox() && gateway.isLocalCallbackFallback() && localDemoEnabled();
+    }
+
+    private boolean localDemoEnabled() {
+        return environment.matchesProfiles("dev")
+                && "true".equalsIgnoreCase(environment.getProperty("app.payment.local-demo.enabled",
+                        environment.getProperty("PAYMENT_LOCAL_DEMO_ENABLED", "false")));
     }
 
     private static void requireEligiblePayment(Payment payment) {

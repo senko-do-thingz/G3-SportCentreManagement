@@ -49,6 +49,9 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public PaymentResponse submitForVerification(Long id, UserAccount actor) {
         Payment payment = ownedPendingPayment(id, actor);
+        if (payment.getPayOsPaymentLinkId() != null) {
+            throw new ConflictException("PayOS payments are confirmed automatically. Wait for the payment status to update.");
+        }
         if (payment.getSubmittedForVerificationAt() == null) {
             payment.setSubmittedForVerificationAt(LocalDateTime.now(clock));
             paymentRepository.saveAndFlush(payment);
@@ -102,7 +105,7 @@ public class PaymentServiceImpl implements PaymentService {
      */
     /**
      * One cancellation rule for every path, checked with the payment row locked: no Receptionist handoff, no
-     * settlement marker on the payment, and no channel (demo QR, later VietQR) with a checkout or settlement under way.
+     * settlement marker on the payment, and no channel with a checkout or settlement under way.
      */
     private void requireCancellable(Payment payment, String settledMessage) {
         if (payment.getSubmittedForVerificationAt() != null || payment.getPaymentTime() != null
@@ -299,6 +302,9 @@ public class PaymentServiceImpl implements PaymentService {
             throw new BusinessRuleException("Cannot mark payment as failed: payment is in status "
                     + payment.getPaymentStatus() + ", expected PENDING");
         }
+        if (payment.getPayOsPaymentLinkId() != null) {
+            throw new ConflictException("Cancel the PayOS checkout before marking this payment as failed");
+        }
 
         payment.setPaymentStatus(PaymentStatus.FAILED);
         payment.setNotes(PaymentNotes.append(payment.getNotes(), reason));
@@ -360,7 +366,7 @@ public class PaymentServiceImpl implements PaymentService {
         if (actor == null) {
             throw new IllegalArgumentException("Actor cannot be null");
         }
-        Payment payment = paymentRepository.findById(id)
+        Payment payment = paymentRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + id));
 
         // MemberProfile shares its primary key with UserAccount (@MapsId user_id), so member id equals user id by design.
@@ -376,6 +382,9 @@ public class PaymentServiceImpl implements PaymentService {
         }
         if (payment.getSubmittedForVerificationAt() != null) {
             throw new ConflictException("Payment has been submitted for verification and cannot be changed");
+        }
+        if (payment.getPayOsPaymentLinkId() != null) {
+            throw new ConflictException("Payment method cannot be changed after PayOS checkout has started");
         }
 
         memberCardRepository.findByPaymentId(payment.getId()).ifPresent(card -> {

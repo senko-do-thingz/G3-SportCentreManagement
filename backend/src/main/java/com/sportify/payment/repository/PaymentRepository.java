@@ -22,6 +22,10 @@ public interface PaymentRepository extends JpaRepository<Payment, Long>, JpaSpec
 
     Optional<Payment> findByVietQrTransactionId(String transactionId);
 
+    Optional<Payment> findByPayOsTransactionReference(String reference);
+
+    Optional<Payment> findByPayOsOrderCode(Long orderCode);
+
     /**
      * Reads a payment and holds a row lock (SQL Server UPDLOCK, HOLDLOCK) until the transaction ends.
      * Lock order rule: every path that changes a payment and the card or registration it pays for takes this

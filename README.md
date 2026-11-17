@@ -14,7 +14,7 @@ The four roles are **MEMBER**, **COACH**, **RECEPTIONIST**, and **MANAGER**. Fro
 |---|---|---|
 | Flow 1 - Identity, cards, packages | Registration, login, profiles, membership cards, sport packages, staff sales and activation, password management and OTP recovery | Gmail OAuth must be configured privately for email delivery |
 | Flow 2 - Classes, sessions, booking | Manager class/session administration and rescheduling, Member schedule and booking, Receptionist-assisted booking and arrival check-in, Coach roster/schedule | Booking, check-in and Coach attendance are separate operations |
-| Flow 3 - Payments and reports | Pending payments, cash/bank methods, staff verification, invoices, receipts, refunds, finance and operations reports, QR flows | VietQR instructions, gateway callback and local/simulated QR modes are distinct; a QR image itself is not proof of payment |
+| Flow 3 - Payments and reports | Pending payments, cash/bank methods, PayOS checkout, staff verification, invoices, receipts, refunds, finance and operations reports | PayOS webhook confirms online transfers; manual transfer QR and cash still require reception verification |
 | Flow 4 - Training | Plans, attendance, results, progress, feedback, notices and class questions | Coach attendance is separate from Receptionist arrival check-in |
 | Flow 5 - Recommendations | Member class recommendations and sport levels; Coach rule-based drill suggestions with optional Gemini drafts | Rule fallback remains available |
 | Flow 6 - Spori and support | Sportify-scoped Spori chat for all four roles plus Member support requests and Receptionist replies | Gemini-backed replies require explicit activation; unknown facts must not be invented |
@@ -98,6 +98,31 @@ mvn spring-boot:run
 - The API listens on `http://localhost:8080`, under `/api/v1`.
 - The `dev` profile is active by default (`application.yml`). Use `SPRING_PROFILES_ACTIVE=prod` for a production-like run.
 - **Flyway applies all pending migrations at startup.** Back up the `sportify` database before you pull and start a newer version. Never edit or delete a migration that has already been applied.
+
+### VietQR sandbox callback tunnel
+
+VietQR must reach the backend callback from outside localhost. For a temporary development tunnel:
+
+1. Install `cloudflared` using [Cloudflare's Windows instructions](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/). The Cloudflare One Client/WARP app is not the `cloudflared` tunnel command-line tool these scripts need.
+2. Start the backend in `dev` on `127.0.0.1:8080` and set the VietQR sandbox values in `backend/.env`. With webhook settlement, use `VIETQR_LOCAL_CALLBACK_FALLBACK=false`, `PAYMENT_LOCAL_DEMO_ENABLED=true`, and callback credentials (`VIETQR_CALLBACK_USERNAME`, `VIETQR_CALLBACK_PASSWORD`, `VIETQR_CALLBACK_JWT_SECRET`). Use the separate VietQR-issued login from step 2 of the VietQR portal for `VIETQR_API_USERNAME` and `VIETQR_API_PASSWORD`.
+3. From `frontend/`, run `npm run vietqr:tunnel`. The temporary proxy forwards only `POST /vqr/api/token_generate` and `POST /vqr/bank/api/transaction-sync` to the backend.
+4. Copy the printed `https://*.trycloudflare.com` origin into VietQR's **Connection URL** field and keep URL Path set to `vqr`. Keep the tunnel terminal open while VietQR tests the callback.
+
+The quick-tunnel hostname changes when restarted. Stop the process after the sandbox test, and update VietQR's URL if you start another tunnel.
+
+### PayOS checkout and local webhook tunnel
+
+PayOS does not provide a sandbox. It uses its production payment API, so scanning and paying a checkout QR transfers real money to the bank account linked to the PayOS payment channel. Start with a small amount only after the channel and beneficiary bank account are verified.
+
+1. Set `PAYOS_ENABLED=true`, `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`, and `PAYOS_FRONTEND_BASE_URL=http://localhost:5173` privately in `backend/.env`; never commit those values. Restart the backend so Flyway applies V66 through V68.
+2. Start the frontend and backend. Members can create a PayOS QR and return to the local status page without a tunnel; on return, Sportify verifies the order directly with PayOS.
+3. To receive PayOS webhooks while the app is local (including when a payer does not return to the browser), install `cloudflared` (the Cloudflare One Client/WARP app alone is not enough), then run `npm run payos:tunnel` from `frontend/`. The temporary public tunnel exposes only `POST /api/v1/payments/payos/webhook`, not the rest of the backend.
+4. Copy the `https://*.trycloudflare.com` origin printed by cloudflared. In a second PowerShell window run `scripts/payment/Register-PayOsWebhook.ps1 -WebhookUrl 'https://<origin>/api/v1/payments/payos/webhook'`. PayOS sends a sample event to validate the route; the app acknowledges it without settling an order.
+5. Keep the tunnel terminal open while testing. The hostname changes when the quick tunnel restarts, so register the new URL each time. A verified PayOS webhook updates any matching member payment and activates its package/card automatically; reception does not confirm PayOS payments. The browser-return verification is a fallback if a webhook cannot reach the local app.
+
+Each developer keeps credentials in their own ignored `backend/.env`. A PayOS channel has one active webhook URL, so only the computer currently running the registered tunnel receives callbacks; use the browser-return verification when each teammate is testing on a separate local backend. For a shared deployment, register that backend's stable HTTPS webhook URL once.
+
+PayOS credentials remain server-side. Checkout links are created only for pending bank-transfer payments and the webhook signature, link ID, amount, currency and payment state are checked before settlement.
 
 ### 4. Run the frontend
 
@@ -288,6 +313,7 @@ Backend defaults to `http://localhost:8080` with REST prefix `/api/v1`. Access t
 | Support | `/member/support-requests`, `/reception/support-requests` | Member and Receptionist |
 | Payment / invoices / refunds | `/payments/...`, `/invoices/...`, `/refunds/...` | Role-scoped |
 | VietQR server callbacks | `POST /api/token_generate`, `/bank/api/transaction-sync` | Provider-specific Basic / callback JWT authentication |
+| PayOS checkout/webhook | `POST /api/v1/payments/{id}/payos-checkout`, `POST /api/v1/payments/payos/webhook` | Member JWT for checkout; HMAC-SHA256 checksum validation for signed provider webhooks |
 | Reports / inbox | `/manager/finance/...`, `/manager/reports/operations`, `/member/notifications`, `/reception/inbox` | Role-scoped |
 
 Paths above are a quick reference, not exhaustive contracts. Read the controller annotations and [API documentation](docs/api/) for exact request/response shapes.

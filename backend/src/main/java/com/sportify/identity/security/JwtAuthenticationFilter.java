@@ -31,7 +31,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String path = request.getServletPath();
         if (path.contains("/api/v1/auth") || path.equals("/api/token_generate")
-                || path.equals("/bank/api/transaction-sync")) {
+                || path.equals("/bank/api/transaction-sync") || path.equals("/vqr/api/token_generate")
+                || path.equals("/vqr/bank/api/transaction-sync")
+                || path.equals("/api/v1/payments/payos/webhook")) {
             filterChain.doFilter(request, response);
             return;
         }

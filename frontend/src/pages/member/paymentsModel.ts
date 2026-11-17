@@ -21,7 +21,7 @@ export const PAYMENT_PATHS = {
 } as const
 
 /**
- * Methods a member can choose at checkout. Bank transfer uses the VietQR code; cash is paid at reception.
+ * Methods a member can choose at checkout. Bank transfer uses PayOS; cash is paid at reception.
  */
 export const AVAILABLE_ONLINE_METHODS: readonly string[] = ['BANK_TRANSFER', 'CASH']
 

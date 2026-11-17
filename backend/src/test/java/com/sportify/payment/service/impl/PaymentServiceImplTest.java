@@ -677,7 +677,7 @@ class PaymentServiceImplTest {
     @DisplayName("PUT payment method by owner when pending updates method to BANK_TRANSFER")
     void updatePaymentMethod_OwnerPending_UpdatesMethod() {
         pendingPayment.setPaymentMethod(PaymentMethod.CASH);
-        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
         when(memberCardRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
         when(sportPackageRegistrationRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -696,7 +696,7 @@ class PaymentServiceImplTest {
     @Test
     @DisplayName("PUT payment method by staff allows setting CASH")
     void updatePaymentMethod_StaffWithCash_Succeeds() {
-        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
         when(memberCardRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
         when(sportPackageRegistrationRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -715,7 +715,7 @@ class PaymentServiceImplTest {
     @Test
     @DisplayName("PUT payment method by non-owner member throws 404 ResourceNotFoundException")
     void updatePaymentMethod_OtherMember_ThrowsResourceNotFoundException() {
-        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
 
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
                 .paymentMethod(PaymentMethod.BANK_TRANSFER)
@@ -730,7 +730,7 @@ class PaymentServiceImplTest {
     @DisplayName("PUT payment method when status is not PENDING throws BusinessRuleException")
     void updatePaymentMethod_NotPending_ThrowsBusinessRuleException() {
         pendingPayment.setPaymentStatus(PaymentStatus.SUCCESS);
-        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
 
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
                 .paymentMethod(PaymentMethod.BANK_TRANSFER)
@@ -744,7 +744,7 @@ class PaymentServiceImplTest {
     @Test
     @DisplayName("PUT payment method when linked card is not PENDING_PAYMENT throws BusinessRuleException")
     void updatePaymentMethod_LinkedCardActive_ThrowsBusinessRuleException() {
-        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
         MemberCard activeCard = MemberCard.builder().id(1L).status(CardStatus.ACTIVE).build();
         when(memberCardRepository.findByPaymentId(10L)).thenReturn(Optional.of(activeCard));
 
@@ -760,7 +760,7 @@ class PaymentServiceImplTest {
     @Test
     @DisplayName("PUT payment method when linked registration is not PENDING_PAYMENT throws BusinessRuleException")
     void updatePaymentMethod_LinkedRegistrationActive_ThrowsBusinessRuleException() {
-        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
         when(memberCardRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
         SportPackageRegistration activeReg = SportPackageRegistration.builder().id(2L).status(PackageRegistrationStatus.ACTIVE).build();
         when(sportPackageRegistrationRepository.findByPaymentId(10L)).thenReturn(Optional.of(activeReg));
@@ -777,7 +777,7 @@ class PaymentServiceImplTest {
     @Test
     @DisplayName("PUT payment method with unsupported or disallowed method throws BusinessRuleException")
     void updatePaymentMethod_DisallowedMethod_ThrowsBusinessRuleException() {
-        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
 
         for (PaymentMethod disallowedForMember : List.of(
                 PaymentMethod.CREDIT_CARD,

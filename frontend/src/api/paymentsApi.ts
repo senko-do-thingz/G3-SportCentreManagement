@@ -77,6 +77,53 @@ export interface VietQrInstructions {
   requiresStaffConfirmation: boolean
 }
 
+/** Mirrors VietQrCheckoutService.Checkout for the VietQR Paygate API flow. */
+export interface VietQrGatewayCheckout {
+  paymentId: number
+  paymentCode: string
+  enabled: boolean
+  sandbox: boolean
+  localSandboxCompletion: boolean
+  sandboxCallbackEnabled: boolean
+  bankCode: string | null
+  bankName: string | null
+  accountNumber: string | null
+  accountName: string | null
+  amount: number | string
+  currency: string
+  orderId: string | null
+  transferContent: string | null
+  qrCode: string | null
+  qrLink: string | null
+  notice: string
+}
+
+export interface VietQrSandboxCallbackResult {
+  status: string
+  message: string
+}
+
+/** Mirrors PayOsCheckoutService.Checkout; credentials never cross into the browser. */
+export interface PayOsCheckout {
+  paymentId: number
+  paymentCode: string
+  enabled: boolean
+  orderCode: number
+  paymentLinkId: string | null
+  checkoutUrl: string | null
+  qrCode: string | null
+  amount: number | string
+  currency: string
+  notice: string
+}
+
+export interface PayOsStatusSync {
+  paymentId: number
+  settled: boolean
+  providerStatus: string
+  notice: string
+}
+
 /** BE-20 InvoiceLineResponse. */
 export interface InvoiceLine {
   id: number
@@ -184,6 +231,26 @@ export const paymentsApi = {
   /** Returns an offline-generated VietQR transfer payload for the configured beneficiary. */
   vietQrInstructions(paymentId: number, options: RequestSignal = {}): Promise<VietQrInstructions> {
     return api.get<unknown>(`/payments/${paymentId}/vietqr-instructions`, options).then(asVietQrInstructions)
+  },
+
+  /** Creates or retrieves a dynamic VietQR Paygate checkout QR for this payment. */
+  vietQrCheckout(paymentId: number, options: RequestSignal = {}): Promise<VietQrGatewayCheckout> {
+    return api.post<VietQrGatewayCheckout>(`/payments/${encodeURIComponent(paymentId)}/vietqr-checkout`, {}, options)
+  },
+
+  /** Asks VietQR's sandbox to send a test transaction callback for this checkout. */
+  vietQrSandboxCallback(paymentId: number): Promise<VietQrSandboxCallbackResult> {
+    return api.post<VietQrSandboxCallbackResult>(`/payments/${encodeURIComponent(paymentId)}/vietqr-sandbox-callback`, {})
+  },
+
+  /** Creates or retrieves a real PayOS checkout link for a pending bank-transfer payment. */
+  payOsCheckout(paymentId: number, options: RequestSignal = {}): Promise<PayOsCheckout> {
+    return api.post<PayOsCheckout>(`/payments/${encodeURIComponent(paymentId)}/payos-checkout`, {}, options)
+  },
+
+  /** Verifies a return against PayOS directly before applying a missed webhook settlement. */
+  payOsSyncStatus(paymentId: number): Promise<PayOsStatusSync> {
+    return api.post<PayOsStatusSync>(`/payments/${encodeURIComponent(paymentId)}/payos-sync`, {})
   },
 
   /** BE-20: zero-based page, size 1..100; omit status for All. */

@@ -3,7 +3,6 @@ package com.sportify.payment.service;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.sportify.payment.config.VietQrGatewayProperties;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
@@ -21,13 +20,17 @@ import java.util.function.Function;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class VietQrApiClient {
 
-    @Qualifier("vietQrRestClient")
     private final RestClient client;
     private final VietQrGatewayProperties properties;
     private volatile CachedToken cachedToken;
+
+    public VietQrApiClient(@Qualifier("vietQrRestClient") RestClient client,
+                           VietQrGatewayProperties properties) {
+        this.client = client;
+        this.properties = properties;
+    }
 
     public GenerateQrResponse generateQr(GenerateQrRequest request) {
         return withBearerToken(token -> client.post()

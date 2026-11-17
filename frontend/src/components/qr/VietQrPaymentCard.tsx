@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import QRCode from 'qrcode'
-import { getErrorMessage } from '../../api/errors'
-import { paymentsApi, type Payment, type VietQrInstructions } from '../../api/paymentsApi'
+import { ApiError, getErrorMessage } from '../../api/errors'
+import { paymentsApi, type Payment, type VietQrGatewayCheckout, type VietQrInstructions } from '../../api/paymentsApi'
 import { localDemoPaymentApi } from '../../api/localDemoPaymentApi'
 import { copyText } from '../../utils/clipboard'
 import { accountNumberToCopy, amountToCopy, formatPaymentMoney } from '../../pages/member/paymentsModel'
@@ -10,7 +10,7 @@ import { Spinner } from '../ui/Spinner'
 
 type InstructionsState =
   | { status: 'loading' }
-  | { status: 'ready'; instructions: VietQrInstructions }
+  | { status: 'ready'; instructions: VietQrInstructions; source: 'gateway' | 'transfer'; sandboxCallbackAvailable: boolean; localSandboxCompletion: boolean }
   | { status: 'error'; error: string }
 
 export function VietQrPaymentCard({
@@ -36,15 +36,50 @@ export function VietQrPaymentCard({
     ? requestState.state
     : { status: 'loading' }
   const demoAvailable = demoCapability?.paymentId === payment.id && demoCapability.enabled
+    && state.status === 'ready' && state.source === 'transfer'
+  const sandboxCallbackAvailable = state.status === 'ready' && state.sandboxCallbackAvailable
 
   useEffect(() => {
     const controller = new AbortController()
     let active = true
-    paymentsApi.vietQrInstructions(payment.id, { signal: controller.signal }).then(
-      (instructions) => {
-        if (active) setRequestState({ key: requestKey, state: { status: 'ready', instructions } })
-      },
-    ).catch((error: unknown) => {
+    const loadInstructions = async () => {
+      let checkout: VietQrGatewayCheckout | null = null
+      try {
+        checkout = await paymentsApi.vietQrCheckout(payment.id, { signal: controller.signal })
+      } catch (error) {
+        // Keep the offline QR usable with an older backend that predates the Paygate checkout route.
+        if (!(error instanceof ApiError) || error.status !== 404) throw error
+      }
+      if (checkout?.enabled) {
+        if (!checkout.qrCode) throw new Error('VietQR did not return a payment QR code.')
+        const instructions: VietQrInstructions = {
+          paymentId: checkout.paymentId,
+          paymentCode: checkout.paymentCode,
+          payable: true,
+          notice: checkout.notice,
+          bankBin: checkout.bankCode,
+          bankName: checkout.bankName,
+          accountNumber: checkout.accountNumber,
+          accountName: checkout.accountName,
+          amount: checkout.amount,
+          currency: checkout.currency,
+          transferReference: checkout.transferContent,
+          qrPayload: checkout.qrCode,
+          requiresStaffConfirmation: false,
+        }
+        return {
+          instructions,
+          source: 'gateway' as const,
+          sandboxCallbackAvailable: checkout.sandbox && checkout.sandboxCallbackEnabled,
+          localSandboxCompletion: checkout.localSandboxCompletion,
+        }
+      }
+      const instructions = await paymentsApi.vietQrInstructions(payment.id, { signal: controller.signal })
+      return { instructions, source: 'transfer' as const, sandboxCallbackAvailable: false, localSandboxCompletion: false }
+    }
+    void loadInstructions().then((result) => {
+      if (active) setRequestState({ key: requestKey, state: { status: 'ready', ...result } })
+    }).catch((error: unknown) => {
       if (active && !controller.signal.aborted) {
         setRequestState({ key: requestKey, state: { status: 'error', error: getErrorMessage(error) } })
       }
@@ -61,7 +96,8 @@ export function VietQrPaymentCard({
   }, [payment.id, requestKey])
 
   const instructions = state.status === 'ready' ? state.instructions : null
-  const brandedImage = instructions?.payable ? quickLinkImage(instructions) : null
+  const brandedImage = instructions?.payable && state.status === 'ready' && state.source === 'transfer'
+    ? quickLinkImage(instructions) : null
   const qrPayload = instructions?.payable ? instructions.qrPayload : null
   const transferReference = instructions?.transferReference?.trim() || null
   const qrImage = qrPayload && qrImageState?.payload === qrPayload ? qrImageState.url : null
@@ -105,6 +141,22 @@ export function VietQrPaymentCard({
     try {
       await localDemoPaymentApi.confirm(payment.id)
       setDemoMessage('Local demo marked this payment as paid. No bank transfer was checked and no money moved.')
+      onRefresh()
+    } catch (error) {
+      setDemoError(getErrorMessage(error))
+    } finally {
+      setSubmittingDemo(false)
+    }
+  }
+
+  async function submitVietQrSandboxCallback() {
+    if (submittingDemo) return
+    setSubmittingDemo(true)
+    setDemoMessage(null)
+    setDemoError(null)
+    try {
+      const result = await paymentsApi.vietQrSandboxCallback(payment.id)
+      setDemoMessage(result.message)
       onRefresh()
     } catch (error) {
       setDemoError(getErrorMessage(error))
@@ -157,6 +209,18 @@ export function VietQrPaymentCard({
           </div>
         ) : <Spinner label="Rendering your VietQR code" />}
       </div>
+      {sandboxCallbackAvailable && (
+        <div className="vietqr-payment-card__demo no-print">
+          <Button variant="primary" fullWidth loading={submittingDemo} onClick={() => void submitVietQrSandboxCallback()}>
+            Run VietQR sandbox test callback
+          </Button>
+          <p className="payment-methods__hint">
+            This asks VietQR Sandbox to send a completed test transaction. No real money moves.
+          </p>
+          {demoMessage && <p role="status" className="notice notice--info">{demoMessage}</p>}
+          {demoError && <p role="alert" className="notice notice--danger">{demoError}</p>}
+        </div>
+      )}
       {demoAvailable && (
         <div className="vietqr-payment-card__demo no-print">
           <Button variant="primary" fullWidth loading={submittingDemo} onClick={() => void submitLocalDemo()}>
@@ -195,9 +259,19 @@ export function VietQrPaymentCard({
           </dd>
         </div>
       </dl>
-      <p className="notice notice--info">
-        The QR contains a bank transfer instruction. Reception must verify the received funds before this payment is confirmed.
-      </p>
+      {state.status === 'ready' && state.source === 'gateway' ? (
+        <p className="notice notice--info">
+          {state.sandboxCallbackAvailable
+            ? state.localSandboxCompletion
+              ? 'This is a VietQR sandbox QR. Run the test callback above to update the local demo payment. No money is transferred.'
+              : 'This is a VietQR sandbox QR. Run the test callback above; VietQR sends the transaction to the configured callback URL. No money is transferred.'
+            : 'VietQR confirms this payment after receiving a matching transaction callback.'}
+        </p>
+      ) : (
+        <p className="notice notice--info">
+          The QR contains a bank transfer instruction. Reception must verify the received funds before this payment is confirmed.
+        </p>
+      )}
     </Card>
   )
 }

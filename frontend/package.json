@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
+    "vietqr:tunnel": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/payment/Start-VietQrTunnel.ps1",
+    "payos:tunnel": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/payment/Start-PayOsTunnel.ps1",
     "dev:preview": "vite --mode manager-preview",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

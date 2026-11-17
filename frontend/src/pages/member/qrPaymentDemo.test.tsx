@@ -31,7 +31,7 @@ describe('QR-01 guarded demo route and payment integration', () => {
     expect(calls.every((call) => call.method === 'GET')).toBe(true)
   })
 
-  it('continues to the VietQR status screen without exposing the retired standalone simulator link', async () => {
+  it('continues to the payment status screen without exposing the retired standalone simulator link', async () => {
     const { calls } = backend({ data: payment({ method: 'BANK_TRANSFER' }) })
     const user = userEvent.setup()
     renderApp('/member/payments/52')
@@ -41,7 +41,7 @@ describe('QR-01 guarded demo route and payment integration', () => {
     expect(screen.getByRole('radio', { name: 'Bank transfer' })).toBeChecked()
     await user.click(screen.getByRole('button', { name: 'Continue to payment' }))
     expect(await screen.findByRole('heading', { name: 'Payment Instructions and Status' })).toBeVisible()
-    expect(calls.every((call) => call.method === 'GET')).toBe(true)
+    expect(calls.some((call) => call.method === 'POST' && call.path === '/payments/52/payos-checkout')).toBe(true)
   })
 
   it('uses the authorized DTO amount rather than its price breakdown', async () => {

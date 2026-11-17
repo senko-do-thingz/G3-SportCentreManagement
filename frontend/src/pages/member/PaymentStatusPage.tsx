@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { parseSessionReference } from '../../api/sessionIdentity'
 import { getErrorMessage } from '../../api/errors'
-import type { Payment } from '../../api/paymentsApi'
+import { paymentsApi, type Payment } from '../../api/paymentsApi'
 import { CancelPayment, SubmitPayment } from './PaymentCancellation'
 import { PaymentHero } from '../../components/PaymentHero'
 import { PaymentWorkspace } from '../../components/PaymentWorkspace'
+import { PayOsPaymentCard } from '../../components/qr/PayOsPaymentCard'
 import { VietQrPaymentCard } from '../../components/qr/VietQrPaymentCard'
 import { Button, Card, EmptyState, ErrorState, StatusBadge, useToast } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
@@ -68,6 +69,8 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
   const { payment, loadError, refresh } = polling
   const toast = useToast()
   const previousStatus = useRef<string | null>(null)
+  const payOsReturnSyncAttempted = useRef(false)
+  const payOsReturn = params.get('payos') === 'return'
 
   // Tell the member once when the status changes while the page is open.
   useEffect(() => {
@@ -81,12 +84,27 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
     }
   }, [payment?.status, toast])
 
+  useEffect(() => {
+    if (!payOsReturn || payment?.status !== 'PENDING' || payOsReturnSyncAttempted.current) return
+    payOsReturnSyncAttempted.current = true
+    let active = true
+    void paymentsApi.payOsSyncStatus(paymentId).then(
+      () => { if (active) refresh() },
+      (error: unknown) => {
+        if (!active) return
+        toast.error('Could not verify this PayOS payment', getErrorMessage(error))
+        refresh()
+      },
+    )
+    return () => { active = false }
+  }, [payOsReturn, payment?.status, paymentId, refresh, toast])
+
   const header = (
     <PaymentHero
       eyebrow="Member / Payments"
       title="Payment Instructions and Status"
       description={payment?.method === 'BANK_TRANSFER'
-        ? 'Review your VietQR transfer instructions below. Reception confirms payment after verifying the received funds.'
+        ? 'Review your PayOS transfer QR below. PayOS updates payment status automatically after the bank confirms the transfer.'
         : 'Check your payment status or give reception your payment reference.'}
     />
   )
@@ -115,10 +133,10 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
         {selectedSession && <Link className={buttonClassName('secondary')} to={`/member/sessions/${selectedSession}`}>Return to selected session</Link>}
         <div className="payment-summary">
           {payment.status === 'PENDING' && payment.method === 'BANK_TRANSFER' ? (
-            <VietQrPaymentCard payment={payment} onRefresh={refresh} fallback={<Instructions payment={payment} />} />
+            <PayOsPaymentCard payment={payment} manualFallback={<VietQrPaymentCard payment={payment} onRefresh={refresh} fallback={<Instructions payment={payment} />} />} />
           ) : <Instructions payment={payment} />}
           <StatusPanel polling={polling} payment={payment} />
-          <SubmitPayment payment={payment} onChanged={refresh} />
+          {payment.method === 'CASH' && <SubmitPayment payment={payment} onChanged={refresh} />}
           <CancelPayment payment={payment} onChanged={refresh} />
         </div>
       </div>
@@ -323,7 +341,7 @@ function StatusPanel({ polling, payment }: { polling: ReturnType<typeof usePayme
         <>
           <div className="notice notice--info payment-summary__note">
             <p>{payment.method === 'BANK_TRANSFER'
-              ? 'This QR does not notify the center when money arrives. If you transferred the amount, ask reception to verify your payment reference.'
+              ? 'PayOS confirms online transfers automatically. If you used manual transfer instructions instead, ask reception to verify the received funds.'
               : 'Bring the cash and payment reference to reception. Your payment stays pending until staff record the cash received.'}</p>
           </div>
           <p className="payment-status__check">

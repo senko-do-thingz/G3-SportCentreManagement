@@ -457,7 +457,7 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     })
     expect(await within(panel).findByRole('alert')).toHaveTextContent('Could not check the status')
     expect(within(panel).getByRole('heading', { name: 'Awaiting confirmation' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Bank transfer' })).toBeInTheDocument()
+    expect(screen.getAllByText(/PAY-0052/).length).toBeGreaterThan(0)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS)
     })
@@ -478,7 +478,7 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     })
     expect(await within(panel).findByRole('alert')).toHaveTextContent('Access denied')
     expect(within(panel).getByText(/Automatic checks stopped/)).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Bank transfer' })).toBeInTheDocument()
+    expect(screen.getAllByText(/PAY-0052/).length).toBeGreaterThan(0)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 3)
     })

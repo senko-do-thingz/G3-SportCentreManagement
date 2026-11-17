@@ -116,6 +116,13 @@ app:
       callback-password: ${VIETQR_CALLBACK_PASSWORD:}
       callback-jwt-secret: ${VIETQR_CALLBACK_JWT_SECRET:}
       callback-token-ttl-seconds: ${VIETQR_CALLBACK_TOKEN_TTL_SECONDS:300}
+    payos:
+      enabled: ${PAYOS_ENABLED:false}
+      api-base-url: ${PAYOS_API_BASE_URL:https://api-merchant.payos.vn}
+      client-id: ${PAYOS_CLIENT_ID:}
+      api-key: ${PAYOS_API_KEY:}
+      checksum-key: ${PAYOS_CHECKSUM_KEY:}
+      frontend-base-url: ${PAYOS_FRONTEND_BASE_URL:http://localhost:5173}
 
 management:
   endpoints:

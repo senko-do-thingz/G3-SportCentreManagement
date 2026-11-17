@@ -1,6 +1,6 @@
 # Read-only reconciliation and recovery
 
-Current migration is V63. Wallet runtime, tables and records are removed by V63. The previous schema fingerprint document was generated for V62 and cannot be used to authorize a V63 target. Generate and independently verify a fresh post-V63 fingerprint before running the protected-target preflight. Flyway V50-V53 must not be edited or deleted.
+Current migration is V68. Wallet runtime, tables and records are removed by V63; V66 adds PayOS checkout metadata, V67 allows PayOS as a settlement provider, and V68 assigns unique provider order codes so local databases sharing one PayOS channel do not reuse their payment IDs. The committed schema fingerprint predates V68 and cannot authorize a V68 target. Regenerate and independently verify the fingerprint from fresh disposable SQL Server fixtures before running protected-target preflight. Flyway V50-V53 must not be edited or deleted.
 
 CODEOWNER fast-track scope update: this release is RUNTIME DATABASE UNIFICATION.
 Historical migration/import/archive/API work is OUT OF SCOPE. Historical data
