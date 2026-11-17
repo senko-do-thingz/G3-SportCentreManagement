@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
-import { backendError, installFakeFetch, json, MEMBER, type RecordedCall } from '../../test/fakeBackend'
+import { backendError, installFakeFetch, json, MEMBER, MEMBER_WITH_DOB, type RecordedCall } from '../../test/fakeBackend'
 import { card, payment, registration, sport, sportPackage } from '../../test/memberFixtures'
 import { renderApp } from '../../test/renderApp'
 import { formatCalendarDate } from '../../utils/dateDisplay'
@@ -24,6 +24,7 @@ const GOLD = card({ tierCode: 'GOLD', tierName: 'Gold', discountPercentage: 5 })
 const VIP = card()
 
 interface Options {
+  profile?: Record<string, unknown>
   cards?: unknown[] | Response
   registrations?: unknown[] | Response
   packages?: unknown[]
@@ -32,7 +33,7 @@ interface Options {
 
 function packagesBackend(options: Options = {}) {
   return installFakeFetch((call) => {
-    if (call.path === '/users/me') return json(200, MEMBER)
+    if (call.path === '/users/me') return json(200, options.profile ?? MEMBER_WITH_DOB)
     if (call.path === '/sports') return json(200, SPORTS)
     if (call.path === '/packages') return json(200, options.packages ?? PACKAGES)
     if (call.path === '/membership-cards/my') {
@@ -479,6 +480,13 @@ describe('FE-03 review round 1', () => {
     expect(picker).toHaveAttribute('min', '2026-10-14')
   })
 
+  it('displays warning when member has no date of birth and disables package registration', async () => {
+    await openDetail({ profile: { ...MEMBER, dateOfBirth: null } })
+    expect(screen.getByTestId('package-dob-warning')).toBeInTheDocument()
+    expect(screen.getByText(/Please update your date of birth in your profile before purchasing a subscription plan/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm registration' })).toBeDisabled()
+  })
+
   it('TC-FE03-048 while the cards load, eligible prices show "-" and "Checking your card discount" (M2, N1)', async () => {
     let release: (response: Response) => void = () => undefined
     // The cards answer stays open until the test releases it.
@@ -531,7 +539,7 @@ describe('FE-03 review round 2', () => {
     const user = userEvent.setup()
     let release: (response: Response) => void = () => undefined
     const { calls } = installFakeFetch((call) => {
-      if (call.path === '/users/me') return json(200, MEMBER)
+      if (call.path === '/users/me') return json(200, MEMBER_WITH_DOB)
       if (call.path === '/packages') return json(200, PACKAGES)
       if (call.path === '/membership-cards/my') return json(200, [])
       if (call.path === '/packages/registrations/my') {

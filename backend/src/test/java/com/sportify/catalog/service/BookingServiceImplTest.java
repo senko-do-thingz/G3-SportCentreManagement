@@ -274,6 +274,24 @@ public class BookingServiceImplTest {
         assertNoBookingWrites();
     }
 
+    @Test
+    void createBooking_MemberWithNoDateOfBirthWhenSessionHasAgeGroup_ThrowsAgeRestricted() {
+        session.setSportClass(com.sportify.catalog.entity.SportClass.builder().id(7L)
+                .ageGroup(com.sportify.catalog.entity.AgeGroup.builder().id(3L).code("ADULT").label("Adult").minAge(16).build())
+                .build());
+        memberUser.setDateOfBirth(null);
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
+
+        var error = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(explicitRequest(), memberUser));
+
+        assertEquals("AGE_RESTRICTED", error.getCode());
+        assertTrue(error.getMessage().contains("Ages 16+"));
+        verify(registrationRepository, never()).findById(any());
+        verify(sessionRepository, never()).reserveSeat(any(), any());
+        assertNoBookingWrites();
+    }
+
     private BookingCreateRequest explicitRequest() {
         return BookingCreateRequest.builder().sessionId(20L).packageRegistrationId(50L).build();
     }

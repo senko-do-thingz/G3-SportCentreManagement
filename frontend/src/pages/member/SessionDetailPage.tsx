@@ -56,7 +56,13 @@ function SessionDetailContent({ id, returnTo }: { id: number | SessionId; return
       </Card>
       <Card title={self ? 'Self-training access' : 'Your coach'}>
         {self ? <><dl className="browse-facts"><div><dt>Sport</dt><dd>{session.sportName}</dd></div><div><dt>Format</dt><dd>Self-training</dd></div><div><dt>Facility</dt><dd>{session.facilityName || 'Facility not assigned'}</dd></div></dl><p className="browse-callout">Practice independently using a self-training sport package. Coach-led sessions need a separate matching package.</p></> : <><div className="browse-avatar" aria-hidden="true">{(session.coachName || '?').split(' ').filter(Boolean).slice(0, 2).map((name) => name[0]).join('')}</div><h3>{session.coachName || 'Coach not provided'}</h3>{session.coachId && <Button variant="secondary" onClick={() => setProfileOpen(true)}>View coach profile</Button>}</>}
-        <div className="browse-eligibility" role="status"><Badge tone={state === 'ELIGIBLE' ? 'success' : state === 'FULL' ? 'warning' : 'info'}>{state === 'ELIGIBLE' ? 'Eligible' : state === 'FULL' ? 'Fully booked' : copy.title}</Badge><p>{copy.message}</p>
+        <div className="browse-eligibility" role="status"><Badge tone={state === 'ELIGIBLE' ? 'success' : state === 'FULL' || state === 'AGE_RESTRICTED' ? 'warning' : 'info'}>{state === 'ELIGIBLE' ? 'Eligible' : state === 'FULL' ? 'Fully booked' : copy.title}</Badge><p>{copy.message}</p>
+          {state === 'AGE_RESTRICTED' && (
+            <div className="notice notice--warning" role="alert" data-testid="age-restriction-notice">
+              <strong>Age Requirement Not Met</strong>
+              <p>{copy.message}</p>
+            </div>
+          )}
           {packageState && <SessionPackageRecommendations session={session} returnTo={returnTo} />}
           {state === 'ALREADY_BOOKED' && <Link className={buttonClassName('secondary')} to="/member/bookings">View my booking</Link>}
           {state === 'ELIGIBLE' && <><p className="notice notice--info">Continue to choose an eligible package and review this booking. No booking has been created yet.</p><Link className={buttonClassName()} to={bookingLink}>Book session</Link></>}

@@ -31,6 +31,7 @@ describe('FE-08 session detail', () => {
     expect(screen.queryByRole('link', { name: 'Book session' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to results' })).toHaveAttribute('href', '/member/classes?level=BEGINNER')
     if (reason === 'NO_PACKAGE' || reason === 'NO_SESSIONS_LEFT') expect(await screen.findByRole('link', { name: 'View matching package' })).toHaveAttribute('href', '/member/packages/4?sport=3&format=COACH_LED&sessionId=5&sessionDate=2026-10-16&returnTo=%2Fmember%2Fclasses%3Flevel%3DBEGINNER')
+    if (reason === 'AGE_RESTRICTED') expect(screen.getByTestId('age-restriction-notice')).toBeInTheDocument()
     expect(api.calls.every((call) => call.method === 'GET')).toBe(true)
   })
   it('routes eligible members to FE-09 with session and return context without creating a booking', async () => {

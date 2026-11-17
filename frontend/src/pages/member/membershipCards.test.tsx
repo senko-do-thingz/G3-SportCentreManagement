@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
-import { backendError, installFakeFetch, json, MEMBER, type RecordedCall } from '../../test/fakeBackend'
+import { backendError, installFakeFetch, json, MEMBER, MEMBER_WITH_DOB, type RecordedCall } from '../../test/fakeBackend'
 import { card, CARD_TIERS, payment, registration } from '../../test/memberFixtures'
 import { renderApp } from '../../test/renderApp'
 
@@ -28,6 +28,7 @@ const PENDING_CARD = card({
 const PENDING_MESSAGE = 'A membership card request is already waiting for payment: CARD-0009. Pay or cancel it first.'
 
 interface Options {
+  profile?: Record<string, unknown>
   cards?: unknown[]
   registrations?: unknown[]
   tiers?: Response
@@ -42,7 +43,7 @@ function membershipBackend(options: Options = {}) {
     cards = next
   }
   return installFakeFetch((call) => {
-    if (call.path === '/users/me') return json(200, MEMBER)
+    if (call.path === '/users/me') return json(200, options.profile ?? MEMBER_WITH_DOB)
     if (call.path === '/membership-cards/tiers') return options.tiers ?? json(200, CARD_TIERS)
     if (call.path === '/membership-cards/my') return json(200, cards)
     if (call.path === '/packages/registrations/my') return json(200, options.registrations ?? [])
@@ -523,5 +524,15 @@ describe('FE-04 review round 1', () => {
     }
     expect(document.getElementById('membership-panel-card')).toHaveAttribute('hidden')
     expect(document.getElementById('membership-panel-packages')).not.toHaveAttribute('hidden')
+  })
+
+  it('displays warning when member has no date of birth and disables purchase confirmation', async () => {
+    await openCards({ profile: { ...MEMBER, dateOfBirth: null } })
+    expect(screen.getByTestId('dob-warning')).toBeInTheDocument()
+    expect(screen.getByText(/Please update your date of birth in your profile before purchasing a subscription plan/)).toBeInTheDocument()
+
+    const { dialog } = await openOverlay('Gold Member', 'Get card')
+    expect(within(dialog).getByTestId('modal-dob-warning')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Confirm and continue' })).toBeDisabled()
   })
 })

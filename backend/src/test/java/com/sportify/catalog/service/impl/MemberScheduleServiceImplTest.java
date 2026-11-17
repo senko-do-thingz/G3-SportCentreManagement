@@ -266,6 +266,24 @@ class MemberScheduleServiceImplTest {
         verifyNoInteractions(registrations);
     }
 
+    @Test void memberWithNoDateOfBirthWhenSessionHasAgeGroup_ReturnsAgeRestricted() {
+        var s = session();
+        s.setSportClass(com.sportify.catalog.entity.SportClass.builder().id(9L).name("Swimming Skills")
+                .ageGroup(com.sportify.catalog.entity.AgeGroup.builder().id(4L).code("ADULT").label("Adult").minAge(16).build()).build());
+        when(sessions.findVisibleById(100L, TODAY, NOW)).thenReturn(Optional.of(s));
+        when(bookings.countBySessionIds(List.of(100L), BookingStatus.CONFIRMED)).thenReturn(List.of(count(100, 3)));
+        var account = account("MEMBER", 2);
+        account.setDateOfBirth(null);
+        when(members.findById(2L)).thenReturn(Optional.of(MemberProfile.builder().id(2L).userAccount(account).build()));
+
+        var result = service.getSession(100L, actor);
+
+        assertThat(result.eligible()).isFalse();
+        assertThat(result.reason()).isEqualTo(com.sportify.catalog.dto.SessionDetailResponse.EligibilityReason.AGE_RESTRICTED);
+        assertThat(result.session().ageGroupLabel()).isEqualTo("Ages 16+");
+        verifyNoInteractions(registrations);
+    }
+
     @Test void staleCachedCapacityThatBlocksExistingBookingIsNotFalselyEligibleOrFull() {
         var s = session(); s.setBookedCount(10);
         when(sessions.findVisibleById(100L, TODAY, NOW)).thenReturn(Optional.of(s));

@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../auth/useAuth'
 import { cardsApi, type CardTier } from '../../api/cardsApi'
 import { ApiError, getErrorMessage } from '../../api/errors'
 import { memberApi, type MemberCard } from '../../api/memberApi'
@@ -52,9 +53,11 @@ interface Selection {
  * PENDING_PAYMENT card and its payment; the member continues to /member/payments/{paymentId}.
  */
 export function MembershipCardsPage() {
+  const { user } = useAuth()
   const [data, reload] = useMemberResource(loadCardsData)
   const [today] = useState(() => toIsoDate(new Date()))
   const [selected, setSelected] = useState<Selection | null>(null)
+  const hasDob = Boolean(user?.dateOfBirth)
 
   const header = (
     <MemberCommerceHeader
@@ -88,9 +91,25 @@ export function MembershipCardsPage() {
         title="UPGRADE YOUR MEMBERSHIP. UNLOCK DISCOUNTS."
         description="Choose the membership card tier that fits your training routine and save on every sport package."
       />
-      <div className="cards-page__content">{content}</div>
+      <div className="cards-page__content">
+        {!hasDob && (
+          <div className="notice notice--warning cards-age-warning" role="alert" data-testid="dob-warning">
+            <p>Please update your date of birth in your profile before purchasing a subscription plan.</p>
+            <Link className={buttonClassName('secondary', 'sm')} to={MEMBER_PATHS.profile}>
+              Update date of birth
+            </Link>
+          </div>
+        )}
+        {content}
+      </div>
       {selected && (
-        <ConfirmCardModal tier={selected.tier} plan={selected.plan} onClose={() => setSelected(null)} onStale={reload} />
+        <ConfirmCardModal
+          tier={selected.tier}
+          plan={selected.plan}
+          hasDob={hasDob}
+          onClose={() => setSelected(null)}
+          onStale={reload}
+        />
       )}
     </div>
   )
@@ -238,11 +257,13 @@ function HowCardWorks() {
 function ConfirmCardModal({
   tier,
   plan,
+  hasDob = true,
   onClose,
   onStale,
 }: {
   tier: CardTier
   plan: CardPlan
+  hasDob?: boolean
   onClose: () => void
   onStale: () => void
 }) {
@@ -254,7 +275,10 @@ function ConfirmCardModal({
   const baseTierName = plan.baseCard?.tierName ?? 'current'
 
   const confirm = async () => {
-    if (sendingRef.current || plan.kind === 'blocked' || plan.kind === 'unknown' || plan.price === null) {
+    if (sendingRef.current || !hasDob || plan.kind === 'blocked' || plan.kind === 'unknown' || plan.price === null) {
+      if (!hasDob) {
+        setError('Please update your date of birth in your profile before purchasing a subscription plan.')
+      }
       return
     }
     sendingRef.current = true
@@ -294,7 +318,7 @@ function ConfirmCardModal({
       description="Your sport packages are purchased separately."
       footer={
         <>
-          <Button onClick={confirm} loading={submitting} disabled={plan.kind === 'blocked' || plan.kind === 'unknown' || plan.price === null}>
+          <Button onClick={confirm} loading={submitting} disabled={!hasDob || plan.kind === 'blocked' || plan.kind === 'unknown' || plan.price === null}>
             Confirm and continue
           </Button>
           <Button variant="secondary" onClick={onClose} disabled={submitting}>
@@ -303,6 +327,14 @@ function ConfirmCardModal({
         </>
       }
     >
+      {!hasDob && (
+        <div className="notice notice--warning" role="alert" data-testid="modal-dob-warning">
+          <p>Please update your date of birth in your profile before purchasing a subscription plan.</p>
+          <Link className={buttonClassName('secondary', 'sm')} to={MEMBER_PATHS.profile}>
+            Update date of birth
+          </Link>
+        </div>
+      )}
       {error && (
         <p className="notice notice--danger" role="alert">
           {error}

@@ -149,6 +149,12 @@ function BookingOptionsContent({ sessionId, returnTo }: { sessionId: number | Se
               {status === 'ELIGIBLE' ? 'Eligible' : ELIGIBILITY_COPY[status].title}
             </Badge>
             {status !== 'ELIGIBLE' && <p>{ELIGIBILITY_COPY[status].message}</p>}
+            {status === 'AGE_RESTRICTED' && (
+              <div className="notice notice--warning" role="alert" data-testid="age-restriction-notice">
+                <strong>Age Requirement Not Met</strong>
+                <p>{ELIGIBILITY_COPY.AGE_RESTRICTED.message}</p>
+              </div>
+            )}
             {detail.session.trainingFormat === 'SELF_TRAINING' && (
               <p className="notice notice--info">Self-training sessions do not have a coach assignment.</p>
             )}
