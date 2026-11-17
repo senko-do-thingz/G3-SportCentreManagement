@@ -957,8 +957,7 @@
 }
 
 /* Spinner */
-.spinner,
-[class*='spinner'] {
+.spinner {
   display: inline-block;
   flex: none;
   border-radius: 50% !important;
@@ -987,6 +986,10 @@
   display: flex;
   justify-content: center;
   padding: var(--space-6);
+  border: none !important;
+  animation: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
 }
 
 .page-loader {

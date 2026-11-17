@@ -1,5 +1,6 @@
 import { sessionIdText, sessionRouteReference } from '../../api/sessionIdentity'
 import '../../components/sessionContext.css'
+import '../../styles/managerSchedule.css'
 import { useCallback, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { memberBookingsApi, type MemberBookingRecord } from '../../api/memberBookingsApi'
@@ -48,24 +49,25 @@ export function MemberSchedulePage({ embedded = false }: { embedded?: boolean })
         actions={<Link className={buttonClassName()} to={FIND_CLASSES}>Find Classes</Link>}
       />}
 
-      <Card title={`${browseDate(from)} - ${browseDate(to)}`}>
-        <div className="schedule-controls">
-          <Input
-            className="schedule-week-input"
-            label="Choose week"
-            type="week"
-            value={browseIsoWeek(from)}
-            onChange={(event) => {
-              const monday = browseMondayFromIsoWeek(event.target.value)
-              if (monday) changeWeek(monday)
-            }}
-          />
-          <div className="schedule-week-nav" role="group" aria-label="Week navigation">
-            <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, -7))}>Previous week</Button>
-            <Button variant={from === currentWeek ? 'primary' : 'secondary'} disabled={from === currentWeek} onClick={() => changeWeek(currentWeek)}>
-              This week
-            </Button>
-            <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, 7))}>Next week</Button>
+      <Card title="Weekly schedule">
+        <div className="manager-row-actions schedule-controls">
+          <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, -7))}>Previous week</Button>
+          <Button variant={from === currentWeek ? 'primary' : 'secondary'} disabled={from === currentWeek} onClick={() => changeWeek(currentWeek)}>
+            This week
+          </Button>
+          <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, 7))}>Next week</Button>
+          <strong>{browseDate(from)} - {browseDate(to)}</strong>
+          <div className="schedule-week-nav" role="group" aria-label="Week navigation" style={{ marginLeft: 'auto' }}>
+            <Input
+              className="schedule-week-input"
+              label="Choose week"
+              type="week"
+              value={browseIsoWeek(from)}
+              onChange={(event) => {
+                const monday = browseMondayFromIsoWeek(event.target.value)
+                if (monday) changeWeek(monday)
+              }}
+            />
           </div>
         </div>
 
@@ -135,14 +137,14 @@ function WeeklyScheduleTable({ bookings, days, today, returnTo }: {
 
   return (
     <>
-      <p className="schedule-scroll-hint">Scroll horizontally to view all seven days.</p>
-      <div className="schedule-table-wrap" role="region" aria-label="Weekly session timetable" tabIndex={0}>
-        <table className="schedule-table" aria-label="Weekly schedule">
+      <p id="member-schedule-grouping" className="f2-schedule-table__guidance">Sessions are grouped by start time. Each card shows its full time range; separate rows can overlap.</p>
+      <div className="f2-schedule-table-wrap schedule-table-wrap" role="region" aria-label="Weekly session timetable" tabIndex={0}>
+        <table className="f2-schedule-table schedule-table" aria-label="Weekly schedule" aria-describedby="member-schedule-grouping">
           <thead>
             <tr>
-              <th className="schedule-table__time-heading" scope="col">Time</th>
+              <th className="f2-schedule-table__time-heading schedule-table__time-heading" scope="col">Time</th>
               {days.map((day) => (
-                <th className={day === today ? 'schedule-table__today' : undefined} scope="col" key={day} aria-current={day === today ? 'date' : undefined}>
+                <th className={day === today ? 'f2-schedule-table__today schedule-table__today' : undefined} scope="col" key={day} aria-current={day === today ? 'date' : undefined}>
                   <span>{browseDay(day)}</span>
                   <time dateTime={day}>{browseDate(day)}</time>
                 </th>
@@ -156,12 +158,12 @@ function WeeklyScheduleTable({ bookings, days, today, returnTo }: {
                 {days.map((day) => {
                   const entries = byDayAndTime.get(`${day}|${time}`) ?? []
                   return (
-                    <td className={day === today ? 'schedule-table__today' : undefined} key={day}>
+                    <td className={day === today ? 'f2-schedule-table__today schedule-table__today' : undefined} key={day}>
                       {entries.length > 0 ? (
-                        <div className="schedule-table__entries">
+                        <div className="f2-schedule-table__entries schedule-table__entries">
                           {entries.map((booking) => <ScheduleEntry booking={booking} past={booking.sessionDate < today} returnTo={returnTo} key={booking.id} />)}
                         </div>
-                      ) : <span className="schedule-table__empty-cell" aria-label="No sessions">-</span>}
+                      ) : <span className="f2-schedule-table__empty-cell schedule-table__empty-cell" aria-label="No sessions">-</span>}
                     </td>
                   )
                 })}
@@ -175,20 +177,40 @@ function WeeklyScheduleTable({ bookings, days, today, returnTo }: {
 }
 
 function ScheduleEntry({ booking, past, returnTo }: { booking: MemberBookingRecord; past: boolean; returnTo: string }) {
+  const [expanded, setExpanded] = useState(false)
   const selfTraining = booking.trainingType === 'SELF_TRAINING'
   const sport = booking.sportName || 'Sport'
   const title = booking.className || `${sport} ${selfTraining ? 'Self-training' : 'Session'}`
   const details = `/member/sessions/${sessionRouteReference({ id: booking.sessionId, sessionId: booking.sessionCode })}?${new URLSearchParams({ returnTo })}`
 
   return (
-    <article className="schedule-entry">
-      <span className="session-identity">Session ID <code>{sessionIdText(booking.sessionCode)}</code></span>
-      <Link className="schedule-entry__title" to={details}>{title}</Link>
-      <p className="schedule-entry__meta">{slot(booking.startTime)} - {slot(booking.endTime)}</p>
-      <p className="schedule-entry__meta">{sport} - {selfTraining ? 'Self-training' : 'Coach-led'}</p>
-      <p className="schedule-entry__meta">{selfTraining ? 'Self-training - No assigned coach' : `Coach: ${booking.coachName || 'Coach not assigned'}`}</p>
-      <p className="schedule-entry__meta">{booking.facilityName || 'Facility not provided'}</p>
-      {past ? <Badge>Past session</Badge> : <Badge tone="success">Booked</Badge>}
+    <article
+      className="f2-session schedule-entry"
+      role="button"
+      tabIndex={0}
+      aria-label={`Session ${title}`}
+      onClick={() => setExpanded((prev) => !prev)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          setExpanded((prev) => !prev)
+        }
+      }}
+    >
+      <div className="f2-session__header">
+        <span className="session-identity">Session ID <code>{sessionIdText(booking.sessionCode)}</code></span>
+      </div>
+      <Link className="f2-session__title schedule-entry__title" to={details} onClick={(e) => e.stopPropagation()}>{title}</Link>
+      <div className="f2-session__timing">
+        <span className="schedule-entry__meta">{slot(booking.startTime)} - {slot(booking.endTime)}</span>
+        {past ? <Badge>Past session</Badge> : <Badge tone="success">Booked</Badge>}
+      </div>
+
+      <div className={`f2-session__details ${expanded ? 'f2-session__details--expanded' : 'f2-session__details--collapsed'}`}>
+        <p className="f2-session__meta schedule-entry__meta">{sport} - {selfTraining ? 'Self-training' : 'Coach-led'}</p>
+        <p className="f2-session__meta schedule-entry__meta">{selfTraining ? 'Self-training - No assigned coach' : `Coach: ${booking.coachName || 'Coach not assigned'}`}</p>
+        <p className="f2-session__meta schedule-entry__meta">{booking.facilityName || 'Facility not provided'}</p>
+      </div>
     </article>
   )
 }
