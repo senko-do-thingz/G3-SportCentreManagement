@@ -14,7 +14,6 @@ import java.util.*;
 public class OperationalNotificationService {
     private final JdbcTemplate jdbc;
     private final Clock clock;
-    private final OperationalMemberPolicy operational;
     @Value("${app.notifications.expiry-window-days:7}") private int expiryDays;
     public record Schedule(long id,String code,String className,LocalDate date,LocalTime startTime,LocalTime endTime,
                            String coachName,String facilityName,String status,long revision) {}
@@ -28,8 +27,7 @@ public class OperationalNotificationService {
             SELECT DISTINCT b.member_id FROM booking b JOIN user_account u ON u.id=b.member_id AND u.status='ACTIVE'
             JOIN role r ON r.id=u.role_id AND r.code='MEMBER' WHERE b.session_id=? AND b.status='CONFIRMED'
             """,Long.class,session);
-        return recipients.stream().filter(id->{try{operational.requireRealMember(id);return true;}
-            catch(com.sportify.core.exception.BusinessRuleException quarantined){return false;}}).toList();
+        return recipients;
     }
     @Transactional public void changed(ClassSession session,List<Long> recipients,boolean cancelled) {
         String type=cancelled?"SESSION_CANCELLED":"SESSION_CHANGED";
@@ -42,7 +40,6 @@ public class OperationalNotificationService {
             type,LocalDateTime.now(clock),event,session.getId(),session.getScheduleRevision(),member,event);
     }
     public Inbox inbox(long member) {
-        operational.requireRealMember(member);
         if(expiryDays<0 || expiryDays>30) throw new IllegalStateException("Expiry notice window must be between 0 and 30 days");
         var notices=jdbc.query("SELECT TOP (100) * FROM notification WHERE user_id=? ORDER BY created_at DESC,id DESC",(rs,row)->{
             Long session=rs.getObject("origin_session_id",Long.class);
