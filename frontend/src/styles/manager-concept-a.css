@@ -1,7 +1,9 @@
 /* Sportify Manager UI - Concept A Foundation Styles */
 /* Strict adherence to design tokens: no raw color literals. */
 
-.staff-content:has(> .manager-concept-page) {
+.staff-content:has(> .manager-concept-page),
+.staff-content:has(.manager-concept-page),
+.staff-content:has(.manager-schedule-page) {
   max-width: 1722px;
   padding: var(--space-6) var(--space-8);
 }

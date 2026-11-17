@@ -52,7 +52,7 @@ export function MemberSchedulePage({ embedded = false }: { embedded?: boolean })
       <Card title="Weekly schedule">
         <div className="manager-row-actions schedule-controls">
           <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, -7))}>Previous week</Button>
-          <Button variant={from === currentWeek ? 'primary' : 'secondary'} disabled={from === currentWeek} onClick={() => changeWeek(currentWeek)}>
+          <Button variant={from === currentWeek ? 'primary' : 'secondary'} onClick={() => changeWeek(currentWeek)}>
             This week
           </Button>
           <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, 7))}>Next week</Button>
@@ -142,7 +142,7 @@ function WeeklyScheduleTable({ bookings, days, today, returnTo }: {
         <table className="f2-schedule-table schedule-table" aria-label="Weekly schedule" aria-describedby="member-schedule-grouping">
           <thead>
             <tr>
-              <th className="f2-schedule-table__time-heading schedule-table__time-heading" scope="col">Time</th>
+              <th className="f2-schedule-table__time-heading schedule-table__time-heading" scope="col">Starts at</th>
               {days.map((day) => (
                 <th className={day === today ? 'f2-schedule-table__today schedule-table__today' : undefined} scope="col" key={day} aria-current={day === today ? 'date' : undefined}>
                   <span>{browseDay(day)}</span>
