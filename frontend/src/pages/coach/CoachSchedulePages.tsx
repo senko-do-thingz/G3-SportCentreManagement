@@ -198,7 +198,7 @@ export function CoachTeachingSchedulePage() {
                     const isToday = date === today
                     return (
                       <th className={isToday ? 'f2-schedule-table__today' : undefined} scope="col" key={date} aria-current={isToday ? 'date' : undefined}>
-                        <span>{browseDay(date)}</span>
+                        <span>{browseDay(date).toUpperCase()}</span>
                         <time dateTime={date}>{browseDate(date)}</time>
                       </th>
                     )

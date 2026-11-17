@@ -15,11 +15,13 @@
 .f2-schedule-table th, .f2-schedule-table td { padding: 6px 4px; border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); vertical-align: top; }
 .f2-schedule-table tr > :last-child { border-right: 0; }
 .f2-schedule-table tbody tr:last-child > * { border-bottom: 0; }
-.f2-schedule-table thead th { background: var(--color-surface-muted); color: var(--color-text); font-size: 12px; text-align: center; }
+.f2-schedule-table thead th { background: var(--color-surface-muted); color: var(--color-text); font-family: var(--font-sans); font-size: 12px; font-weight: 700; text-align: center; }
 .f2-schedule-table thead th:first-child, .f2-schedule-table tbody th { width: 60px; }
 .f2-schedule-table thead th > span, .f2-schedule-table thead th > time { display: block; }
-.f2-schedule-table thead th > time { margin-top: 3px; color: var(--color-text-muted); font-size: 11px; font-weight: 400; }
-.f2-schedule-table tbody th { background: var(--color-surface-muted); color: var(--color-text-muted); font-size: 12px; font-weight: 700; text-align: center; white-space: nowrap; }
+.f2-schedule-table thead th > span { font-family: var(--font-sans); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); line-height: 1.25; }
+.f2-schedule-table thead th > time { margin-top: 3px; color: var(--color-text-muted); font-family: var(--font-sans); font-size: 11px; font-weight: 400; text-transform: none; letter-spacing: normal; line-height: 1.2; }
+.f2-schedule-table thead th.f2-schedule-table__time-heading { font-family: var(--font-sans); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); line-height: 1.25; }
+.f2-schedule-table tbody th { background: var(--color-surface-muted); color: var(--color-text-muted); font-family: var(--font-sans); font-size: 12px; font-weight: 700; text-align: center; white-space: nowrap; }
 .f2-schedule-table thead th.f2-schedule-table__today,
 .f2-schedule-table tbody td.f2-schedule-table__today { background: var(--color-primary-soft); }
 .f2-schedule-table tbody tr { transition: background-color 0.15s ease; }

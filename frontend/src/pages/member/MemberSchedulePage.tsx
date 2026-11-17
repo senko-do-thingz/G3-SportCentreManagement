@@ -1,6 +1,7 @@
 import { sessionIdText, sessionRouteReference } from '../../api/sessionIdentity'
 import '../../components/sessionContext.css'
 import '../../styles/managerSchedule.css'
+import '../../styles/manager-concept-a.css'
 import { useCallback, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { memberBookingsApi, type MemberBookingRecord } from '../../api/memberBookingsApi'
@@ -184,7 +185,7 @@ function WeeklyScheduleTable({ bookings, days, today, returnTo }: {
               <th className="f2-schedule-table__time-heading schedule-table__time-heading" scope="col">Starts at</th>
               {days.map((day) => (
                 <th className={day === today ? 'f2-schedule-table__today schedule-table__today' : undefined} scope="col" key={day} aria-current={day === today ? 'date' : undefined}>
-                  <span>{browseDay(day)}</span>
+                  <span>{browseDay(day).toUpperCase()}</span>
                   <time dateTime={day}>{browseDate(day)}</time>
                 </th>
               ))}

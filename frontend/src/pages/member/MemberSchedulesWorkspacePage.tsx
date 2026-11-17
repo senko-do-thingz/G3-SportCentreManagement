@@ -4,6 +4,7 @@ import { memberSessionsApi, type BrowseFormat, type BrowseSession } from '../../
 import { packagesApi } from '../../api/packagesApi'
 import { sessionIdText, sessionRouteReference } from '../../api/sessionIdentity'
 import '../../styles/managerSchedule.css'
+import '../../styles/manager-concept-a.css'
 import { HOME_PHOTOS } from '../public/homeContent'
 import trainingGroundImage from '../../assets/home/hero.jpg'
 import { Button, CalendarDateField, Card, EmptyState, PageLoader, Select, StatusBadge, StatIcon } from '../../components/ui'
@@ -217,7 +218,7 @@ function CenterSchedule() {
                     const isToday = date === today
                     return (
                       <th className={isToday ? 'f2-schedule-table__today' : undefined} scope="col" key={date} aria-current={isToday ? 'date' : undefined}>
-                        <span>{browseDay(date)}</span>
+                        <span>{browseDay(date).toUpperCase()}</span>
                         <time dateTime={date}>{browseDate(date)}</time>
                       </th>
                     )
