@@ -65,7 +65,7 @@ export function ManagerSchedulePage() {
   const weekSessionsCount = sessions.status === 'ready' ? String(sessions.data.length).padStart(2, '0') : '--'
   const publishedCount = sessions.status === 'ready' ? String(sessions.data.filter((s) => s.status === 'PUBLISHED').length).padStart(2, '0') : '--'
   const coachesCount = coaches.status === 'ready' ? String(coaches.data.length).padStart(2, '0') : '--'
-  const facilitiesCount = facilities.status === 'ready' ? String(facilities.data.length).padStart(2, '0') : '--'
+  const isThisWeek = week === monday(centerNow().date)
 
   return <div className="page manager-page manager-concept-page manager-schedule-page">
     <div className="concept-header">
@@ -108,10 +108,10 @@ export function ManagerSchedulePage() {
         </div>
       </div>
       <div className="concept-stat concept-stat--schedule">
-        <StatIcon name="pin" />
+        <StatIcon name="calendar" />
         <div>
-          <strong>{facilitiesCount}</strong>
-          <small>Venues / Courts</small>
+          <strong>{displayDate(week)} - {displayDate(addDays(week, 6))}</strong>
+          <small>Week in view</small>
         </div>
       </div>
     </div>
@@ -128,7 +128,11 @@ export function ManagerSchedulePage() {
       {coaches.status === 'error' && <ManagerError error={coaches.error} onRetry={retryCoaches} />}
       {manualFacility ? <div className="notice notice--info">The facility dropdown API is not available. You can still create and edit sessions using a known facility ID; the scheduling API validates it. No sample IDs are substituted. <Button variant="ghost" onClick={retryFacilities}>Retry facility lookup</Button></div> : facilities.status === 'error' && <ManagerError error={facilities.error} onRetry={retryFacilities} />}
       {classes.status === 'ready' && !classes.data.some((item) => item.active) && <p className="notice notice--info">Create an active class before scheduling sessions. <Link to="/manager/classes/new">Create class</Link></p>}
-      <div className="manager-row-actions"><Button variant="secondary" onClick={() => query('week', addDays(week, -7))}>Previous week</Button><Button variant="secondary" onClick={() => query('week', monday(centerNow().date))}>This week</Button><Button variant="secondary" onClick={() => query('week', addDays(week, 7))}>Next week</Button><strong>{displayDate(week)} - {displayDate(addDays(week, 6))}</strong></div>
+      <div className="manager-row-actions schedule-week-nav" role="group" aria-label="Schedule week navigation">
+        <Button variant="secondary" onClick={() => query('week', addDays(week, -7))}>Previous week</Button>
+        <Button variant={isThisWeek ? 'primary' : 'secondary'} onClick={() => query('week', monday(centerNow().date))}>This week</Button>
+        <Button variant="secondary" onClick={() => query('week', addDays(week, 7))}>Next week</Button>
+      </div>
       {sessions.status === 'loading' ? <PageLoader label="Loading schedule" /> : sessions.status === 'error' ? <ManagerError error={sessions.error} onRetry={reload} /> : <>
         {!sessions.data.length ? <EmptyState title="No sessions this week" description="Change filters or create a session for an active class." /> : (
           <>

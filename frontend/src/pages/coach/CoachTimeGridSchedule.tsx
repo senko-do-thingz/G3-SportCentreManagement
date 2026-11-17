@@ -163,7 +163,7 @@ export function CoachTimeGridSchedule({
                 className={`coach-timegrid-col-header${isToday ? ' is-today' : ''}`}
                 id={`coach-schedule-day-${date}`}
               >
-                <span className="coach-timegrid-day-name">{browseDay(date)}</span>
+                <span className="coach-timegrid-day-name">{browseDay(date).toUpperCase()}</span>
                 <time className="coach-timegrid-date-text" dateTime={date}>
                   {browseDate(date)}
                 </time>

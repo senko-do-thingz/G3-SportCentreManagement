@@ -407,7 +407,7 @@
 }
 
 .member-main:has(.member-schedule-theme) {
-  max-width: 1500px;
+  max-width: 1722px;
 }
 
 .member-main:has(.member-ui--packages) {
