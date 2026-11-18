@@ -272,7 +272,12 @@ jobs:
         run: npm ci
       - name: Audit frontend dependencies
         working-directory: frontend
-        run: npm audit --audit-level=high
+        # High and critical advisories still fail; only reviewed, unexpired entries in npm-audit-exceptions.json are accepted.
+        run: |
+          set +e
+          npm audit --json > "$RUNNER_TEMP/npm-audit.json"
+          set -e
+          python3 ../scripts/ci/npm_audit_gate.py "$RUNNER_TEMP/npm-audit.json" npm-audit-exceptions.json
       - name: Lint frontend
         working-directory: frontend
         run: npm run lint
