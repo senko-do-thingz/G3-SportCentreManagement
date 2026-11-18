@@ -202,6 +202,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .fullName("Member BE03")
                 .status("ACTIVE")
                 .role(memberRole)
+                .dateOfBirth(LocalDate.of(1995, 5, 20))
                 .build());
         memberUser = memberAccount;
         jdbcTemplate.update("INSERT INTO member_profile (user_id, member_code, current_level, joined_on) VALUES (?, ?, 'BEGINNER', ?)",

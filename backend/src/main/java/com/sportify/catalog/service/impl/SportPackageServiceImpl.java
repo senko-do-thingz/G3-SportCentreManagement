@@ -259,6 +259,8 @@ public class SportPackageServiceImpl implements SportPackageService {
             throw new BusinessRuleException("Cannot register for an inactive sport package");
         }
 
+        MemberAccountEligibility.requireDateOfBirthForSelfServicePurchase(actor, member);
+
         LocalDate today = LocalDate.now(clock);
         LocalDate startDate = request.getStartDate() != null ? request.getStartDate() : today;
         if (startDate.isBefore(today)) {

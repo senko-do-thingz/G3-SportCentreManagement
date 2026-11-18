@@ -258,7 +258,7 @@ public class MembershipCardServiceImplTest {
         });
 
         Role memberRole = Role.builder().id(1L).code("MEMBER").name("Member").build();
-        memberUser = UserAccount.builder().id(100L).role(memberRole).fullName("Test Member").build();
+        memberUser = UserAccount.builder().id(100L).role(memberRole).fullName("Test Member").dateOfBirth(LocalDate.of(1995, 5, 20)).build();
         memberProfile = MemberProfile.builder().id(100L).userAccount(memberUser).memberCode("MEM-100").build();
 
         Role recRole = Role.builder().id(2L).code("RECEPTIONIST").name("Receptionist").build();
@@ -274,6 +274,23 @@ public class MembershipCardServiceImplTest {
         assertEquals(1, tiers.size());
         assertEquals("GOLD", tiers.get(0).getCode());
         assertEquals(5, tiers.get(0).getDiscountPercentage());
+    }
+
+    @Test
+    void purchaseCard_WhenMemberHasNoDateOfBirth_ThrowsBusinessRuleException() {
+        memberUser.setDateOfBirth(null);
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(goldTier));
+
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .tierId(2L)
+                .build();
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.purchaseCard(req, memberUser));
+
+        assertEquals("DATE_OF_BIRTH_REQUIRED", ex.getCode());
+        assertEquals("Please update your date of birth in your profile before purchasing a subscription plan", ex.getMessage());
     }
 
     @Test
@@ -425,6 +442,13 @@ public class MembershipCardServiceImplTest {
         assertEquals(LocalDate.of(2026, 10, 6), res.getStartDate());
         assertEquals(LocalDate.of(2027, 10, 5), res.getEndDate()); // 12 months counting today, not 12 months + 1 day
         assertEquals(0, BigDecimal.valueOf(200000).compareTo(res.getPricePaid()));
+    }
+
+    @Test
+    void purchaseCard_AsReceptionist_ForMemberWithoutDateOfBirth_IsStillSoldAtTheDesk() {
+        // The date of birth rule only blocks member self-service purchases, not staff desk sales.
+        memberUser.setDateOfBirth(null);
+        purchaseCard_AsReceptionist_IsPaidAtTheDeskAndActive();
     }
 
     @Test

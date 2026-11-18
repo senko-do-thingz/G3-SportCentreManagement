@@ -530,4 +530,40 @@ describe('FE-02 My Profile (F1-08) - change password', () => {
     expect(await within(card).findByText('Password change is not allowed right now', { selector: '.notice' })).toBeInTheDocument()
     expect(within(form).getByLabelText(/Current password/)).not.toHaveAttribute('aria-invalid')
   })
+
+  it('member can delete their own account with password confirmation', async () => {
+    const user = userEvent.setup()
+    let deleteCalled = false
+    await openProfile({
+      profile: MEMBER,
+    })
+
+    // Install fake fetch handler for delete
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.includes('/users/me/delete')) {
+        deleteCalled = true
+        return new Response(null, { status: 204 })
+      }
+      return originalFetch(input, init)
+    })
+
+    const deleteBtn = screen.getByRole('button', { name: 'Delete my account' })
+    await user.click(deleteBtn)
+
+    // Password confirmation input appears
+    const passInput = screen.getByLabelText(/Confirm your password/)
+    expect(passInput).toBeInTheDocument()
+
+    // Enter password and confirm
+    await user.type(passInput, 'MySecretPass123')
+    await user.click(screen.getByRole('button', { name: 'Permanently delete account' }))
+
+    await waitFor(() => {
+      expect(deleteCalled).toBe(true)
+    })
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(tokenStorage.getAccessToken()).toBeNull()
+  })
 })

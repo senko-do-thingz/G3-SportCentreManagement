@@ -37,14 +37,14 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
         // These are new, owned fixtures, never an existing user's identities.
         jdbc.update("UPDATE user_account SET email=REPLACE(email,'@example.com','@unified-demo.invalid') WHERE email IN ('an.gold@example.com','mai.standard@example.com')");
         for (String local : new String[]{"rollback", "unsupported", "ordinary", "ops", "fault0", "fault1", "fault2", "fault3", "fault4", "fault5", "fault6", "fault7", "fault8", "life0", "life1", "life2", "life3", "life4", "life5", "life6", "life7", "life8"}) {
-            jdbc.update("INSERT user_account(email,password_hash,full_name,role_id,status) SELECT ?,password_hash,'Synthetic unify fixture',role_id,'ACTIVE' FROM user_account WHERE email='an.gold@unified-demo.invalid'", local + "@unified-demo.invalid");
+            jdbc.update("INSERT user_account(email,password_hash,full_name,role_id,status,date_of_birth) SELECT ?,password_hash,'Synthetic unify fixture',role_id,'ACTIVE',date_of_birth FROM user_account WHERE email='an.gold@unified-demo.invalid'", local + "@unified-demo.invalid");
             jdbc.update("INSERT member_profile(user_id,member_code) SELECT id,? FROM user_account WHERE email=?", "UNIFY-" + local, local + "@unified-demo.invalid");
         }
         String ids = String.join(",", jdbc.queryForList("SELECT CONVERT(varchar(20),id) FROM user_account WHERE email LIKE '%@unified-demo.invalid' ORDER BY id", String.class));
         jdbc.update("UPDATE user_account SET email='ordinary@example.test' WHERE email='ordinary@unified-demo.invalid'");
-        jdbc.update("INSERT user_account(email,password_hash,full_name,role_id,status) SELECT 'live@example.test',password_hash,'Real paid fixture',role_id,'ACTIVE' FROM user_account WHERE email='an.gold@unified-demo.invalid'");
+        jdbc.update("INSERT user_account(email,password_hash,full_name,role_id,status,date_of_birth) SELECT 'live@example.test',password_hash,'Real paid fixture',role_id,'ACTIVE',date_of_birth FROM user_account WHERE email='an.gold@unified-demo.invalid'");
         jdbc.update("INSERT member_profile(user_id,member_code) SELECT id,'UNIFY-LIVE' FROM user_account WHERE email='live@example.test'");
-        jdbc.update("INSERT user_account(email,password_hash,full_name,role_id,status) SELECT 'control@example.test',password_hash,'Unquarantined paid fixture',role_id,'ACTIVE' FROM user_account WHERE email='an.gold@unified-demo.invalid'");
+        jdbc.update("INSERT user_account(email,password_hash,full_name,role_id,status,date_of_birth) SELECT 'control@example.test',password_hash,'Unquarantined paid fixture',role_id,'ACTIVE',date_of_birth FROM user_account WHERE email='an.gold@unified-demo.invalid'");
         jdbc.update("INSERT member_profile(user_id,member_code) SELECT id,'UNIFY-CONTROL' FROM user_account WHERE email='control@example.test'");
         registry.add("spring.datasource.url", fixture::url);
         registry.add("spring.datasource.username", fixture::user);

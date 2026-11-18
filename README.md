@@ -114,7 +114,7 @@ The quick-tunnel hostname changes when restarted. Stop the process after the san
 
 PayOS does not provide a sandbox. It uses its production payment API, so scanning and paying a checkout QR transfers real money to the bank account linked to the PayOS payment channel. Start with a small amount only after the channel and beneficiary bank account are verified.
 
-1. Set `PAYOS_ENABLED=true`, `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`, and `PAYOS_FRONTEND_BASE_URL=http://localhost:5173` privately in `backend/.env`; never commit those values. Restart the backend so Flyway applies V67 through V69.
+1. Set `PAYOS_ENABLED=true`, `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`, and `PAYOS_FRONTEND_BASE_URL=http://localhost:5173` privately in `backend/.env`; never commit those values. Restart the backend so Flyway applies PayOS migrations V68 through V70. V67 is reserved for the main branch's demo-only birth-date migration.
 2. Start the frontend and backend. Members can create a PayOS QR and return to the local status page without a tunnel; on return, Sportify verifies the order directly with PayOS.
 3. To receive PayOS webhooks while the app is local (including when a payer does not return to the browser), install `cloudflared` (the Cloudflare One Client/WARP app alone is not enough). From the repository root, run this single PowerShell script:
 

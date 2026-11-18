@@ -545,25 +545,32 @@
       "sha256_lf": "357c57f3bb919198051b0d215f1a6669fd932065f0900ab32fa30eea16e113a6"
     },
     {
-      "path": "backend/src/main/resources/db/migration/catalog/V67__add_payos_checkout_fields.sql",
+      "path": "backend/src/main/resources/db/demo/V67__assign_demo_member_dates_of_birth.sql",
       "version": 67,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "115fb3e85c270e95f0a3dd1bd61d5d829344d2713c02324a26fa609b91f4c2e7"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V68__add_payos_checkout_fields.sql",
+      "version": 68,
       "creates": [],
       "drops": [],
       "sha256_lf": "01ec71ae174e1bb9da8786e30711e606c8f59f3e26d27fb996e797e410f5e5e4"
     },
     {
-      "path": "backend/src/main/resources/db/migration/catalog/V68__allow_payos_settlement_provider.sql",
-      "version": 68,
-      "creates": [],
-      "drops": [],
-      "sha256_lf": "1920d0044271a0ddc7e1a70c5bfa8aef29cce6a5d47f3e1f3c141b3b5066ecab"
-    },
-    {
-      "path": "backend/src/main/resources/db/migration/catalog/V69__use_unique_payos_order_codes.sql",
+      "path": "backend/src/main/resources/db/migration/catalog/V69__allow_payos_settlement_provider.sql",
       "version": 69,
       "creates": [],
       "drops": [],
-      "sha256_lf": "245629d02fe452216b682e1e9c1fbe5f65ea5e3b74aada8da989a6b71ecc26ee"
+      "sha256_lf": "cddae29900861fbc4188df728e891133883854820ebbfd17071e3a3ac2d37bcf"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V70__use_unique_payos_order_codes.sql",
+      "version": 70,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "85eff3526385d4f8d73d75da2037f65df8df13874927036a25f276e8f32f926b"
     }
   ],
   "create_occurrences": 82,
@@ -930,7 +937,7 @@
     {
       "id": "S14",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 360,
+      "line": 364,
       "definition": "recordSelfTrainingAttendance"
     },
     {

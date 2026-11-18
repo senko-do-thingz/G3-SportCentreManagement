@@ -2,7 +2,7 @@ import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
-import { backendError, installFakeFetch, json, MEMBER } from '../../test/fakeBackend'
+import { backendError, installFakeFetch, json, MEMBER, MEMBER_WITH_DOB } from '../../test/fakeBackend'
 import { registration, sport, sportPackage } from '../../test/memberFixtures'
 import { renderApp } from '../../test/renderApp'
 
@@ -63,7 +63,7 @@ describe('DEF-003 package registration submission', () => {
     vi.setSystemTime(new Date('2026-10-19T18:00:00Z'))
     const submissions: unknown[] = []
     installFakeFetch((call) => {
-      if (call.path === '/users/me') return json(200, MEMBER)
+      if (call.path === '/users/me') return json(200, MEMBER_WITH_DOB)
       if (call.path === '/packages') return json(200, [sportPackage()])
       if (call.path === '/membership-cards/my' || call.path === '/packages/registrations/my') return json(200, [])
       if (call.path === '/packages/registrations' && call.method === 'POST') {
@@ -91,7 +91,7 @@ describe('DEF-003 package registration submission', () => {
   it('refreshes the minimum and validation after Vietnam midnight without a timer', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-12-31T16:59:59Z'))
-    installFakeFetch((call) => call.path === '/users/me' ? json(200, MEMBER) : call.path === '/packages' ? json(200, [sportPackage()]) : json(200, []))
+    installFakeFetch((call) => call.path === '/users/me' ? json(200, MEMBER_WITH_DOB) : call.path === '/packages' ? json(200, [sportPackage()]) : json(200, []))
     const user = userEvent.setup()
     renderApp('/member/packages/4')
     const input = await screen.findByLabelText(/Start date/)

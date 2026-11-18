@@ -38,8 +38,10 @@ public final class UnifyPreflight {
                 .outOfOrder(false).baselineOnMigrate(false).ignoreMigrationPatterns(new String[0]).load();
         // validate and info only: never migrate, baseline, repair or clean.
         require(flyway.validateWithResult().validationSuccessful, "FLYWAY_HISTORY_MISMATCH");
-        require(flyway.info().current() != null && "69".equals(flyway.info().current().getVersion().toString())
-                && flyway.info().pending().length == 0, "V69_REQUIRED");
+        // Main uses V67 for demo birth dates; PayOS migrations continue after it in V68-V70.
+        String releaseVersion = "70";
+        require(flyway.info().current() != null && releaseVersion.equals(flyway.info().current().getVersion().toString())
+                && flyway.info().pending().length == 0, "V" + releaseVersion + "_REQUIRED");
         require(zero(jdbc, "SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0 AND schema_id<>SCHEMA_ID('dbo')"), "UNDECLARED_SCHEMA");
         require(zero(jdbc, "SELECT COUNT(*) FROM sys.foreign_keys WHERE is_disabled=1 OR is_not_trusted=1"), "FOREIGN_KEY_DRIFT");
         require(zero(jdbc, "SELECT COUNT(*) FROM sys.check_constraints WHERE is_disabled=1 OR is_not_trusted=1"), "CHECK_CONSTRAINT_DRIFT");

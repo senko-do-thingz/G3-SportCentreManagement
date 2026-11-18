@@ -291,6 +291,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             throw new BusinessRuleException("Card tier is not on sale: " + tier.getCode());
         }
 
+        MemberAccountEligibility.requireDateOfBirthForSelfServicePurchase(actor, member);
+
         LocalDate today = LocalDate.now(clock);
         boolean paidAtDesk = SecurityUtils.isStaff(actor);
 

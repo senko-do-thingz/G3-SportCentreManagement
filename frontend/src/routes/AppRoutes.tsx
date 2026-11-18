@@ -143,9 +143,11 @@ const SCREENS: Record<string, ReactNode> = {
 const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
   '/coach': [
     { path: 'notifications', element: <NotificationsPage /> },
+    { path: 'assistant', element: <MemberAssistantPage /> },
   ],
   '/manager': [
     { path: 'notifications', element: <NotificationsPage /> },
+    { path: 'assistant', element: <MemberAssistantPage /> },
     { path: 'classes/new', element: <ClassEditorPage /> },
     { path: 'classes/:classId/edit', element: <ClassEditorPage /> },
   ],
@@ -183,6 +185,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
   ],
   '/reception': [
     { path: 'inbox', element: <ReceptionInboxPage /> },
+    { path: 'assistant', element: <MemberAssistantPage /> },
     { path: 'training/attendance', element: <ForbiddenPage /> },
     { path: 'bookings/new', element: <ReceptionAssistedBookingPage /> },
     { path: 'bookings/confirmed/:bookingId', element: <ReceptionBookingConfirmedPage /> },
