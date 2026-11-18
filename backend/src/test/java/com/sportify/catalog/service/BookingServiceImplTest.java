@@ -269,6 +269,7 @@ public class BookingServiceImplTest {
 
         assertEquals("AGE_RESTRICTED", error.getCode());
         assertTrue(error.getMessage().contains("Ages 16+"));
+        assertTrue(error.getMessage().contains("outside the class age group"));
         verify(registrationRepository, never()).findById(any());
         verify(sessionRepository, never()).reserveSeat(any(), any());
         assertNoBookingWrites();
@@ -287,6 +288,7 @@ public class BookingServiceImplTest {
 
         assertEquals("AGE_RESTRICTED", error.getCode());
         assertTrue(error.getMessage().contains("Ages 16+"));
+        assertTrue(error.getMessage().contains("date of birth is required"));
         verify(registrationRepository, never()).findById(any());
         verify(sessionRepository, never()).reserveSeat(any(), any());
         assertNoBookingWrites();

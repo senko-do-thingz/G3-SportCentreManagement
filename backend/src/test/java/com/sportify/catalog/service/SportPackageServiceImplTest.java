@@ -322,6 +322,13 @@ public class SportPackageServiceImplTest {
     }
 
     @Test
+    void registerPackage_AsReceptionist_ForMemberWithoutDateOfBirth_IsStillSoldAtTheDesk() {
+        // The date of birth rule only blocks member self-service purchases, not staff desk sales.
+        memberUser.setDateOfBirth(null);
+        registerPackage_AsReceptionist_UsesProvidedMemberId_SetsActive();
+    }
+
+    @Test
     void registerPackage_AsReceptionist_UsesProvidedMemberId_SetsActive() {
         PackageRegistrationRequest req = PackageRegistrationRequest.builder()
                 .memberId(100L)

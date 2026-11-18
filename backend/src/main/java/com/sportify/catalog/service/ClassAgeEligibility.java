@@ -24,10 +24,15 @@ public final class ClassAgeEligibility {
     public static boolean fits(LocalDate dateOfBirth, ClassSession session) {
         AgeGroup group = ageGroup(session);
         if (group == null || session.getSessionDate() == null) return true;
-        if (dateOfBirth == null) return false;
+        if (requiresDateOfBirth(dateOfBirth, session)) return false;
         int age = Period.between(dateOfBirth, session.getSessionDate()).getYears();
         return (group.getMinAge() == null || age >= group.getMinAge())
                 && (group.getMaxAge() == null || age <= group.getMaxAge());
+    }
+
+    /** True when the session has an age group in force but the member has not provided a date of birth yet. */
+    public static boolean requiresDateOfBirth(LocalDate dateOfBirth, ClassSession session) {
+        return dateOfBirth == null && ageGroup(session) != null && session.getSessionDate() != null;
     }
 
     /** Display label such as "Ages 16+" or "Ages 6-12"; null when the session has no age group. */

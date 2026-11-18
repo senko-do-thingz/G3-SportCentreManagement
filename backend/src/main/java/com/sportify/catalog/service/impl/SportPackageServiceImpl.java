@@ -259,14 +259,7 @@ public class SportPackageServiceImpl implements SportPackageService {
             throw new BusinessRuleException("Cannot register for an inactive sport package");
         }
 
-        if (SecurityUtils.isMember(actor)) {
-            UserAccount targetAccount = member.getUserAccount();
-            if (targetAccount == null || targetAccount.getDateOfBirth() == null) {
-                throw new BusinessRuleException(
-                        "Please update your date of birth in your profile before purchasing a subscription plan",
-                        "DATE_OF_BIRTH_REQUIRED");
-            }
-        }
+        MemberAccountEligibility.requireDateOfBirthForSelfServicePurchase(actor, member);
 
         LocalDate today = LocalDate.now(clock);
         LocalDate startDate = request.getStartDate() != null ? request.getStartDate() : today;

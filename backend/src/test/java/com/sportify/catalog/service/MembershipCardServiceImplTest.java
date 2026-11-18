@@ -445,6 +445,13 @@ public class MembershipCardServiceImplTest {
     }
 
     @Test
+    void purchaseCard_AsReceptionist_ForMemberWithoutDateOfBirth_IsStillSoldAtTheDesk() {
+        // The date of birth rule only blocks member self-service purchases, not staff desk sales.
+        memberUser.setDateOfBirth(null);
+        purchaseCard_AsReceptionist_IsPaidAtTheDeskAndActive();
+    }
+
+    @Test
     void purchaseCard_AsReceptionist_IsPaidAtTheDeskAndActive() {
         MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder().memberId(100L).tierId(2L).build();
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
