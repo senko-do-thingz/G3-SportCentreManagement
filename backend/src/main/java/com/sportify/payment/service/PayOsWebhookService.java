@@ -40,7 +40,12 @@ public class PayOsWebhookService {
         if (!properties.isEnabled()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "PayOS webhook processing is disabled.");
         }
-        if (event == null || event.data() == null || !api.verifyWebhook(event.data(), event.signature())) {
+        if (event == null || event.data() == null || event.signature() == null) {
+            log.warn("Rejected PayOS webhook without event data or signature.");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "PayOS webhook signature is invalid.");
+        }
+        if (!api.verifyWebhook(event.data(), event.signature())) {
+            log.warn("Rejected PayOS webhook because its signature did not match; verify PAYOS_CHECKSUM_KEY for this channel.");
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "PayOS webhook signature is invalid.");
         }
         if (!event.success() || !"00".equals(event.code())) {
@@ -64,6 +69,7 @@ public class PayOsWebhookService {
         Payment payment = payments.findByPayOsOrderCode(data.orderCode()).flatMap(found ->
                 payments.findByIdForUpdate(found.getId())).orElse(null);
         if (payment == null || !data.paymentLinkId().equals(payment.getPayOsPaymentLinkId())) {
+            log.info("Acknowledged a valid PayOS webhook with no matching local payment (order code {}).", data.orderCode());
             return ignored("No matching PayOS payment link was found.");
         }
         if (payment.getPaymentStatus() == PaymentStatus.SUCCESS && "PAYOS".equals(payment.getSettlementProvider())) {

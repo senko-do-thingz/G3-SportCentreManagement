@@ -430,14 +430,14 @@ public class PaymentServiceImpl implements PaymentService {
                 && payment.getPaymentStatus() == PaymentStatus.PENDING) {
             boolean payable = liveTransferAllowed(payment);
             instructions = BankTransferInstructions.builder()
-                    .accountName(payable ? bankProperties.getAccountName() : "DEMO NON-PAYABLE")
+                    .accountName(payable ? bankProperties.getAccountName() : "NOT CONFIGURED")
                     .accountNumber(payable ? bankProperties.getAccountNumber() : "NOT CONFIGURED")
-                    .bank(payable ? bankProperties.getBank() : "DEMO NON-PAYABLE")
+                    .bank(payable ? bankProperties.getBank() : "NOT CONFIGURED")
                     .transferContent(payment.getPaymentCode())
                     .payable(payable)
                     .notice(payable
                             ? "Manual transfer instructions. Payment remains pending until staff verifies receipt."
-                            : "DEMO NON-PAYABLE. No verified beneficiary is configured.")
+                            : "Manual bank transfer is unavailable because no verified receiving account is configured.")
                     .build();
         }
 

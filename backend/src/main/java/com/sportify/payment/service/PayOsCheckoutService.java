@@ -10,6 +10,7 @@ import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PayOsCheckoutService {
     private final PaymentService payments;
     private final PaymentRepository paymentRepository;
@@ -63,7 +65,7 @@ public class PayOsCheckoutService {
             String cancelUrl = base + "/member/payments/" + paymentId + "/status?payos=cancel";
             PayOsApiClient.PaymentLinkData link = createOrRecoverLink(payment, amount, cancelUrl, returnUrl);
             orderCode = payment.getPayOsOrderCode();
-            validateLink(link, orderCode, amount);
+            validateLink(payment.getId(), link, orderCode, amount);
             payment.setPayOsPaymentLinkId(link.linkId());
             payment.setPayOsCheckoutUrl(link.checkoutUrl());
             payment.setPayOsQrCode(blankToNull(link.qrCode()));
@@ -180,19 +182,24 @@ public class PayOsCheckoutService {
                                                 int amount, String description) {
         return link != null && link.orderCode() != null && link.orderCode() == orderCode
                 && link.amount() != null && link.amount() == amount
-                && description.equals(link.description());
+                && (link.description() == null || matchesProviderDescription(description, link.description()));
     }
 
     private static String shortDescription(long orderCode) {
         return "S" + Long.toString(orderCode, 36).toUpperCase(Locale.ROOT);
     }
 
-    private static void validateLink(PayOsApiClient.PaymentLinkData link, long orderCode, int amount) {
-        if (link == null || link.linkId() == null || link.linkId().isBlank()
-                || link.checkoutUrl() == null || link.checkoutUrl().isBlank()
-                || link.orderCode() == null || link.orderCode() != orderCode
-                || link.amount() == null || link.amount() != amount
-                || !shortDescription(orderCode).equals(link.description())) {
+    private void validateLink(long paymentId, PayOsApiClient.PaymentLinkData link, long orderCode, int amount) {
+        String expectedDescription = shortDescription(orderCode);
+        boolean linkIdPresent = link != null && link.linkId() != null && !link.linkId().isBlank();
+        boolean checkoutUrlPresent = link != null && link.checkoutUrl() != null && !link.checkoutUrl().isBlank();
+        boolean orderCodeMatches = link != null && link.orderCode() != null && link.orderCode() == orderCode;
+        boolean amountMatches = link != null && link.amount() != null && link.amount() == amount;
+        boolean descriptionMatches = link != null && matchesProviderDescription(expectedDescription, link.description());
+        if (!linkIdPresent || !checkoutUrlPresent || !orderCodeMatches || !amountMatches || !descriptionMatches) {
+            log.warn("PayOS create-link response did not match local payment {}: linkIdPresent={}, checkoutUrlPresent={}, "
+                            + "orderCodeMatches={}, amountMatches={}, descriptionMatches={}",
+                    paymentId, linkIdPresent, checkoutUrlPresent, orderCodeMatches, amountMatches, descriptionMatches);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "PayOS returned a payment link for different order details.");
         }
         try {
@@ -207,6 +214,19 @@ public class PayOsCheckoutService {
         if (link.qrCode() != null && link.qrCode().length() > 1500) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "PayOS returned an oversized QR payload.");
         }
+    }
+
+    /**
+     * PayOS may prepend its own transfer reference to the merchant description. The unique local token
+     * remains at the end, so require either an exact match or an alphanumeric provider prefix followed by it.
+     */
+    private static boolean matchesProviderDescription(String expected, String actual) {
+        if (expected == null || actual == null) return false;
+        if (expected.equals(actual)) return true;
+        String suffix = " " + expected;
+        if (!actual.endsWith(suffix)) return false;
+        String providerReference = actual.substring(0, actual.length() - suffix.length());
+        return providerReference.matches("[A-Za-z0-9]{1,32}");
     }
 
     private static String blankToNull(String value) {

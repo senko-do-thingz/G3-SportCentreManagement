@@ -661,7 +661,8 @@ class PaymentServiceImplTest {
         assertThat(responsePendingBank.getBankTransferInstructions().getTransferContent()).isEqualTo("PAY-1000");
         assertThat(responsePendingBank.getBankTransferInstructions().getPayable()).isFalse();
         assertThat(responsePendingBank.getBankTransferInstructions().getAccountNumber()).isEqualTo("NOT CONFIGURED");
-        assertThat(responsePendingBank.getBankTransferInstructions().getNotice()).contains("DEMO NON-PAYABLE");
+        assertThat(responsePendingBank.getBankTransferInstructions().getNotice())
+                .contains("no verified receiving account is configured");
 
         pendingPayment.setPaymentMethod(PaymentMethod.CASH);
         PaymentResponse responseCash = paymentService.getPayment(10L, ownerUser);

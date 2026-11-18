@@ -16,6 +16,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -174,6 +175,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<Map<String, Object>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
         return buildErrorResponse(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed", null);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatusException(ResponseStatusException ex) {
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+        if (status == null) {
+            return buildErrorResponse(HttpStatus.BAD_GATEWAY, "An upstream service returned an error", null);
+        }
+        String reason = ex.getReason();
+        return buildErrorResponse(status, reason == null || reason.isBlank() ? status.getReasonPhrase() : reason, null);
     }
 
     @ExceptionHandler(Exception.class)

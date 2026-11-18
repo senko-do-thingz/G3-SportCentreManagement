@@ -45,10 +45,49 @@ try {
         -Uri 'https://api-merchant.payos.vn/confirm-webhook' `
         -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 20
 } catch {
-    throw 'PayOS could not confirm the webhook. Confirm that the backend and tunnel are running and that the PayOS credentials are valid.'
+    $failure = $_
+    $statusCode = $null
+    $responseBody = $failure.ErrorDetails.Message
+    try {
+        if ($failure.Exception.Response) {
+            $statusCode = [int]$failure.Exception.Response.StatusCode
+            if ([string]::IsNullOrWhiteSpace($responseBody)) {
+                $responseStream = $failure.Exception.Response.GetResponseStream()
+                if ($responseStream) {
+                    $reader = [System.IO.StreamReader]::new($responseStream)
+                    try { $responseBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
+                }
+            }
+        }
+    } catch { }
+
+    $details = $null
+    if (-not [string]::IsNullOrWhiteSpace($responseBody)) {
+        try {
+            $providerError = $responseBody | ConvertFrom-Json
+            $parts = @()
+            if ($providerError.code) { $parts += "code $($providerError.code)" }
+            if ($providerError.desc) { $parts += [string]$providerError.desc }
+            if ($parts.Count -gt 0) { $details = $parts -join ': ' }
+        } catch { }
+    }
+    if ([string]::IsNullOrWhiteSpace($details)) {
+        $details = $failure.Exception.Message
+    }
+    if ($details.Length -gt 300) { $details = $details.Substring(0, 300) }
+
+    $statusText = if ($statusCode) { "HTTP $statusCode" } else { 'request error' }
+    throw "PayOS confirm-webhook failed ($statusText): $details"
 }
 
 if ($result.code -ne '00' -or $result.data.webhookUrl -ne $webhookUri.AbsoluteUri) {
-    throw 'PayOS did not confirm the configured webhook URL.'
+    $responseDetails = @()
+    if ($result.code) { $responseDetails += "code $($result.code)" }
+    if ($result.desc) { $responseDetails += [string]$result.desc }
+    if ($result.data.webhookUrl -and $result.data.webhookUrl -ne $webhookUri.AbsoluteUri) {
+        $responseDetails += 'PayOS returned a different webhook URL'
+    }
+    $details = if ($responseDetails.Count -gt 0) { $responseDetails -join ': ' } else { 'PayOS returned an incomplete response' }
+    throw "PayOS did not confirm the configured webhook URL ($details)."
 }
 Write-Host 'PayOS confirmed the webhook endpoint. Its sample validation event is acknowledged without settling a payment.'
