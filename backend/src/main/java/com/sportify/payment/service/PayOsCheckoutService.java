@@ -75,7 +75,7 @@ public class PayOsCheckoutService {
         return new Checkout(paymentId, payment.getPaymentCode(), true, orderCode,
                 payment.getPayOsPaymentLinkId(), payment.getPayOsCheckoutUrl(), payment.getPayOsQrCode(),
                 payment.getAmount(), "VND",
-                "PayOS uses a real bank transfer. This payment updates automatically after PayOS confirms it by webhook.");
+                "PayOS uses a real bank transfer. This page checks PayOS automatically and updates after the transfer is confirmed.");
     }
 
     @Transactional
@@ -87,10 +87,12 @@ public class PayOsCheckoutService {
                 && "PAYOS".equals(payment.getSettlementProvider())) {
             return new StatusSync(paymentId, true, "PAID", "PayOS payment was already recorded.");
         }
-        if (payment.getPaymentStatus() != PaymentStatus.PENDING || payment.getPaymentMethod() != PaymentMethod.BANK_TRANSFER
-                || payment.getPayOsPaymentLinkId() == null || payment.getPayOsPaymentLinkId().isBlank()
-                || payment.getPayOsOrderCode() == null) {
+        if (payment.getPaymentStatus() != PaymentStatus.PENDING || payment.getPaymentMethod() != PaymentMethod.BANK_TRANSFER) {
             throw new BusinessRuleException("This payment has no pending PayOS checkout to verify.", "PAYOS_PAYMENT_NOT_AVAILABLE");
+        }
+        if (payment.getPayOsPaymentLinkId() == null || payment.getPayOsPaymentLinkId().isBlank()
+                || payment.getPayOsOrderCode() == null) {
+            return new StatusSync(paymentId, false, "PENDING", "PayOS checkout link has not been created yet.");
         }
         if (!properties.isEnabled()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "PayOS status verification is disabled.");
