@@ -5,6 +5,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../../api/errors'
 import { memberSessionsApi } from '../../api/memberSessionsApi'
 import { Badge, Button, Card, PageHeader, PageLoader, buttonClassName } from '../../components/ui'
+import { useAuth } from '../../auth/useAuth'
+import { AgeRestrictionNotice } from './AgeVerificationNotices'
 import { BrowseError } from './BrowseError'
 import { CoachProfileModal } from './CoachProfileModal'
 import { MemberScheduleNav } from './MemberScheduleNav'
@@ -26,6 +28,8 @@ export function SessionDetailPage() {
 function SessionDetailContent({ id, returnTo }: { id: number | SessionId; returnTo: string }) {
   const loader = useCallback((signal: AbortSignal) => typeof id === 'number' ? memberSessionsApi.detail(id, signal) : memberSessionsApi.detailByCode(id, signal), [id])
   const [resource, reload] = useMemberResource(loader)
+  const { user } = useAuth()
+  const hasDob = Boolean(user?.dateOfBirth)
   const [profileOpen, setProfileOpen] = useState(false)
   const lastRefresh = useRef(0)
   useEffect(() => {
@@ -39,6 +43,7 @@ function SessionDetailContent({ id, returnTo }: { id: number | SessionId; return
   if (resource.status === 'error') return <div className="page browse-page member-schedule-theme"><MemberScheduleNav /><PageHeader eyebrow="Member workspace" title={resource.error instanceof ApiError && resource.error.status === 404 ? 'Session Unavailable' : 'Session Detail'} /><BrowseError error={resource.error} onRetry={reload} /><Link to={returnTo}>Back to results</Link></div>
   const detail = resource.data, session = detail.session
   const state = resolveSessionDetailState(detail), copy = ELIGIBILITY_COPY[state]
+  const dateOfBirthMissingForAgeGroup = state === 'AGE_RESTRICTED' && !hasDob
   const self = session.trainingFormat === 'SELF_TRAINING'
   const packageState = ['NO_PACKAGE', 'NO_SESSIONS_LEFT', 'PACKAGE_EXPIRED_BY_THEN', 'PACKAGE_NOT_STARTED_BY_THEN'].includes(state)
   const bookingLink = `/member/bookings/new?${new URLSearchParams({ sessionId: sessionRouteReference(session), returnTo })}`
@@ -56,13 +61,9 @@ function SessionDetailContent({ id, returnTo }: { id: number | SessionId; return
       </Card>
       <Card title={self ? 'Self-training access' : 'Your coach'}>
         {self ? <><dl className="browse-facts"><div><dt>Sport</dt><dd>{session.sportName}</dd></div><div><dt>Format</dt><dd>Self-training</dd></div><div><dt>Facility</dt><dd>{session.facilityName || 'Facility not assigned'}</dd></div></dl><p className="browse-callout">Practice independently using a self-training sport package. Coach-led sessions need a separate matching package.</p></> : <><div className="browse-avatar" aria-hidden="true">{(session.coachName || '?').split(' ').filter(Boolean).slice(0, 2).map((name) => name[0]).join('')}</div><h3>{session.coachName || 'Coach not provided'}</h3>{session.coachId && <Button variant="secondary" onClick={() => setProfileOpen(true)}>View coach profile</Button>}</>}
-        <div className="browse-eligibility" role="status"><Badge tone={state === 'ELIGIBLE' ? 'success' : state === 'FULL' || state === 'AGE_RESTRICTED' ? 'warning' : 'info'}>{state === 'ELIGIBLE' ? 'Eligible' : state === 'FULL' ? 'Fully booked' : copy.title}</Badge><p>{copy.message}</p>
-          {state === 'AGE_RESTRICTED' && (
-            <div className="notice notice--warning" role="alert" data-testid="age-restriction-notice">
-              <strong>Age Requirement Not Met</strong>
-              <p>{copy.message}</p>
-            </div>
-          )}
+        <div className="browse-eligibility" role="status"><Badge tone={state === 'ELIGIBLE' ? 'success' : state === 'FULL' || state === 'AGE_RESTRICTED' ? 'warning' : 'info'}>{state === 'ELIGIBLE' ? 'Eligible' : state === 'FULL' ? 'Fully booked' : copy.title}</Badge>
+          {!dateOfBirthMissingForAgeGroup && <p>{copy.message}</p>}
+          {state === 'AGE_RESTRICTED' && <AgeRestrictionNotice ageGroupLabel={session.ageGroupLabel} hasDateOfBirth={hasDob} />}
           {packageState && <SessionPackageRecommendations session={session} returnTo={returnTo} />}
           {state === 'ALREADY_BOOKED' && <Link className={buttonClassName('secondary')} to="/member/bookings">View my booking</Link>}
           {state === 'ELIGIBLE' && <><p className="notice notice--info">Continue to choose an eligible package and review this booking. No booking has been created yet.</p><Link className={buttonClassName()} to={bookingLink}>Book session</Link></>}

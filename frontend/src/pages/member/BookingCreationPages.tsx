@@ -8,6 +8,7 @@ import { memberApi, type PackageRegistration } from '../../api/memberApi'
 import { memberSessionsApi, type SessionDetail } from '../../api/memberSessionsApi'
 import { useAuth } from '../../auth/useAuth'
 import { Badge, Button, Card, PageHeader, PageLoader, buttonClassName } from '../../components/ui'
+import { AgeRestrictionNotice } from './AgeVerificationNotices'
 import { BrowseError } from './BrowseError'
 import { MemberScheduleNav } from './MemberScheduleNav'
 import { safeBrowseReturn } from './scheduleFilters'
@@ -100,6 +101,8 @@ function BookingOptionsContent({ sessionId, returnTo }: { sessionId: number | Se
     [sessionId]
   )
   const [resource, reload] = useMemberResource(loader)
+  const { user } = useAuth()
+  const hasDob = Boolean(user?.dateOfBirth)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   if (resource.status === 'loading')
     return (
@@ -148,13 +151,8 @@ function BookingOptionsContent({ sessionId, returnTo }: { sessionId: number | Se
             <Badge tone={status === 'ELIGIBLE' ? 'success' : 'warning'}>
               {status === 'ELIGIBLE' ? 'Eligible' : ELIGIBILITY_COPY[status].title}
             </Badge>
-            {status !== 'ELIGIBLE' && <p>{ELIGIBILITY_COPY[status].message}</p>}
-            {status === 'AGE_RESTRICTED' && (
-              <div className="notice notice--warning" role="alert" data-testid="age-restriction-notice">
-                <strong>Age Requirement Not Met</strong>
-                <p>{ELIGIBILITY_COPY.AGE_RESTRICTED.message}</p>
-              </div>
-            )}
+            {status !== 'ELIGIBLE' && !(status === 'AGE_RESTRICTED' && !hasDob) && <p>{ELIGIBILITY_COPY[status].message}</p>}
+            {status === 'AGE_RESTRICTED' && <AgeRestrictionNotice ageGroupLabel={detail.session.ageGroupLabel} hasDateOfBirth={hasDob} />}
             {detail.session.trainingFormat === 'SELF_TRAINING' && (
               <p className="notice notice--info">Self-training sessions do not have a coach assignment.</p>
             )}

@@ -8,7 +8,7 @@ import type { MemberBookingRecord } from '../../api/memberBookingsApi'
 import type { SessionDetail } from '../../api/memberSessionsApi'
 import { tokenStorage } from '../../api/tokenStorage'
 import { renderApp } from '../../test/renderApp'
-import { backendError, installFakeFetch, json, MANAGER, MEMBER } from '../../test/fakeBackend'
+import { backendError, installFakeFetch, json, MANAGER, MEMBER, MEMBER_WITH_DOB } from '../../test/fakeBackend'
 
 const detail: SessionDetail = {
   session: { id: 5, sportId: 3, sportName: 'Basketball', classId: 7, className: 'Basketball Foundations', trainingFormat: 'COACH_LED', level: 'BEGINNER', coachId: 8, coachName: 'Quan Coach', facilityId: 2, facilityName: 'Court A', sessionDate: '2026-11-05', startTime: '17:00:00', endTime: '18:00:00', capacity: 20, bookedCount: 3, freeSeats: 17, full: false, status: 'PUBLISHED' },
@@ -77,6 +77,26 @@ describe('FE-09 member booking screens', () => {
     expect(screen.getByRole('link', { name: 'Add to calendar' })).toHaveAttribute('download', 'sportify-BK-1021.ics')
     expect(backend.calls.filter((call) => call.method === 'POST' && call.path === '/bookings')).toHaveLength(1)
     expect(backend.calls.find((call) => call.method === 'POST')?.body).toEqual({ sessionId: 5, packageRegistrationId: 11 })
+  })
+
+  it('blocks age-restricted booking options and links a member without a date of birth to the profile', async () => {
+    const ageRestricted = { ...detail, session: { ...detail.session, ageGroupLabel: 'Ages 18+' }, eligible: false, reason: 'AGE_RESTRICTED', suitableRegistrations: [] }
+    const backend = api((call) => call.path === '/sessions/5' ? json(200, ageRestricted) : backendError(404, 'Unexpected request'))
+    renderApp('/member/bookings/new?sessionId=5&returnTo=%2Fmember%2Fclasses')
+    expect(await screen.findByTestId('age-restriction-notice')).toHaveTextContent('Add your date of birth in your profile')
+    expect(screen.getByRole('link', { name: 'Update date of birth' })).toHaveAttribute('href', '/member/profile')
+    expect(screen.queryByRole('link', { name: 'Review booking' })).not.toBeInTheDocument()
+    expect(backend.calls.every((call) => call.method === 'GET')).toBe(true)
+  })
+
+  it('keeps the age group message for a member whose known age is outside the class age group', async () => {
+    const ageRestricted = { ...detail, session: { ...detail.session, ageGroupLabel: 'Ages 18+' }, eligible: false, reason: 'AGE_RESTRICTED', suitableRegistrations: [] }
+    api((call) => call.path === '/sessions/5' ? json(200, ageRestricted) : backendError(404, 'Unexpected request'), MEMBER_WITH_DOB)
+    renderApp('/member/bookings/new?sessionId=5&returnTo=%2Fmember%2Fclasses')
+    expect(await screen.findByTestId('age-restriction-notice')).toHaveTextContent('Age requirement not met')
+    expect(screen.getByText(/Your age on the session date is outside this class age group/)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Update date of birth' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Review booking' })).not.toBeInTheDocument()
   })
 
   it('does not submit when the selected registration is no longer eligible', async () => {

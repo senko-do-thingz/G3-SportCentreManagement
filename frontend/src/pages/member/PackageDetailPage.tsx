@@ -9,6 +9,7 @@ import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDate, formatMoney } from '../../utils/format'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
+import { DATE_OF_BIRTH_PURCHASE_MESSAGE, DateOfBirthNotice } from './AgeVerificationNotices'
 import { currentCard, MEMBER_PATHS, paymentSummaryPath, trainingFormatLabel } from './dashboardModel'
 import { businessDate } from '../../utils/date'
 import {
@@ -185,7 +186,7 @@ function RegistrationForm({
       return
     }
     if (!hasDob) {
-      setFormError('Please update your date of birth in your profile before purchasing a subscription plan.')
+      setFormError(DATE_OF_BIRTH_PURCHASE_MESSAGE)
       return
     }
     setFormError(null)
@@ -284,14 +285,7 @@ function RegistrationForm({
         </Card>
 
         <Card title="Registration summary" className="package-detail__summary" aria-label="Registration summary">
-          {!hasDob && (
-            <div className="notice notice--warning" role="alert" data-testid="package-dob-warning">
-              <p>Please update your date of birth in your profile before purchasing a subscription plan.</p>
-              <Link className={buttonClassName('secondary', 'sm')} to={MEMBER_PATHS.profile}>
-                Update date of birth
-              </Link>
-            </div>
-          )}
+          {!hasDob && <DateOfBirthNotice testId="package-dob-warning" message={DATE_OF_BIRTH_PURCHASE_MESSAGE} />}
           {formError && (
             <p className="notice notice--danger" role="alert">
               {formError}

@@ -8,6 +8,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, Modal, useToast } from '..
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDate, formatMoney } from '../../utils/format'
+import { DATE_OF_BIRTH_PURCHASE_MESSAGE, DateOfBirthNotice } from './AgeVerificationNotices'
 import { MemberCommerceHeader, MemberCommerceHero } from './MemberCommerceComponents'
 import {
   cardInForce,
@@ -92,14 +93,7 @@ export function MembershipCardsPage() {
         description="Choose the membership card tier that fits your training routine and save on every sport package."
       />
       <div className="cards-page__content">
-        {!hasDob && (
-          <div className="notice notice--warning cards-age-warning" role="alert" data-testid="dob-warning">
-            <p>Please update your date of birth in your profile before purchasing a subscription plan.</p>
-            <Link className={buttonClassName('secondary', 'sm')} to={MEMBER_PATHS.profile}>
-              Update date of birth
-            </Link>
-          </div>
-        )}
+        {!hasDob && <DateOfBirthNotice testId="dob-warning" message={DATE_OF_BIRTH_PURCHASE_MESSAGE} />}
         {content}
       </div>
       {selected && (
@@ -277,7 +271,7 @@ function ConfirmCardModal({
   const confirm = async () => {
     if (sendingRef.current || !hasDob || plan.kind === 'blocked' || plan.kind === 'unknown' || plan.price === null) {
       if (!hasDob) {
-        setError('Please update your date of birth in your profile before purchasing a subscription plan.')
+        setError(DATE_OF_BIRTH_PURCHASE_MESSAGE)
       }
       return
     }
@@ -327,14 +321,7 @@ function ConfirmCardModal({
         </>
       }
     >
-      {!hasDob && (
-        <div className="notice notice--warning" role="alert" data-testid="modal-dob-warning">
-          <p>Please update your date of birth in your profile before purchasing a subscription plan.</p>
-          <Link className={buttonClassName('secondary', 'sm')} to={MEMBER_PATHS.profile}>
-            Update date of birth
-          </Link>
-        </div>
-      )}
+      {!hasDob && <DateOfBirthNotice testId="modal-dob-warning" message={DATE_OF_BIRTH_PURCHASE_MESSAGE} />}
       {error && (
         <p className="notice notice--danger" role="alert">
           {error}
