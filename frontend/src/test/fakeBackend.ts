@@ -60,3 +60,8 @@ export const MEMBER = {
   role: 'MEMBER',
   status: 'ACTIVE',
 }
+
+export const MEMBER_WITH_DOB = {
+  ...MEMBER,
+  dateOfBirth: '1995-05-20',
+}

@@ -291,6 +291,15 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             throw new BusinessRuleException("Card tier is not on sale: " + tier.getCode());
         }
 
+        if (SecurityUtils.isMember(actor)) {
+            UserAccount targetAccount = member.getUserAccount();
+            if (targetAccount == null || targetAccount.getDateOfBirth() == null) {
+                throw new BusinessRuleException(
+                        "Please update your date of birth in your profile before purchasing a subscription plan",
+                        "DATE_OF_BIRTH_REQUIRED");
+            }
+        }
+
         LocalDate today = LocalDate.now(clock);
         boolean paidAtDesk = SecurityUtils.isStaff(actor);
 
