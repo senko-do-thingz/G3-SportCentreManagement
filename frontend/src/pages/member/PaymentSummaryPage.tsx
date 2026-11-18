@@ -367,7 +367,7 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
           <p className="payment-methods__hint">
             {method === 'CASH'
               ? 'Pay at reception and provide your payment reference. The receptionist confirms after receiving the cash.'
-              : 'The next screen opens PayOS checkout. PayOS confirms a real bank transfer automatically by webhook.'}
+              : 'The next screen opens PayOS checkout. This page checks PayOS automatically and updates after the transfer is confirmed.'}
           </p>
           {error && (
             <div className="notice notice--danger" role="alert">
