@@ -346,7 +346,8 @@ class InactiveMemberSalesIntegrationTest extends AbstractIntegrationTest {
     private UserAccount account(String role) {
         return users.saveAndFlush(UserAccount.builder().email(code() + "@sportify.test").fullName(role + " fixture")
                 .phone(Long.toString(RANDOM.nextLong(100_000_000_000L, 1_000_000_000_000L)))
-                .passwordHash("test-only-hash").role(roles.findByCode(role).orElseThrow()).status("ACTIVE").build());
+                .passwordHash("test-only-hash").role(roles.findByCode(role).orElseThrow()).status("ACTIVE")
+                .dateOfBirth(LocalDate.of(1995, 5, 20)).build());
     }
     private UserAccount member() {
         var account = account("MEMBER");

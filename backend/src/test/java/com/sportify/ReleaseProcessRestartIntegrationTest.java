@@ -79,7 +79,10 @@ class ReleaseProcessRestartIntegrationTest {
         var created=call("POST","/members",reception,Map.of("fullName","Release Learner","email","learner@release.test","phone","0900000103"),201);
         long member=created.path("userId").asLong();String memberPassword=created.path("temporaryPassword").asText();
         assertThat(member).isPositive();String owner=login("learner@release.test",memberPassword);
-        call("PUT","/users/me",owner,Map.of("mainGoal","BUILD_SKILLS","currentLevel","BEGINNER"),200);owner=login("learner@release.test",memberPassword);
+        // The class uses the first age group, so the learner needs a date of birth that fits it on the session date.
+        int minAge=jdbc.queryForObject("SELECT min_age FROM age_group WHERE id=?",Integer.class,age);
+        String dateOfBirth=LocalDate.of(2026,11,2).minusYears(minAge).toString();
+        call("PUT","/users/me",owner,Map.of("mainGoal","BUILD_SKILLS","currentLevel","BEGINNER","dateOfBirth",dateOfBirth),200);owner=login("learner@release.test",memberPassword);
         assertThat(call("GET","/users/me",owner,null,200).path("memberCode").asText()).isEqualTo(created.path("memberCode").asText());
         call("GET","/members?query=learner%40release.test",reception,null,200);
         call("POST","/manager/card-tiers",manager,Map.of("code","RELEASE_TIER","name","Release Tier","price",900000,"durationMonths",12,"discountPercentage",10,"tierRank",100,"active",true),201);
