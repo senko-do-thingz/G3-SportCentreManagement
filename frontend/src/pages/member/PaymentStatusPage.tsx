@@ -66,10 +66,11 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
   const [params] = useSearchParams()
   const selectedSession = parseSessionReference(params.get('sessionId'))
   const polling = usePaymentPolling(paymentId)
-  const { payment, loadError, refresh } = polling
+  const { payment, loadError, refresh, checkedAt } = polling
   const toast = useToast()
   const previousStatus = useRef<string | null>(null)
-  const payOsReturnSyncAttempted = useRef(false)
+  const syncInFlight = useRef(false)
+  const syncErrorNotified = useRef(false)
   const payOsReturn = params.get('payos') === 'return'
 
   // Tell the member once when the status changes while the page is open.
@@ -85,26 +86,42 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
   }, [payment?.status, toast])
 
   useEffect(() => {
-    if (!payOsReturn || payment?.status !== 'PENDING' || payOsReturnSyncAttempted.current) return
-    payOsReturnSyncAttempted.current = true
+    if (!checkedAt || payment?.status !== 'PENDING' || payment?.method !== 'BANK_TRANSFER') return
+    if (syncInFlight.current) return
+    syncInFlight.current = true
     let active = true
-    void paymentsApi.payOsSyncStatus(paymentId).then(
-      () => { if (active) refresh() },
-      (error: unknown) => {
-        if (!active) return
-        toast.error('Could not verify this PayOS payment', getErrorMessage(error))
-        refresh()
-      },
-    )
-    return () => { active = false }
-  }, [payOsReturn, payment?.status, paymentId, refresh, toast])
+
+    void paymentsApi.payOsSyncStatus(paymentId)
+      .then(
+        (result) => {
+          if (!active) return
+          if (result.settled) {
+            refresh()
+          }
+        },
+        (error: unknown) => {
+          if (!active) return
+          if (payOsReturn || !syncErrorNotified.current) {
+            syncErrorNotified.current = true
+            toast.error('Could not verify this PayOS payment', getErrorMessage(error))
+          }
+        },
+      )
+      .finally(() => {
+        syncInFlight.current = false
+      })
+
+    return () => {
+      active = false
+    }
+  }, [checkedAt, payment?.status, payment?.method, paymentId, payOsReturn, refresh, toast])
 
   const header = (
     <PaymentHero
       eyebrow="Member / Payments"
       title="Payment Instructions and Status"
       description={payment?.method === 'BANK_TRANSFER'
-        ? 'Review your PayOS transfer QR below. PayOS updates payment status automatically after the bank confirms the transfer.'
+        ? 'Review your PayOS transfer QR below. This page checks PayOS automatically and updates after the transfer is confirmed.'
         : 'Check your payment status or give reception your payment reference.'}
     />
   )

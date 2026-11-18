@@ -22,11 +22,13 @@ import java.util.Optional;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
@@ -108,6 +110,123 @@ class PayOsCheckoutServiceTest {
         assertThat(status.settled()).isTrue();
         assertThat(status.providerStatus()).isEqualTo("PAID");
         verify(verification).confirmPayOsPayment(71L, "BANK-REF-71", LocalDateTime.of(2026, 11, 17, 11, 30));
+    }
+
+    @Test
+    void statusSyncReturnsUnsettledWhenProviderStatusIsPendingOrProcessing() {
+        Payment payment = pendingPayment();
+        payment.setPayOsPaymentLinkId("link-71");
+        payment.setPayOsOrderCode(71L);
+        when(paymentRepository.findByIdForUpdate(71L)).thenReturn(Optional.of(payment));
+        when(api.getPaymentLink("link-71")).thenReturn(new PayOsApiClient.PaymentLinkData(
+                "link-71", "link-71", 71L, 4750L, "S1Z", "PENDING", "https://pay.payos.vn/web/link-71", "vietqr-payload"));
+
+        PayOsCheckoutService.StatusSync status = service.syncStatus(71L, UserAccount.builder().id(12L).build());
+
+        assertThat(status.settled()).isFalse();
+        assertThat(status.providerStatus()).isEqualTo("PENDING");
+        verify(verification, never()).confirmPayOsPayment(anyLong(), any(), any());
+
+        when(api.getPaymentLink("link-71")).thenReturn(new PayOsApiClient.PaymentLinkData(
+                "link-71", "link-71", 71L, 4750L, "S1Z", "PROCESSING", "https://pay.payos.vn/web/link-71", "vietqr-payload"));
+
+        PayOsCheckoutService.StatusSync processingStatus = service.syncStatus(71L, UserAccount.builder().id(12L).build());
+
+        assertThat(processingStatus.settled()).isFalse();
+        assertThat(processingStatus.providerStatus()).isEqualTo("PROCESSING");
+        verify(verification, never()).confirmPayOsPayment(anyLong(), any(), any());
+    }
+
+    @Test
+    void statusSyncReturnsUnsettledWhenProviderStatusIsCancelledOrExpiredAndLeavesPaymentPending() {
+        Payment payment = pendingPayment();
+        payment.setPayOsPaymentLinkId("link-71");
+        payment.setPayOsOrderCode(71L);
+        when(paymentRepository.findByIdForUpdate(71L)).thenReturn(Optional.of(payment));
+        when(api.getPaymentLink("link-71")).thenReturn(new PayOsApiClient.PaymentLinkData(
+                "link-71", "link-71", 71L, 4750L, "S1Z", "CANCELLED", "https://pay.payos.vn/web/link-71", "vietqr-payload"));
+
+        PayOsCheckoutService.StatusSync status = service.syncStatus(71L, UserAccount.builder().id(12L).build());
+
+        assertThat(status.settled()).isFalse();
+        assertThat(status.providerStatus()).isEqualTo("CANCELLED");
+        assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
+        verify(verification, never()).confirmPayOsPayment(anyLong(), any(), any());
+
+        when(api.getPaymentLink("link-71")).thenReturn(new PayOsApiClient.PaymentLinkData(
+                "link-71", "link-71", 71L, 4750L, "S1Z", "EXPIRED", "https://pay.payos.vn/web/link-71", "vietqr-payload"));
+
+        PayOsCheckoutService.StatusSync expiredStatus = service.syncStatus(71L, UserAccount.builder().id(12L).build());
+
+        assertThat(expiredStatus.settled()).isFalse();
+        assertThat(expiredStatus.providerStatus()).isEqualTo("EXPIRED");
+        assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
+        verify(verification, never()).confirmPayOsPayment(anyLong(), any(), any());
+    }
+
+    @Test
+    void statusSyncReturnsUnsettledWithoutCallingApiWhenPaymentHasNoLinkYet() {
+        Payment payment = pendingPayment();
+        payment.setPayOsPaymentLinkId(null);
+        payment.setPayOsOrderCode(null);
+        when(paymentRepository.findByIdForUpdate(71L)).thenReturn(Optional.of(payment));
+
+        PayOsCheckoutService.StatusSync status = service.syncStatus(71L, UserAccount.builder().id(12L).build());
+
+        assertThat(status.settled()).isFalse();
+        verify(api, never()).getPaymentLink(any());
+        verify(verification, never()).confirmPayOsPayment(anyLong(), any(), any());
+    }
+
+    @Test
+    void statusSyncIsIdempotentWhenPaymentAlreadySettled() {
+        Payment payment = pendingPayment();
+        payment.setPaymentStatus(PaymentStatus.SUCCESS);
+        payment.setSettlementProvider("PAYOS");
+        when(paymentRepository.findByIdForUpdate(71L)).thenReturn(Optional.of(payment));
+
+        PayOsCheckoutService.StatusSync status = service.syncStatus(71L, UserAccount.builder().id(12L).build());
+
+        assertThat(status.settled()).isTrue();
+        assertThat(status.providerStatus()).isEqualTo("PAID");
+        verify(api, never()).getPaymentLink(any());
+        verify(verification, never()).confirmPayOsPayment(anyLong(), any(), any());
+    }
+
+    @Test
+    void statusSyncRejectsProviderAmountMismatch() {
+        Payment payment = pendingPayment();
+        payment.setPayOsPaymentLinkId("link-71");
+        payment.setPayOsOrderCode(71L);
+        when(paymentRepository.findByIdForUpdate(71L)).thenReturn(Optional.of(payment));
+        when(api.getPaymentLink("link-71")).thenReturn(new PayOsApiClient.PaymentLinkData(
+                "link-71", "link-71", 71L, 9999L, "S1Z", "PAID", "https://pay.payos.vn/web/link-71", "vietqr-payload",
+                9999L, 0L, null));
+
+        assertThatThrownBy(() -> service.syncStatus(71L, UserAccount.builder().id(12L).build()))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_GATEWAY);
+
+        verify(verification, never()).confirmPayOsPayment(anyLong(), any(), any());
+    }
+
+    @Test
+    void statusSyncRejectsProviderAmountPaidMismatch() {
+        Payment payment = pendingPayment();
+        payment.setPayOsPaymentLinkId("link-71");
+        payment.setPayOsOrderCode(71L);
+        when(paymentRepository.findByIdForUpdate(71L)).thenReturn(Optional.of(payment));
+        when(api.getPaymentLink("link-71")).thenReturn(new PayOsApiClient.PaymentLinkData(
+                "link-71", "link-71", 71L, 4750L, "S1Z", "PAID", "https://pay.payos.vn/web/link-71", "vietqr-payload",
+                2000L, 2750L, null));
+
+        assertThatThrownBy(() -> service.syncStatus(71L, UserAccount.builder().id(12L).build()))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_GATEWAY);
+
+        verify(verification, never()).confirmPayOsPayment(anyLong(), any(), any());
     }
 
     private static Payment pendingPayment() {

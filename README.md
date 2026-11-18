@@ -14,7 +14,7 @@ The four roles are **MEMBER**, **COACH**, **RECEPTIONIST**, and **MANAGER**. Fro
 |---|---|---|
 | Flow 1 - Identity, cards, packages | Registration, login, profiles, membership cards, sport packages, staff sales and activation, password management and OTP recovery | Gmail OAuth must be configured privately for email delivery |
 | Flow 2 - Classes, sessions, booking | Manager class/session administration and rescheduling, Member schedule and booking, Receptionist-assisted booking and arrival check-in, Coach roster/schedule | Booking, check-in and Coach attendance are separate operations |
-| Flow 3 - Payments and reports | Pending payments, cash/bank methods, PayOS checkout, staff verification, invoices, receipts, refunds, finance and operations reports | PayOS webhook confirms online transfers; manual transfer QR and cash still require reception verification |
+| Flow 3 - Payments and reports | Pending payments, cash/bank methods, PayOS checkout, staff verification, invoices, receipts, refunds, finance and operations reports | PayOS confirms online transfers automatically; manual transfer QR and cash still require reception verification |
 | Flow 4 - Training | Plans, attendance, results, progress, feedback, notices and class questions | Coach attendance is separate from Receptionist arrival check-in |
 | Flow 5 - Recommendations | Member class recommendations and sport levels; Coach rule-based drill suggestions with optional Gemini drafts | Rule fallback remains available |
 | Flow 6 - Spori and support | Sportify-scoped Spori chat for all four roles plus Member support requests and Receptionist replies | Gemini-backed replies require explicit activation; unknown facts must not be invented |
@@ -110,24 +110,44 @@ VietQR must reach the backend callback from outside localhost. For a temporary d
 
 The quick-tunnel hostname changes when restarted. Stop the process after the sandbox test, and update VietQR's URL if you start another tunnel.
 
-### PayOS checkout and local webhook tunnel
+### PayOS checkout and polling sync
 
 PayOS does not provide a sandbox. It uses its production payment API, so scanning and paying a checkout QR transfers real money to the bank account linked to the PayOS payment channel. Start with a small amount only after the channel and beneficiary bank account are verified.
 
-1. Set `PAYOS_ENABLED=true`, `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`, and `PAYOS_FRONTEND_BASE_URL=http://localhost:5173` privately in `backend/.env`; never commit those values. Restart the backend so Flyway applies PayOS migrations V68 through V70. V67 is reserved for the main branch's demo-only birth-date migration.
-2. Start the frontend and backend. Members can create a PayOS QR and return to the local status page without a tunnel; on return, Sportify verifies the order directly with PayOS.
-3. To receive PayOS webhooks while the app is local (including when a payer does not return to the browser), install `cloudflared` (the Cloudflare One Client/WARP app alone is not enough). From the repository root, run this single PowerShell script:
+1. Enable PayOS in `backend/.env` (fill in channel values from the PayOS dashboard; never commit real credentials):
+
+   ```env
+   PAYOS_ENABLED=true
+   PAYOS_CLIENT_ID=your_client_id
+   PAYOS_API_KEY=your_api_key
+   PAYOS_CHECKSUM_KEY=your_checksum_key
+   PAYOS_FRONTEND_BASE_URL=http://localhost:5173
+   ```
+
+   Restart the backend so Flyway applies PayOS migrations V68 through V70. V67 is reserved for the main branch demo birth-date migration.
+2. Start the frontend (`npm run dev`) and backend (`mvn spring-boot:run` or via IDE).
+3. Member checkout and confirmation flow:
+   - When a member selects Bank transfer and proceeds to checkout, Sportify creates a PayOS payment link and displays the bank QR code.
+   - The status page periodically polls PayOS (`POST /api/v1/payments/{id}/payos-sync`) every 15 seconds.
+   - Once the bank confirms the transfer, PayOS reports PAID status, Sportify confirms the payment locally and activates the membership card or package registration, and the page updates to Paid automatically.
+   - No tunnel, no inbound connection, and no staff confirmation are required. Multiple developers can run locally at the same time without webhook URL conflicts.
+
+PayOS credentials remain server-side. Checkout links are created only for pending bank-transfer payments and link ID, amount, currency and payment state are checked before settlement.
+
+#### Optional: real webhook (needs a fixed public URL)
+
+PayOS webhook handling remains supported in the backend codebase for production deployments or environments with a fixed public HTTPS URL. In a local environment:
+
+1. Install `cloudflared` (the Cloudflare One Client/WARP app alone is not enough).
+2. Run the helper script from the repository root:
 
    ```powershell
    powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\payment\Start-PayOsTunnel.ps1
    ```
 
-   It checks that the backend and PayOS settings are ready, starts the restricted webhook proxy on an OS-selected free local port, retries transient Quick Tunnel startup failures up to three times, waits for Cloudflare's connection to be established, then registers the webhook automatically. The public `trycloudflare.com` hostname remains temporary; the script registers the new URL each time. The tunnel exposes only `POST /api/v1/payments/payos/webhook`, not the rest of the backend. `npm run payos:tunnel` from `frontend/` runs the same script.
-4. Keep the tunnel terminal open while testing. The hostname changes when the quick tunnel restarts, so run the script again to register the new URL. PayOS sends a sample event to validate the route; the app acknowledges it without settling an order. A verified webhook updates a matching member payment and activates its package/card automatically; reception does not confirm PayOS payments. Browser-return verification remains a fallback if a webhook cannot reach the local app. Stop the tunnel and its local proxy with `npm run payos:tunnel:stop` from `frontend/` if Ctrl+C does not return to the prompt.
-
-Each developer keeps credentials in their own ignored `backend/.env`. A PayOS channel has one active webhook URL, so only the computer currently running the registered tunnel receives callbacks; use the browser-return verification when each teammate is testing on a separate local backend. For a shared deployment, register that backend's stable HTTPS webhook URL once.
-
-PayOS credentials remain server-side. Checkout links are created only for pending bank-transfer payments and the webhook signature, link ID, amount, currency and payment state are checked before settlement.
+   The script starts a restricted webhook proxy on an OS-selected free local port, establishes a Cloudflare Quick Tunnel, and registers the temporary webhook URL with PayOS automatically. `npm run payos:tunnel` from `frontend/` runs the same script.
+3. Keep the tunnel terminal open while testing. Stop the tunnel and its local proxy with `npm run payos:tunnel:stop` from `frontend/`.
+4. Note: A PayOS payment channel allows only one active webhook URL at a time, and Quick Tunnel URLs change on each restart. Polling sync is recommended for local multi-developer workflows.
 
 ### 4. Run the frontend
 
@@ -318,7 +338,7 @@ Backend defaults to `http://localhost:8080` with REST prefix `/api/v1`. Access t
 | Support | `/member/support-requests`, `/reception/support-requests` | Member and Receptionist |
 | Payment / invoices / refunds | `/payments/...`, `/invoices/...`, `/refunds/...` | Role-scoped |
 | VietQR server callbacks | `POST /api/token_generate`, `/bank/api/transaction-sync` | Provider-specific Basic / callback JWT authentication |
-| PayOS checkout/webhook | `POST /api/v1/payments/{id}/payos-checkout`, `POST /api/v1/payments/payos/webhook` | Member JWT for checkout; HMAC-SHA256 checksum validation for signed provider webhooks |
+| PayOS checkout/sync/webhook | `POST /api/v1/payments/{id}/payos-checkout`, `POST /api/v1/payments/{id}/payos-sync`, `POST /api/v1/payments/payos/webhook` | Member JWT for checkout and polling sync; HMAC-SHA256 checksum validation for signed provider webhooks |
 | Reports / inbox | `/manager/finance/...`, `/manager/reports/operations`, `/member/notifications`, `/reception/inbox` | Role-scoped |
 
 Paths above are a quick reference, not exhaustive contracts. Read the controller annotations and [API documentation](docs/api/) for exact request/response shapes.
