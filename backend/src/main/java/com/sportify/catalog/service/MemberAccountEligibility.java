@@ -1,7 +1,10 @@
 package com.sportify.catalog.service;
 
+import com.sportify.core.common.SecurityUtils;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
+import com.sportify.identity.entity.MemberProfile;
+import com.sportify.identity.entity.UserAccount;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -22,6 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class MemberAccountEligibility {
 
     public static final String MEMBER_INACTIVE = "MEMBER_INACTIVE";
+    public static final String DATE_OF_BIRTH_REQUIRED = "DATE_OF_BIRTH_REQUIRED";
+    public static final String DATE_OF_BIRTH_REQUIRED_MESSAGE =
+            "Please update your date of birth in your profile before purchasing a subscription plan";
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -38,6 +44,21 @@ public class MemberAccountEligibility {
         if (!"ACTIVE".equals(status.getFirst())) {
             throw new BusinessRuleException("The member account is not active, so new purchases and payment"
                     + " confirmations are not allowed for it", MEMBER_INACTIVE);
+        }
+    }
+
+    /**
+     * A member buying a card or a sport package for themselves must have a known date of birth, because class age
+     * groups are checked against it at booking time. Staff desk sales are not blocked, so reception can still sell
+     * to a walk-in member whose profile is incomplete.
+     */
+    public static void requireDateOfBirthForSelfServicePurchase(UserAccount actor, MemberProfile member) {
+        if (!SecurityUtils.isMember(actor)) {
+            return;
+        }
+        UserAccount account = member == null ? null : member.getUserAccount();
+        if (account == null || account.getDateOfBirth() == null) {
+            throw new BusinessRuleException(DATE_OF_BIRTH_REQUIRED_MESSAGE, DATE_OF_BIRTH_REQUIRED);
         }
     }
 }

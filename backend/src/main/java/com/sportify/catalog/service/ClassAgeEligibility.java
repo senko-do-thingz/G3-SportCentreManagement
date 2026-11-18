@@ -9,8 +9,8 @@ import java.time.Period;
 /**
  * Class age-group rule shared by session eligibility reads and transactional booking. Age is the member's completed
  * years on the session date; both bounds are inclusive and a null maximum means no upper bound. A session without a
- * class or a class without an age group is open to every age. An unknown date of birth is not rejected, matching the
- * Flow 5 recommendation rule ({@code TrainingGuidanceService.fitsAge}).
+ * class or a class without an age group is open to every age. When an age group is specified, members must have a
+ * known date of birth that meets the requirement.
  */
 public final class ClassAgeEligibility {
     private ClassAgeEligibility() { }
@@ -23,10 +23,16 @@ public final class ClassAgeEligibility {
 
     public static boolean fits(LocalDate dateOfBirth, ClassSession session) {
         AgeGroup group = ageGroup(session);
-        if (group == null || dateOfBirth == null || session.getSessionDate() == null) return true;
+        if (group == null || session.getSessionDate() == null) return true;
+        if (requiresDateOfBirth(dateOfBirth, session)) return false;
         int age = Period.between(dateOfBirth, session.getSessionDate()).getYears();
         return (group.getMinAge() == null || age >= group.getMinAge())
                 && (group.getMaxAge() == null || age <= group.getMaxAge());
+    }
+
+    /** True when the session has an age group in force but the member has not provided a date of birth yet. */
+    public static boolean requiresDateOfBirth(LocalDate dateOfBirth, ClassSession session) {
+        return dateOfBirth == null && ageGroup(session) != null && session.getSessionDate() != null;
     }
 
     /** Display label such as "Ages 16+" or "Ages 6-12"; null when the session has no age group. */

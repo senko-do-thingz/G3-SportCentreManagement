@@ -140,7 +140,11 @@ public class BookingServiceImpl implements BookingService {
             throw rule("Session is fully booked", "CAPACITY_UNAVAILABLE");
         }
         // Same precedence as the BE-11 eligibility read: after capacity, before package selection. Staff booking too.
-        if (!ClassAgeEligibility.fits(member.getUserAccount() == null ? null : member.getUserAccount().getDateOfBirth(), session)) {
+        LocalDate memberDateOfBirth = member.getUserAccount() == null ? null : member.getUserAccount().getDateOfBirth();
+        if (ClassAgeEligibility.requiresDateOfBirth(memberDateOfBirth, session)) {
+            throw rule("Member date of birth is required for the class age group (" + ClassAgeEligibility.label(session) + ")", "AGE_RESTRICTED");
+        }
+        if (!ClassAgeEligibility.fits(memberDateOfBirth, session)) {
             throw rule("Member age is outside the class age group (" + ClassAgeEligibility.label(session) + ")", "AGE_RESTRICTED");
         }
 

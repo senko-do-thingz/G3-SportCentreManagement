@@ -108,7 +108,7 @@ class CashEventIntegrationTest {
         return tx().execute(s -> {
             UserAccount actor = users.saveAndFlush(UserAccount.builder().email(code() + "@example.invalid")
                     .passwordHash(UUID.randomUUID().toString()).fullName("Synthetic cash member")
-                    .role(roles.findByCode("MEMBER").orElseThrow()).status("ACTIVE").build());
+                    .role(roles.findByCode("MEMBER").orElseThrow()).status("ACTIVE").dateOfBirth(LocalDate.of(1995, 5, 20)).build());
             members.saveAndFlush(MemberProfile.builder().userAccount(actor).memberCode(code()).currentLevel("BEGINNER")
                     .joinedOn(LocalDate.now(clock)).build());
             return actor;

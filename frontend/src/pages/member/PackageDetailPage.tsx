@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
+import { useAuth } from '../../auth/useAuth'
 import { ApiError, getErrorMessage } from '../../api/errors'
 import { memberApi, type MemberCard, type PackageRegistration } from '../../api/memberApi'
 import { packagesApi, type SportPackage } from '../../api/packagesApi'
@@ -8,6 +9,7 @@ import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDate, formatMoney } from '../../utils/format'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
+import { DATE_OF_BIRTH_PURCHASE_MESSAGE, DateOfBirthNotice } from './AgeVerificationNotices'
 import { currentCard, MEMBER_PATHS, paymentSummaryPath, trainingFormatLabel } from './dashboardModel'
 import { businessDate } from '../../utils/date'
 import {
@@ -44,6 +46,7 @@ function loadMyRegistrations(signal: AbortSignal): Promise<PackageRegistration[]
  * summary /member/payments/{paymentId} (F3-01).
  */
 export function PackageDetailPage() {
+  const { user } = useAuth()
   const { packageId } = useParams()
   const location = useLocation()
   const [packages, reloadPackages] = useMemberResource(loadPackages)
@@ -56,6 +59,7 @@ export function PackageDetailPage() {
   const selectedSessionDate = selectedSession && requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) && requestedDate >= today ? requestedDate : null
   const sessionReturn = selectedSession ? `/member/sessions/${selectedSession}` : null
   const paymentSuffix = selectedSession ? `?${new URLSearchParams({ sessionId: String(selectedSession) })}` : ''
+  const hasDob = Boolean(user?.dateOfBirth)
 
   const header = (
     <PageHeader
@@ -110,6 +114,7 @@ export function PackageDetailPage() {
       {header}
       <RegistrationForm
         pkg={pkg}
+        hasDob={hasDob}
         card={cards.status === 'ready' ? currentCard(cards.data, today) : null}
         cardsFailed={cards.status === 'error'}
         cardsLoading={cards.status === 'loading'}
@@ -142,6 +147,7 @@ function RegistrationForm({
   sessionReturn,
   paymentSuffix,
   selectedSessionDate,
+  hasDob = true,
 }: {
   pkg: SportPackage
   card: MemberCard | null
@@ -152,6 +158,7 @@ function RegistrationForm({
   sessionReturn: string | null
   paymentSuffix: string
   selectedSessionDate: string | null
+  hasDob?: boolean
 }) {
   // "Today" is read again on focus, on change and at submit, so a page left open past midnight
   // never accepts yesterday and the picker minimum follows the date.
@@ -176,6 +183,10 @@ function RegistrationForm({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (sendingRef.current || registration || blocked || checking) {
+      return
+    }
+    if (!hasDob) {
+      setFormError(DATE_OF_BIRTH_PURCHASE_MESSAGE)
       return
     }
     setFormError(null)
@@ -274,6 +285,7 @@ function RegistrationForm({
         </Card>
 
         <Card title="Registration summary" className="package-detail__summary" aria-label="Registration summary">
+          {!hasDob && <DateOfBirthNotice testId="package-dob-warning" message={DATE_OF_BIRTH_PURCHASE_MESSAGE} />}
           {formError && (
             <p className="notice notice--danger" role="alert">
               {formError}
@@ -324,7 +336,7 @@ function RegistrationForm({
               <dd>{endDate ? formatDate(endDate) : '-'}</dd>
             </div>
           </dl>
-          <Button type="submit" loading={submitting} disabled={registration !== null || blocked || checking} fullWidth>
+          <Button type="submit" loading={submitting} disabled={!hasDob || registration !== null || blocked || checking} fullWidth>
             Confirm registration
           </Button>
           {checking && (

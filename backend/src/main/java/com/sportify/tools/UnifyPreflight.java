@@ -38,8 +38,10 @@ public final class UnifyPreflight {
                 .outOfOrder(false).baselineOnMigrate(false).ignoreMigrationPatterns(new String[0]).load();
         // validate and info only: never migrate, baseline, repair or clean.
         require(flyway.validateWithResult().validationSuccessful, "FLYWAY_HISTORY_MISMATCH");
-        require(flyway.info().current() != null && "66".equals(flyway.info().current().getVersion().toString())
-                && flyway.info().pending().length == 0, "V66_REQUIRED");
+        // The demo-only V67 seeds demo member birth dates, so a disposable demo history is one version ahead.
+        String releaseVersion = disposableDemo ? "67" : "66";
+        require(flyway.info().current() != null && releaseVersion.equals(flyway.info().current().getVersion().toString())
+                && flyway.info().pending().length == 0, "V" + releaseVersion + "_REQUIRED");
         require(zero(jdbc, "SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0 AND schema_id<>SCHEMA_ID('dbo')"), "UNDECLARED_SCHEMA");
         require(zero(jdbc, "SELECT COUNT(*) FROM sys.foreign_keys WHERE is_disabled=1 OR is_not_trusted=1"), "FOREIGN_KEY_DRIFT");
         require(zero(jdbc, "SELECT COUNT(*) FROM sys.check_constraints WHERE is_disabled=1 OR is_not_trusted=1"), "CHECK_CONSTRAINT_DRIFT");

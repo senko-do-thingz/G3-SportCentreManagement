@@ -543,6 +543,13 @@
       "creates": [],
       "drops": [],
       "sha256_lf": "357c57f3bb919198051b0d215f1a6669fd932065f0900ab32fa30eea16e113a6"
+    },
+    {
+      "path": "backend/src/main/resources/db/demo/V67__assign_demo_member_dates_of_birth.sql",
+      "version": 67,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "115fb3e85c270e95f0a3dd1bd61d5d829344d2713c02324a26fa609b91f4c2e7"
     }
   ],
   "create_occurrences": 82,
@@ -909,7 +916,7 @@
     {
       "id": "S14",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 360,
+      "line": 364,
       "definition": "recordSelfTrainingAttendance"
     },
     {

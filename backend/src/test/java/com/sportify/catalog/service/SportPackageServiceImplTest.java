@@ -155,7 +155,7 @@ public class SportPackageServiceImplTest {
                 .build();
 
         Role memberRole = Role.builder().id(1L).code("MEMBER").name("Member").build();
-        memberUser = UserAccount.builder().id(100L).email("member@example.com").fullName("Member One").role(memberRole).build();
+        memberUser = UserAccount.builder().id(100L).email("member@example.com").fullName("Member One").role(memberRole).dateOfBirth(LocalDate.of(1995, 5, 20)).build();
         memberProfile = MemberProfile.builder().id(100L).userAccount(memberUser).memberCode("MEM-100").build();
 
         Role recRole = Role.builder().id(2L).code("RECEPTIONIST").name("Receptionist").build();
@@ -173,6 +173,23 @@ public class SportPackageServiceImplTest {
 
         assertEquals(1, result.size());
         assertEquals("BADMINTON_30D", result.get(0).getCode());
+    }
+
+    @Test
+    void registerPackage_WhenMemberHasNoDateOfBirth_ThrowsBusinessRuleException() {
+        memberUser.setDateOfBirth(null);
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sportPackageRepository.findById(1L)).thenReturn(Optional.of(sportPackage));
+
+        PackageRegistrationRequest req = PackageRegistrationRequest.builder()
+                .packageId(1L)
+                .build();
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> sportPackageService.registerPackage(req, memberUser));
+
+        assertEquals("DATE_OF_BIRTH_REQUIRED", ex.getCode());
+        assertEquals("Please update your date of birth in your profile before purchasing a subscription plan", ex.getMessage());
     }
 
     @Test
@@ -302,6 +319,13 @@ public class SportPackageServiceImplTest {
         assertEquals(100L, res.getMemberId());
         assertEquals(RegistrationChannel.ONLINE, res.getChannel()); // Channel forced to ONLINE
         assertEquals(PackageRegistrationStatus.PENDING_PAYMENT, res.getStatus()); // Status forced to PENDING_PAYMENT
+    }
+
+    @Test
+    void registerPackage_AsReceptionist_ForMemberWithoutDateOfBirth_IsStillSoldAtTheDesk() {
+        // The date of birth rule only blocks member self-service purchases, not staff desk sales.
+        memberUser.setDateOfBirth(null);
+        registerPackage_AsReceptionist_UsesProvidedMemberId_SetsActive();
     }
 
     @Test

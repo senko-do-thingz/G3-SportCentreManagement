@@ -7,7 +7,7 @@ import { coachProfilesApi, type CoachProfile } from '../../api/coachProfilesApi'
 import { ApiError } from '../../api/errors'
 import { tokenStorage } from '../../api/tokenStorage'
 import { renderApp } from '../../test/renderApp'
-import { backendError, installFakeFetch, json, MEMBER, MANAGER } from '../../test/fakeBackend'
+import { backendError, installFakeFetch, json, MEMBER, MEMBER_WITH_DOB, MANAGER } from '../../test/fakeBackend'
 import { sportPackage } from '../../test/memberFixtures'
 
 const session: BrowseSession = { id: 5, sportId: 3, sportName: 'Basketball', classId: 1, className: 'Basketball Foundations', trainingFormat: 'COACH_LED', level: 'BEGINNER', coachId: 3, coachName: 'Quan Coach', facilityId: 1, facilityName: 'Court A', sessionDate: '2026-10-16', startTime: '16:00:00', endTime: '17:00:00', capacity: 20, bookedCount: 2, freeSeats: 18, full: false, status: 'PUBLISHED' }
@@ -31,7 +31,26 @@ describe('FE-08 session detail', () => {
     expect(screen.queryByRole('link', { name: 'Book session' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to results' })).toHaveAttribute('href', '/member/classes?level=BEGINNER')
     if (reason === 'NO_PACKAGE' || reason === 'NO_SESSIONS_LEFT') expect(await screen.findByRole('link', { name: 'View matching package' })).toHaveAttribute('href', '/member/packages/4?sport=3&format=COACH_LED&sessionId=5&sessionDate=2026-10-16&returnTo=%2Fmember%2Fclasses%3Flevel%3DBEGINNER')
+    if (reason === 'AGE_RESTRICTED') expect(screen.getByTestId('age-restriction-notice')).toBeInTheDocument()
     expect(api.calls.every((call) => call.method === 'GET')).toBe(true)
+  })
+  it('asks a member without a date of birth to add it instead of claiming the age does not fit', async () => {
+    backend({ ...detail, session: { ...session, ageGroupLabel: 'Ages 18+' }, eligible: false, reason: 'AGE_RESTRICTED', suitableRegistrations: [] })
+    renderApp('/member/sessions/5')
+    const notice = await screen.findByTestId('age-restriction-notice')
+    expect(notice).toHaveTextContent('This class is for Ages 18+. Add your date of birth in your profile so we can confirm your age on the session date.')
+    expect(within(notice).getByRole('link', { name: 'Update date of birth' })).toHaveAttribute('href', '/member/profile')
+    expect(screen.queryByText(/Your age on the session date is outside this class age group/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Book session' })).not.toBeInTheDocument()
+  })
+  it('explains the age group once when a member with a known date of birth is outside it', async () => {
+    backend({ ...detail, session: { ...session, ageGroupLabel: 'Ages 18+' }, eligible: false, reason: 'AGE_RESTRICTED', suitableRegistrations: [] }, MEMBER_WITH_DOB)
+    renderApp('/member/sessions/5')
+    const notice = await screen.findByTestId('age-restriction-notice')
+    expect(notice).toHaveTextContent('Age requirement not met')
+    expect(notice).toHaveTextContent('This class is for Ages 18+.')
+    expect(within(notice).queryByRole('link', { name: 'Update date of birth' })).not.toBeInTheDocument()
+    expect(screen.getAllByText(/Your age on the session date is outside this class age group/)).toHaveLength(1)
   })
   it('routes eligible members to FE-09 with session and return context without creating a booking', async () => {
     const api = backend()

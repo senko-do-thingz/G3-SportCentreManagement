@@ -43,8 +43,24 @@ class ClassAgeEligibilityTest {
     }
 
     @Test
-    void unknownBirthDateNoClassOrNoAgeGroupAreNotRestricted() {
-        assertTrue(ClassAgeEligibility.fits(null, session(16, null)));
+    void unknownBirthDateRequiresAgeVerificationWhenAgeGroupIsSpecified() {
+        assertFalse(ClassAgeEligibility.fits(null, session(16, null)));
+        assertFalse(ClassAgeEligibility.fits(null, session(6, 12)));
+    }
+
+    @Test
+    void missingBirthDateIsReportedOnlyWhenAnActiveAgeGroupApplies() {
+        assertTrue(ClassAgeEligibility.requiresDateOfBirth(null, session(16, null)));
+        assertFalse(ClassAgeEligibility.requiresDateOfBirth(LocalDate.of(2020, 1, 1), session(16, null)));
+        assertFalse(ClassAgeEligibility.requiresDateOfBirth(null, session(null, null)));
+        ClassSession retired = session(16, null);
+        retired.getSportClass().getAgeGroup().setIsActive(false);
+        assertFalse(ClassAgeEligibility.requiresDateOfBirth(null, retired));
+    }
+
+    @Test
+    void sessionsWithoutClassOrWithoutAgeGroupAreOpenToAllAges() {
+        assertTrue(ClassAgeEligibility.fits(null, session(null, null)));
         assertTrue(ClassAgeEligibility.fits(LocalDate.of(2020, 1, 1), session(null, null)));
         assertTrue(ClassAgeEligibility.fits(LocalDate.of(2020, 1, 1),
                 ClassSession.builder().id(1L).sessionDate(SESSION_DATE).build()));
