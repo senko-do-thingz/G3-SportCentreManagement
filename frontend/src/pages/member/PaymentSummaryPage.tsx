@@ -274,7 +274,7 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const pending = isPending(payment)
-  // Bank transfer opens the VietQR instructions; Cash leaves the payment pending for reception.
+  // Bank transfer opens PayOS checkout; Cash leaves the payment pending for reception.
   const [method, setMethod] = useState<string>(payment.method ?? DEFAULT_PAYMENT_METHOD)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -366,7 +366,7 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
           <p className="payment-methods__hint">
             {method === 'CASH'
               ? 'Pay at reception and provide your payment reference. The receptionist confirms after receiving the cash.'
-              : 'The next screen shows your VietQR transfer QR. Reception confirms real transfers after checking the received funds.'}
+              : 'The next screen opens PayOS checkout. This page checks PayOS automatically and updates after the transfer is confirmed.'}
           </p>
           {error && (
             <div className="notice notice--danger" role="alert">

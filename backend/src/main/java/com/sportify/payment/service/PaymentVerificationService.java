@@ -41,6 +41,9 @@ public interface PaymentVerificationService {
     Invoice confirmVietQrPayment(Long paymentId, String referenceNumber, String transactionId,
                                  LocalDateTime transactionTime, String environment);
 
+    /** Settles an actual bank-transfer payment after a verified PayOS webhook. */
+    Invoice confirmPayOsPayment(Long paymentId, String transactionReference, LocalDateTime transactionTime);
+
     /**
      * Receipt of a payment that has just become SUCCESS: issues the PAID invoice with its line and writes the
      * PAYMENT_CONFIRMED activity log. Both confirmation paths call it, PUT /payments/{id}/confirm and the

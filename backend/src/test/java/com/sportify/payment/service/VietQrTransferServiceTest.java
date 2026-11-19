@@ -33,6 +33,6 @@ class VietQrTransferServiceTest {
                 .amount(BigDecimal.TEN).status(PaymentStatus.PENDING).method(PaymentMethod.BANK_TRANSFER).build());
         var result=new VietQrTransferService(payments,new BankTransferProperties(),directory).instructions(20L,actor);
         assertThat(result.payable()).isFalse(); assertThat(result.qrPayload()).isNull(); assertThat(result.accountNumber()).isNull();
-        assertThat(result.notice()).contains("DEMO NON-PAYABLE");
+        assertThat(result.notice()).contains("Configure a verified receiving account");
     }
 }

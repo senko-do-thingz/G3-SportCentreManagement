@@ -135,6 +135,9 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
 
         Payment payment = lockPayment(paymentId);
         requirePending(payment, "confirmed");
+        if (payment.getPayOsPaymentLinkId() != null) {
+            throw new BusinessRuleException("A PayOS payment link is active. PayOS confirms it automatically after a verified webhook.");
+        }
         // E2E-BUG-04: lock order payment row, then the target member account row. The rejection rolls back, so the
         // payment and its card or registration stay pending and no invoice is created.
         memberAccountEligibility.requireActiveForPurchase(payment.getMember().getId());
@@ -203,6 +206,36 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         Invoice invoice = recordPaymentConfirmed(payment.getId(), null,
                 sandbox ? "VietQR sandbox transaction " + transactionId + " (no real money moved)"
                         : "Settled by VietQR transaction " + transactionId);
+        flushPayment();
+        return invoice;
+    }
+
+    @Override
+    @Transactional
+    public Invoice confirmPayOsPayment(Long paymentId, String transactionReference, LocalDateTime transactionTime) {
+        Payment payment = lockPayment(paymentId);
+        requirePending(payment, "confirmed");
+        if (payment.getPaymentMethod() != PaymentMethod.BANK_TRANSFER || payment.getPayOsPaymentLinkId() == null) {
+            throw new BusinessRuleException("PayOS can settle only a pending payment with a PayOS checkout link.");
+        }
+        PaymentItem item = itemResolver.findItem(payment)
+                .orElseThrow(() -> new BusinessRuleException("Payment " + payment.getPaymentCode()
+                        + " is not linked to a membership card or a package registration"));
+
+        if (item.type() == InvoiceItemType.MEMBERSHIP_CARD) {
+            membershipCardService.activateCardForPaymentConfirmation(item.id(), null, PaymentMethod.BANK_TRANSFER);
+        } else {
+            sportPackageService.activateRegistrationForPaymentConfirmation(item.id(), null, PaymentMethod.BANK_TRANSFER);
+        }
+
+        payment.setReferenceCode(transactionReference);
+        payment.setPayOsTransactionReference(transactionReference);
+        payment.setPaymentTime(transactionTime);
+        payment.setSettlementType("ACTUAL");
+        payment.setSettlementProvider("PAYOS");
+        payment.setNotes(PaymentNotes.append(payment.getNotes(), "Paid through PayOS payment link " + payment.getPayOsPaymentLinkId()));
+        Invoice invoice = recordPaymentConfirmed(payment.getId(), null,
+                "Settled by PayOS transaction " + transactionReference);
         flushPayment();
         return invoice;
     }
@@ -300,6 +333,9 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
 
         Payment payment = lockPayment(paymentId);
         requirePending(payment, "marked as failed");
+        if (payment.getPayOsPaymentLinkId() != null) {
+            throw new BusinessRuleException("Cancel this PayOS checkout before marking the payment as failed.");
+        }
 
         Optional<PaymentItem> item = itemResolver.findItem(payment);
         String failNote = "Payment failed, checked by user id " + actor.getId() + ": " + reason;
