@@ -122,6 +122,11 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
     expect(within(order).getByText('Discount (10%)').nextSibling).toHaveTextContent('-90.000 VND')
     expect(within(order).getByText('Total due').nextSibling).toHaveTextContent('810.000 VND')
     expect(within(order).getByTestId('payment-amount')).toHaveTextContent('810.000 VND')
+    // Kiem tra nut Cancel Payment mau do nam ben trong Order summary va ben duoi nut My membership and packages
+    const membershipLink = within(order).getByRole('link', { name: 'My membership and packages' })
+    const cancelBtn = within(order).getByRole('button', { name: 'Cancel Payment' })
+    expect(cancelBtn).toHaveClass('btn--danger', 'btn--full')
+    expect(membershipLink.compareDocumentPosition(cancelBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('heading', { level: 1, name: 'Payment Summary' })).toBeInTheDocument()
   })
 

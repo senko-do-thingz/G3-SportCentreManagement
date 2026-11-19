@@ -18,7 +18,17 @@ function cancellationBlockedReason(payment: Payment): string | null {
  * Cancel Payment stays visible for every payment. Once it is not allowed (handed to Receptionist, settled or no longer
  * pending) it is grey and disabled, and hovering or focusing it explains why. The backend enforces the same rule.
  */
-export function CancelPayment({ payment, onChanged }: { payment: Payment; onChanged: () => void }) {
+export function CancelPayment({
+  payment,
+  onChanged,
+  size = 'sm',
+  fullWidth = false,
+}: {
+  payment: Payment
+  onChanged: () => void
+  size?: 'sm' | 'md' | 'lg'
+  fullWidth?: boolean
+}) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const reasonId = useId()
@@ -30,9 +40,10 @@ export function CancelPayment({ payment, onChanged }: { payment: Payment; onChan
     catch (caught) { setError(getErrorMessage(caught)); onChanged() }
     finally { setBusy(false) }
   }
-  return <span className={'payment-cancel' + (reason ? ' payment-cancel--blocked' : '')}
+  // Su dung bien the danger (mau do) va ho tro fullWidth khi dat trong Order summary
+  return <span className={'payment-cancel' + (fullWidth ? ' payment-cancel--full' : '') + (reason ? ' payment-cancel--blocked' : '')}
     title={reason ?? undefined} tabIndex={reason ? 0 : undefined} aria-describedby={reason ? reasonId : undefined}>
-    <Button type="button" variant="secondary" size="sm" disabled={!!reason || busy} loading={busy}
+    <Button type="button" variant="danger" size={size} fullWidth={fullWidth} disabled={!!reason || busy} loading={busy}
       aria-describedby={reason ? reasonId : undefined} onClick={() => void cancel()}>Cancel Payment</Button>
     {reason && <span id={reasonId} role="tooltip" className="payment-cancel__reason">{reason}</span>}
     {error && <span role="alert" className="payment-cancel__error">{error}</span>}

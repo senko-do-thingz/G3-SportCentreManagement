@@ -351,10 +351,12 @@ function RegistrationForm({
         </Card>
       </form>
 
+      {/* Tang kich thuoc modal PAYMENT SUMMARY de tranh cac nut hanh dong bi tran ra ngoai */}
       <Modal
         open={registration !== null}
         onClose={() => undefined}
         dismissible={false}
+        size="lg"
         title="Payment summary"
         description={title}
         footer={

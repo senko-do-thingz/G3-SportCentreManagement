@@ -1,5 +1,7 @@
 /* Member Cancel Payment and Receptionist handoff controls. Theme tokens only. */
 .payment-cancel { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+/* Hien thi full-width va khoang cach dong bo khi dat ben duoi nut My membership and packages trong Order summary */
+.payment-cancel--full { display: flex; width: 100%; margin-top: var(--space-3); }
 .payment-cancel--blocked { cursor: not-allowed; }
 .payment-cancel--blocked .btn:disabled { border-color: var(--color-border); background: var(--color-surface-muted); color: var(--color-text-muted); opacity: 1; }
 .payment-cancel--blocked:focus-visible { border-radius: var(--radius-md); outline: 2px solid var(--color-primary); outline-offset: 2px; }

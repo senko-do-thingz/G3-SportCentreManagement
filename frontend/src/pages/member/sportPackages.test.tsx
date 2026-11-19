@@ -336,6 +336,8 @@ describe('FE-03 Package Detail and Registration (F1-10)', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm registration' }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Payment summary' })
+    // Kiem tra modal Payment summary co size lg de khong bi tran nut View my registration
+    expect(dialog).toHaveClass('modal--lg')
     expect(within(dialog).getByText('REG-0040')).toBeInTheDocument()
     expect(within(dialog).getByText('PAY-0052')).toBeInTheDocument()
     expect(within(dialog).getByTestId('amount-payable')).toHaveTextContent('810.000 VND')
