@@ -7,6 +7,7 @@ import { memberSessionsApi } from '../../api/memberSessionsApi'
 import { Badge, Button, Card, PageHeader, PageLoader, buttonClassName } from '../../components/ui'
 import { useAuth } from '../../auth/useAuth'
 import { AgeRestrictionNotice } from './AgeVerificationNotices'
+import { sessionCalendarHref } from './bookingPresentation'
 import { BrowseError } from './BrowseError'
 import { CoachProfileModal } from './CoachProfileModal'
 import { MemberScheduleNav } from './MemberScheduleNav'
@@ -47,6 +48,8 @@ function SessionDetailContent({ id, returnTo }: { id: number | SessionId; return
   const self = session.trainingFormat === 'SELF_TRAINING'
   const packageState = ['NO_PACKAGE', 'NO_SESSIONS_LEFT', 'PACKAGE_EXPIRED_BY_THEN', 'PACKAGE_NOT_STARTED_BY_THEN'].includes(state)
   const bookingLink = `/member/bookings/new?${new URLSearchParams({ sessionId: sessionRouteReference(session), returnTo })}`
+  // Chi cho phep tai file lich .ics khi Member da dat buoi tap nay
+  const calendarHref = state === 'ALREADY_BOOKED' ? sessionCalendarHref(session) : null
   return <div className="page browse-page member-schedule-theme">
     <MemberScheduleNav />
     <PageHeader eyebrow="Member / Classes & schedule" title={state === 'ELIGIBLE' && self ? 'Session Detail - Self-training' : copy.title} description="Choose a session before selecting your sport package. Times use Vietnam time (UTC+7)." />
@@ -65,7 +68,16 @@ function SessionDetailContent({ id, returnTo }: { id: number | SessionId; return
           {!dateOfBirthMissingForAgeGroup && <p>{copy.message}</p>}
           {state === 'AGE_RESTRICTED' && <AgeRestrictionNotice ageGroupLabel={session.ageGroupLabel} hasDateOfBirth={hasDob} />}
           {packageState && <SessionPackageRecommendations session={session} returnTo={returnTo} />}
-          {state === 'ALREADY_BOOKED' && <Link className={buttonClassName('secondary')} to="/member/bookings">View my booking</Link>}
+          {state === 'ALREADY_BOOKED' && (
+            <>
+              {calendarHref && (
+                <a className={buttonClassName('secondary')} href={calendarHref} download={`${sessionRouteReference(session)}.ics`}>
+                  Add to calendar (.ics)
+                </a>
+              )}
+              <Link className={buttonClassName('secondary')} to="/member/bookings">View my booking</Link>
+            </>
+          )}
           {state === 'ELIGIBLE' && <><p className="notice notice--info">Continue to choose an eligible package and review this booking. No booking has been created yet.</p><Link className={buttonClassName()} to={bookingLink}>Book session</Link></>}
           <Link className={buttonClassName('secondary')} to={returnTo}>Find another class</Link>
         </div>

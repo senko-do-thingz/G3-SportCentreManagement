@@ -130,6 +130,15 @@ describe('F1-05 Log in', () => {
     expect(calls.filter((call) => call.path === '/auth/login')).toHaveLength(0)
   })
 
+  it('renders a single combined Terms of Service and Privacy Policy link on login', async () => {
+    installFakeFetch(authBackend())
+    renderApp('/login')
+
+    // Kiem tra ca cum tu duoc gop thanh 1 the Link duy nhat tro den /terms
+    const legalLink = await screen.findByRole('link', { name: 'Terms of Service and Privacy Policy' })
+    expect(legalLink).toHaveAttribute('href', '/terms')
+  })
+
   it('shows and hides the password with the Show button', async () => {
     installFakeFetch(authBackend())
     const user = userEvent.setup()

@@ -303,6 +303,11 @@
   overflow-wrap: anywhere;
 }
 
+/* Khoang cach dong bo giua danh sach thong tin va thong bao trong khung Public preview */
+.profile-layout__side .summary-list {
+  margin-bottom: var(--space-4);
+}
+
 .profile-layout .profile-summary__note {
   margin-bottom: var(--space-4);
 }

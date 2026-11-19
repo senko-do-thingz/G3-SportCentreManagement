@@ -141,4 +141,15 @@ describe('FE-08 session detail', () => {
    expect(screen.getByRole('link', { name: 'Book session' })).toHaveAttribute('href', '/member/bookings/new?sessionId=161026BK01&returnTo=%2Fmember%2Fclasses')
    expect(calls.calls.some(call => call.path === '/sessions/by-code/161026BK01')).toBe(true)
    expect(calls.calls.some(call => call.path === '/sessions/161026BK01')).toBe(false)
+   // Chua dat cho thi khong hien thi nut tai file .ics
+   expect(screen.queryByRole('link', { name: 'Add to calendar (.ics)' })).not.toBeInTheDocument()
+ })
+
+ it('shows .ics calendar download on session detail only when already booked', async () => {
+   backend({ ...detail, alreadyBooked: true, eligible: false, reason: 'ALREADY_BOOKED' })
+   renderApp('/member/sessions/5')
+   const calendarLink = await screen.findByRole('link', { name: 'Add to calendar (.ics)' })
+   expect(calendarLink).toHaveAttribute('download', '5.ics')
+   expect(calendarLink.getAttribute('href')).toContain('data:text/calendar')
+   expect(screen.getByRole('link', { name: 'View my booking' })).toHaveAttribute('href', '/member/bookings')
  })
