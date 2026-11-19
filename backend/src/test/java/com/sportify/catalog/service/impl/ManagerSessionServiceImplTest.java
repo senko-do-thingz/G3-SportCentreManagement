@@ -822,4 +822,58 @@ class ManagerSessionServiceImplTest {
         assertThrows(BusinessRuleException.class, () -> service.deleteSession(100L, "   ", manager));
         verifyNoInteractions(sessions, audit);
     }
+
+    @Test
+    void coachNotifications_sentForPublishedCreatePublishReassignRescheduleAndCancelOnly() {
+        validClass();
+        validAssignment();
+        saveBatch();
+        // Tao ca day PUBLISHED se gui thong bao COACH_SESSION_ASSIGNED cho Coach
+        service.createSessions(10L, single(), manager);
+        verify(notifications).notifyUser(eq(20L), contains("191026FB01"), contains("Football Fundamentals"),
+                eq("COACH_SESSION_ASSIGNED"), eq("COACH_SESSION:100:0:ASSIGNED:20"), eq(100L), eq(0L));
+
+        // Tao ca day DRAFT khong gui thong bao cho den khi publish
+        clearInvocations(notifications);
+        var draftReq = create(DATE, null, null, null, 16, TrainingFormat.COACH_LED, SessionStatus.DRAFT);
+        service.createSessions(10L, draftReq, manager);
+        verify(notifications, never()).notifyUser(anyLong(), anyString(), anyString(), anyString(), anyString(), any(), any());
+
+        ClassSession draft = existing(100L);
+        draft.setStatus(SessionStatus.DRAFT);
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(draft));
+        when(sessions.saveAndFlush(draft)).thenReturn(draft);
+        service.publishSession(100L, manager);
+        verify(notifications).notifyUser(eq(20L), contains("191026FB01"), contains("Football Fundamentals"),
+                eq("COACH_SESSION_ASSIGNED"), eq("COACH_SESSION:100:0:ASSIGNED:20"), eq(100L), eq(0L));
+
+        // Doi Coach tren ca day PUBLISHED se thong bao cho ca Coach moi (ASSIGNED) va Coach cu (UNASSIGNED)
+        clearInvocations(notifications);
+        CoachProfile secondCoach = CoachProfile.builder().id(21L).userAccount(UserAccount.builder().id(21L)
+                .fullName("Alex Coach").role(Role.builder().code("COACH").build()).status("ACTIVE").build()).build();
+        when(coaches.findForScheduleUpdate(21L)).thenReturn(Optional.of(secondCoach));
+        when(qualifications.existsById(new CoachSportId(21L, 1L))).thenReturn(true);
+        ClassSession published = existing(100L);
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(published));
+        when(sessions.saveAndFlush(published)).thenReturn(published);
+        service.updateSession(100L, new SessionUpdateRequest(DATE, START, END, 30L, 21L, 16), manager);
+        verify(notifications).notifyUser(eq(21L), contains("191026FB01"), contains("Football Fundamentals"),
+                eq("COACH_SESSION_ASSIGNED"), eq("COACH_SESSION:100:1:ASSIGNED:21"), eq(100L), eq(1L));
+        verify(notifications).notifyUser(eq(20L), contains("191026FB01"), contains("Football Fundamentals"),
+                eq("COACH_SESSION_UNASSIGNED"), eq("COACH_SESSION:100:1:UNASSIGNED:20"), eq(100L), eq(1L));
+
+        // Doi gio tren cung Coach se gui thong bao SESSION_CHANGED cho Coach
+        clearInvocations(notifications);
+        service.updateSession(100L, new SessionUpdateRequest(DATE, START.plusHours(1), END.plusHours(1), 30L, 21L, 16), manager);
+        verify(notifications).notifyUser(eq(21L), eq("Assigned session schedule changed"), contains("191026FB01"),
+                eq("SESSION_CHANGED"), eq("COACH_SESSION:100:2:SESSION_CHANGED:21"), eq(100L), eq(2L));
+
+        // Huy ca day PUBLISHED se gui thong bao SESSION_CANCELLED cho Coach
+        clearInvocations(notifications);
+        when(cancellations.cancelConfirmedBookings(eq(100L), anyLong(), anyString(), any()))
+                .thenReturn(new SessionCancellationRepository.CancellationResult(0, List.of()));
+        service.cancelSession(100L, new SessionCancelRequest("Court maintenance"), manager);
+        verify(notifications).notifyUser(eq(21L), eq("Assigned session cancelled"), contains("Court maintenance"),
+                eq("SESSION_CANCELLED"), eq("COACH_SESSION:100:2:SESSION_CANCELLED:21"), eq(100L), eq(2L));
+    }
 }

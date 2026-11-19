@@ -53,6 +53,7 @@ class MyProfileIntegrationTest extends AbstractIntegrationTest {
     @Autowired RoleRepository roles;
     @Autowired MemberProfileRepository members;
     @Autowired CoachProfileRepository coaches;
+    @Autowired CoachCertificationRepository certifications;
     @Autowired CoachSportRepository coachSports;
     @Autowired SportRepository sports;
     @Autowired MembershipCardTierRepository tiers;
@@ -71,9 +72,11 @@ class MyProfileIntegrationTest extends AbstractIntegrationTest {
     void cleanup() {
         assertThat(workerPools).allMatch(ExecutorService::isTerminated, "writers stopped before cleanup");
         String own = "SELECT id FROM user_account WHERE email LIKE ?";
+        jdbc.update("DELETE FROM notification WHERE user_id IN (" + own + ")", marker + "%");
         jdbc.update("DELETE FROM activity_log WHERE actor_user_id IN (" + own + ")"
                 + " OR (action = 'LOGIN_FAILED' AND JSON_VALUE(details, '$.email') LIKE ?)", marker + "%", marker + "%");
         jdbc.update("DELETE FROM member_card WHERE member_id IN (" + own + ")", marker + "%");
+        jdbc.update("DELETE FROM coach_certification WHERE coach_id IN (" + own + ")", marker + "%");
         jdbc.update("DELETE FROM coach_sport WHERE coach_id IN (" + own + ")", marker + "%");
         jdbc.update("DELETE FROM coach_profile WHERE user_id IN (" + own + ")", marker + "%");
         jdbc.update("DELETE FROM member_profile WHERE user_id IN (" + own + ")", marker + "%");
@@ -489,5 +492,68 @@ class MyProfileIntegrationTest extends AbstractIntegrationTest {
         assertThat(storedHash(owner)).isEqualTo(before);
         assertThat(jdbc.queryForObject("SELECT status FROM user_account WHERE id = ?", String.class, owner.getId())).isEqualTo("INACTIVE");
         assertThat(auditCount(owner)).isZero();
+    }
+
+    @Test
+    void coachCanCustomizeSelfProfileAndCertificationsFromCenterCatalog() throws Exception {
+        // Tao 2 coach: 1 coach co chung chi san trong danh muc trung tam va 1 coach tu cap nhat ho so
+        var catalogCoach = account("COACH");
+        var coach = account("COACH");
+        var member = account("MEMBER");
+        var sp = sport();
+        coachSports.saveAllAndFlush(List.of(
+                CoachSport.of(catalogCoach.getId(), sp.getId()),
+                CoachSport.of(coach.getId(), sp.getId())
+        ));
+        jdbc.update("UPDATE coach_profile SET is_public = 1, display_order = 3 WHERE user_id = ?", coach.getId());
+        certifications.saveAndFlush(CoachCertification.builder()
+                .coach(coaches.findById(catalogCoach.getId()).orElseThrow())
+                .name("BWF Coach Level 2")
+                .issuer("Badminton World Federation")
+                .isVerified(true)
+                .build());
+
+        var initial = call(own(get("/api/v1/coach/profile"), coach), 200);
+        assertThat(initial.path("coachId").asLong()).isEqualTo(coach.getId());
+        assertThat(initial.path("isPublic").asBoolean()).isTrue();
+        assertThat(initial.path("certificationOptions").toString()).contains("BWF Coach Level 2");
+
+        // Cap nhat headline, bio, yearsExperience, specialties ma khong lam thay doi isPublic
+        var updated = call(body(own(put("/api/v1/coach/profile"), coach), Map.of(
+                "headline", "National team mentor",
+                "bio", "Updated coaching biography for member directory.",
+                "yearsExperience", 9,
+                "specialties", "Footwork, Singles Strategy"
+        )), 200);
+        assertThat(updated.path("headline").asText()).isEqualTo("National team mentor");
+        assertThat(updated.path("yearsExperience").asInt()).isEqualTo(9);
+        assertThat(updated.path("isPublic").asBoolean()).isTrue();
+        assertThat(updated.path("displayOrder").asInt()).isEqualTo(3);
+
+        // Tu choi chung chi ngoai danh muc va chap nhan chung chi co trong danh muc trung tam
+        call(body(own(post("/api/v1/coach/profile/certifications"), coach), Map.of(
+                "name", "Unlisted Custom Certificate"
+        )), 400);
+
+        var withCert = call(body(own(post("/api/v1/coach/profile/certifications"), coach), Map.of(
+                "name", "BWF Coach Level 2",
+                "issuer", "Badminton World Federation",
+                "issuedOn", "2023-05-10"
+        )), 200);
+        assertThat(withCert.path("certifications").size()).isEqualTo(1);
+        long certId = withCert.path("certifications").get(0).path("id").asLong();
+        assertThat(withCert.path("certifications").get(0).path("isVerified").asBoolean()).isFalse();
+
+        // Kiem tra ho so cong khai tren trang Member /api/v1/coaches/{id} phan anh thay doi
+        var publicView = call(own(get("/api/v1/coaches/" + coach.getId()), member), 200);
+        assertThat(publicView.path("headline").asText()).isEqualTo("National team mentor");
+        assertThat(publicView.path("bio").asText()).isEqualTo("Updated coaching biography for member directory.");
+        assertThat(publicView.path("yearsExperience").asInt()).isEqualTo(9);
+        assertThat(publicView.path("certifications").size()).isEqualTo(1);
+        assertThat(publicView.path("certifications").get(0).path("name").asText()).isEqualTo("BWF Coach Level 2");
+
+        // Xoa chung chi
+        var afterDelete = call(own(delete("/api/v1/coach/profile/certifications/" + certId), coach), 200);
+        assertThat(afterDelete.path("certifications").size()).isZero();
     }
 }

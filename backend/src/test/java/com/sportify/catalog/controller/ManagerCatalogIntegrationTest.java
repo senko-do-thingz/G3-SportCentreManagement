@@ -224,6 +224,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         jdbcTemplate.update("DELETE FROM invoice_line WHERE invoice_id IN (SELECT id FROM invoice WHERE member_id IN (SELECT user_id FROM member_profile WHERE member_code LIKE '%" + MARKER + "%'))");
         jdbcTemplate.update("DELETE FROM invoice WHERE member_id IN (SELECT user_id FROM member_profile WHERE member_code LIKE '%" + MARKER + "%')");
         jdbcTemplate.update("DELETE FROM payment WHERE member_id IN (SELECT user_id FROM member_profile WHERE member_code LIKE '%" + MARKER + "%') OR payment_code LIKE '%" + MARKER + "%'");
+        jdbcTemplate.update("DELETE FROM notification WHERE user_id IN (SELECT id FROM user_account WHERE email LIKE '%" + MARKER + "%')");
         jdbcTemplate.update("DELETE FROM activity_log WHERE actor_user_id IN (SELECT id FROM user_account WHERE email LIKE '%" + MARKER + "%') OR summary LIKE '%" + MARKER + "%' OR entity_code LIKE '%" + MARKER + "%' OR details LIKE '%" + MARKER + "%'");
         jdbcTemplate.update("DELETE FROM sport_package WHERE code LIKE '%" + MARKER + "%'");
         jdbcTemplate.update("DELETE FROM membership_card_tier WHERE code LIKE '%" + MARKER + "%'");

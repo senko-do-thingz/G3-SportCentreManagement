@@ -96,6 +96,7 @@ class ReceiptIntegrationTest extends AbstractIntegrationTest {
             jdbcTemplate.update("DELETE FROM invoice WHERE payment_id IN (" + payments + ")");
         }
         if (!userIds.isEmpty()) {
+            jdbcTemplate.update("DELETE FROM notification WHERE user_id IN (" + idList(userIds) + ")");
             jdbcTemplate.update("DELETE FROM activity_log WHERE actor_user_id IN (" + idList(userIds) + ")");
         }
         deleteByIds("sport_package_registration", registrationIds);

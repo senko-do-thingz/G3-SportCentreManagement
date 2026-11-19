@@ -77,6 +77,7 @@ class ManagerUserIntegrationTest extends AbstractIntegrationTest {
     @AfterEach
     void cleanUp() {
         String ids = "SELECT id FROM user_account WHERE email LIKE '%" + MARKER + "%'";
+        jdbcTemplate.update("DELETE FROM notification WHERE user_id IN (" + ids + ")");
         jdbcTemplate.update("DELETE FROM activity_log WHERE entity_type = 'USER_ACCOUNT' AND entity_id IN (" + ids + ")");
         jdbcTemplate.update("DELETE FROM coach_sport WHERE coach_id IN (" + ids + ")");
         jdbcTemplate.update("DELETE FROM coach_profile WHERE user_id IN (" + ids + ")");

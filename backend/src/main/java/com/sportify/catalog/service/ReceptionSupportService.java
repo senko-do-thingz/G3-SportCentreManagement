@@ -62,6 +62,7 @@ public class ReceptionSupportService {
     private final AuditService audit;
     private final EntityManager em;
     private final ObjectMapper json;
+    private final OperationalNotificationService notifications;
     private static final String SELECT="""
         SELECT q.*,m.member_code,u.full_name,s.session_code,
             (SELECT COUNT(*) FROM support_request_message x WHERE x.request_id=q.id AND x.sender_id<>q.member_id) reply_count
@@ -306,17 +307,19 @@ public class ReceptionSupportService {
     }
     private long insert(long creator,long member,Category category,String subject,String description,Long booking,Long assigned,UUID operation,String fingerprint) {
         Long sequence=jdbc.queryForObject("SELECT NEXT VALUE FOR seq_support_request_code",Long.class);
+        String requestCode="SUP-"+sequence;
         var keys=new GeneratedKeyHolder();var now=LocalDateTime.now(clock);
         jdbc.update(connection->{var statement=connection.prepareStatement("INSERT support_request(request_code,member_id,category,subject,description,assigned_staff_id,intake_created_by,intake_booking_id,intake_operation_id,intake_fingerprint,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",new String[]{"id"});
-            Object[] values={"SUP-"+sequence,member,category.name(),subject,description,assigned,creator,booking,operation.toString(),fingerprint,now,now};
+            Object[] values={requestCode,member,category.name(),subject,description,assigned,creator,booking,operation.toString(),fingerprint,now,now};
             for(int i=0;i<values.length;i++)statement.setObject(i+1,values[i]);return statement;},keys);
-        return Objects.requireNonNull(keys.getKey()).longValue();
+        long id=Objects.requireNonNull(keys.getKey()).longValue();
+        // Ghi ngay thong bao cho cac Receptionist dang ACTIVE de nhan duoc khi offline va khop event_key voi ReceptionInboxService
+        String shortSubject=subject.length()>120?subject.substring(0,120):subject;
+        notifications.notifyRole("RECEPTIONIST","Support request "+requestCode,"Open member support request: "+shortSubject,"RECEPTION_TASK","SUPPORT_REQUEST:"+id);
+        return id;
     }
     private void notifyMember(Ticket ticket,String event,String type,String title,String content) {
-        jdbc.update("""
-            INSERT notification(user_id,title,content,type,created_at,event_key)
-            SELECT ?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM notification WITH(UPDLOCK,HOLDLOCK) WHERE user_id=? AND event_key=?)
-            """,ticket.memberId(),title,content,type,LocalDateTime.now(clock),event,ticket.memberId(),event);
+        notifications.notifyUser(ticket.memberId(),title,content,type,event,null,null);
     }
     private static String eventPrefix(long id){return "SUPPORT:"+id+":";}
     private void staffAccount(long actor,boolean lock) {

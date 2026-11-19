@@ -67,4 +67,44 @@ describe('Header inbox', () => {
     expect(screen.queryByRole('link', { name: 'View all' })).not.toBeInTheDocument()
     expect(calls.some(call => call.path.startsWith('/reception/inbox') || call.path.startsWith('/member/notifications'))).toBe(false)
   })
+
+  it('displays Coach session assignment notifications, marks read and navigates to teaching schedule', async () => {
+    let read = false
+    const coachNotice = {
+      id: 19,
+      title: 'Assigned to session 201126BD01',
+      content: 'You have been assigned to teach Badminton Fundamentals (201126BD01) on 2026-11-20.',
+      type: 'COACH_SESSION_ASSIGNED',
+      read: false,
+      createdAt: '2026-11-19T08:00:00',
+      currentSchedule: {
+        id: 100,
+        code: '201126BD01',
+        className: 'Badminton Fundamentals',
+        date: '2026-11-20',
+        startTime: '09:00:00',
+        endTime: '10:00:00',
+        coachName: 'Tran Minh Quan',
+        facilityName: 'Court 1',
+        status: 'PUBLISHED',
+        revision: 0,
+      },
+    }
+    const { calls } = setup('COACH', '/coach/roster', (path, method) => {
+      if (path === '/staff/notifications/19/read' && method === 'PUT') {
+        read = true
+        return new Response(null, { status: 204 })
+      }
+      if (path === '/staff/notifications') return json(200, [{ ...coachNotice, read }])
+      return null
+    })
+    const user = userEvent.setup()
+    const button = await screen.findByRole('button', { name: 'Inbox, 1 unread' })
+    await user.click(button)
+    const panel = screen.getByRole('region', { name: 'Recent notifications' })
+    expect(within(panel).getByRole('link', { name: 'View all' })).toHaveAttribute('href', '/coach/notifications')
+    await user.click(within(panel).getByRole('button', { name: /Assigned to session 201126BD01/ }))
+    await waitFor(() => expect(calls.some(c => c.method === 'PUT' && c.path === '/staff/notifications/19/read')).toBe(true))
+    expect(await screen.findByRole('heading', { name: 'Teaching Schedule' })).toBeInTheDocument()
+  })
 })

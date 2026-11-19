@@ -158,6 +158,7 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
             // failed before it recorded an id (a sale made through the API) still leaves nothing behind.
             String users = idList(userIds);
             String memberPayments = "SELECT id FROM payment WHERE member_id IN (" + users + ")";
+            jdbcTemplate.update("DELETE FROM notification WHERE user_id IN (" + users + ")");
             jdbcTemplate.update("DELETE FROM activity_log WHERE actor_user_id IN (" + users + ")"
                     + " OR (entity_type = 'PAYMENT' AND entity_id IN (" + memberPayments + "))");
             jdbcTemplate.update("DELETE FROM invoice_line WHERE invoice_id IN (SELECT id FROM invoice WHERE member_id IN ("

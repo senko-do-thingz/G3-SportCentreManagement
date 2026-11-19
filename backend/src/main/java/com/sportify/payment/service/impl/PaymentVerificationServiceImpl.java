@@ -75,6 +75,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
     private final CodeFormatter codeFormatter;
     private final Clock clock;
     private final MemberAccountEligibility memberAccountEligibility;
+    private final com.sportify.catalog.service.OperationalNotificationService notifications;
 
     @Override
     @Transactional(readOnly = true)
@@ -404,6 +405,13 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                         + amountReceived.toPlainString() + ", expected " + payment.getAmount().toPlainString(), SUMMARY_MAX))
                 .details(details)
                 .build());
+
+        // Ghi ngay thong bao PAYMENT_EXCEPTION cho ca RECEPTIONIST va MANAGER de nhan duoc ke ca khi offline
+        String eventKey = "PAYMENT_EXCEPTION:" + payment.getId();
+        String title = "Payment needs review " + payment.getPaymentCode();
+        String content = "An amount mismatch was recorded. The payment is still pending.";
+        notifications.notifyRole("RECEPTIONIST", title, content, "RECEPTION_TASK", eventKey);
+        notifications.notifyRole("MANAGER", title, content, "PAYMENT_EXCEPTION", eventKey);
     }
 
     /**

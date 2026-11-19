@@ -95,6 +95,7 @@ class ManagerClassIntegrationTest extends AbstractIntegrationTest {
         String classIds = "SELECT id FROM sport_class WHERE name LIKE '%" + MARKER + "%' OR code LIKE '%" + MARKER + "%'";
 
         jdbcTemplate.update("DELETE FROM activity_log WHERE (entity_type = 'SPORT_CLASS' AND entity_id IN (" + classIds + ")) OR actor_user_id IN (" + userIds + ")");
+        jdbcTemplate.update("DELETE FROM notification WHERE user_id IN (" + userIds + ")");
         jdbcTemplate.update("DELETE FROM booking WHERE session_id IN (SELECT id FROM class_session WHERE class_id IN (" + classIds + ")) OR member_id IN (" + userIds + ")");
         jdbcTemplate.update("DELETE FROM class_session WHERE class_id IN (" + classIds + ")");
         jdbcTemplate.update("DELETE FROM sport_class WHERE id IN (" + classIds + ")");

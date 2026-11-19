@@ -59,6 +59,7 @@ public final class FrontDeskFixtures {
     }
 
     public void deleteCreatedMembers() {
+        jdbc.update("DELETE FROM notification WHERE user_id IN (SELECT id FROM user_account WHERE email LIKE ?)", marker + "%");
         jdbc.update("DELETE FROM member_profile WHERE user_id IN (SELECT id FROM user_account WHERE email LIKE ?)", marker + "%");
         jdbc.update("DELETE FROM user_account WHERE email LIKE ?", marker + "%");
     }

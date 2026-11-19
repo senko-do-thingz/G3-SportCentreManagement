@@ -27,6 +27,7 @@ class ReleaseOnboardingIntegrationTest extends AbstractIntegrationTest {
         if(fixtureMarker==null) return;
         String owners="SELECT id FROM user_account WHERE email IN (?,?)";
         Object[] emails={fixtureMarker+"_desk@release.invalid",fixtureMarker+"@release.invalid"};
+        jdbc.update("DELETE FROM notification WHERE user_id IN ("+owners+")",emails);
         jdbc.update("DELETE FROM activity_log WHERE actor_user_id IN ("+owners+")",emails);
         jdbc.update("DELETE FROM member_profile WHERE user_id IN ("+owners+")",emails);
         jdbc.update("DELETE FROM user_account WHERE email IN (?,?)",emails);

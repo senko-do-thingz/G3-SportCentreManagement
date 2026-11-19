@@ -33,6 +33,7 @@ class ReleaseCatalogIntegrationTest extends AbstractIntegrationTest {
     }
     @AfterEach void cleanup() {
         if(fixtureSession!=null) jdbc.update("DELETE FROM class_session WHERE id=?",fixtureSession);
+        jdbc.update("DELETE FROM notification WHERE user_id=?",manager.getId());
         jdbc.update("DELETE FROM activity_log WHERE actor_user_id=?",manager.getId());
         jdbc.update("DELETE FROM facility WHERE code=?",code);
         jdbc.update("DELETE FROM sport WHERE code=?",code);

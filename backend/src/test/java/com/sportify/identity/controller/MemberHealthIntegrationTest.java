@@ -79,6 +79,7 @@ class MemberHealthIntegrationTest extends AbstractIntegrationTest {
     void cleanup() {
         String accounts = "SELECT id FROM user_account WHERE email LIKE ?";
         String like = marker + "%";
+        jdbc.update("DELETE FROM notification WHERE user_id IN (" + accounts + ")", like);
         jdbc.update("DELETE FROM member_health_assessment WHERE member_id IN (" + accounts + ")", like);
         jdbc.update("DELETE FROM booking WHERE member_id IN (" + accounts + ")", like);
         jdbc.update("DELETE FROM class_session WHERE class_id IN (SELECT id FROM sport_class WHERE code LIKE ?)", like);

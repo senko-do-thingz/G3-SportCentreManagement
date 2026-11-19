@@ -10,8 +10,32 @@ export const INBOX_CHANGED_EVENT = 'sportify:reception-inbox-changed'
 export interface InboxEntry { id: number; title: string; content: string; createdAt: string; read: boolean; link: string | null }
 export interface InboxFeed { entries: InboxEntry[]; unread: number }
 
-const fromNotices = (notices: OwnNotice[]): InboxFeed => ({
-  entries: notices.map(notice => ({ id: notice.id, title: notice.title, content: notice.content, createdAt: notice.createdAt, read: notice.read, link: null })),
+// Anh xa duong dan dieu huong tu loai thong bao hoac event_key cho Member, Coach va Manager
+function noticeLink(role: Role, notice: OwnNotice): string | null {
+  if (role === 'COACH') {
+    if (notice.type === 'COACH_SESSION_ASSIGNED' || notice.type === 'COACH_SESSION_UNASSIGNED'
+      || notice.type === 'SESSION_CHANGED' || notice.type === 'SESSION_CANCELLED') {
+      const date = notice.currentSchedule?.date
+      return date ? `/coach?week=${encodeURIComponent(date)}` : '/coach'
+    }
+  }
+  if (role === 'MANAGER') {
+    if (notice.type === 'PAYMENT_EXCEPTION' || notice.eventKey?.startsWith('PAYMENT_EXCEPTION:')) {
+      return '/manager/transactions'
+    }
+  }
+  return null
+}
+
+const fromNotices = (role: Role, notices: OwnNotice[]): InboxFeed => ({
+  entries: notices.map(notice => ({
+    id: notice.id,
+    title: notice.title,
+    content: notice.content,
+    createdAt: notice.createdAt,
+    read: notice.read,
+    link: noticeLink(role, notice),
+  })),
   unread: notices.filter(notice => !notice.read).length,
 })
 
@@ -23,8 +47,8 @@ export function loadInbox(role: Role, signal?: AbortSignal): Promise<InboxFeed> 
       unread: inbox.unreadOpen,
     }))
   }
-  if (role === 'MEMBER') return memberNotificationApi.get(signal).then(inbox => fromNotices(inbox.notices ?? []))
-  return staffNotificationApi.get(signal).then(fromNotices)
+  if (role === 'MEMBER') return memberNotificationApi.get(signal).then(inbox => fromNotices(role, inbox.notices ?? []))
+  return staffNotificationApi.get(signal).then(notices => fromNotices(role, notices ?? []))
 }
 
 /** Presentation state only: marking read never resolves the underlying task. */

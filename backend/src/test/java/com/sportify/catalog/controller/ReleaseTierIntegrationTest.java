@@ -27,6 +27,7 @@ class ReleaseTierIntegrationTest extends AbstractIntegrationTest {
     @AfterEach void cleanupOwnedRows() {
         String owners="SELECT id FROM user_account WHERE email IN (?,?)";
         Object[] emails={code+"@release.invalid",code+"_member@release.invalid"};
+        jdbc.update("DELETE FROM notification WHERE user_id IN ("+owners+")",emails);
         jdbc.update("DELETE FROM activity_log WHERE actor_user_id IN ("+owners+")",emails);
         jdbc.update("DELETE FROM member_card WHERE member_id IN ("+owners+")",emails);
         jdbc.update("DELETE FROM member_profile WHERE user_id IN ("+owners+")",emails);

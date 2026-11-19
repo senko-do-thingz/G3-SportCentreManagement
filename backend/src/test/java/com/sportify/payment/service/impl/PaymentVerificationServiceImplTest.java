@@ -85,6 +85,8 @@ class PaymentVerificationServiceImplTest {
     private AuditService auditService;
     @Mock
     private BankTransferProperties bankProperties;
+    @Mock
+    private com.sportify.catalog.service.OperationalNotificationService notifications;
 
     private PaymentServiceImpl paymentService;
 
@@ -102,7 +104,7 @@ class PaymentVerificationServiceImplTest {
                 resolver, bankProperties, new CodeFormatter(), clock, org.mockito.Mockito.mock(com.sportify.payment.service.impl.CashCaptureService.class));
         service = new PaymentVerificationServiceImpl(paymentRepository, invoiceRepository, resolver,
                 paymentService, membershipCardService, sportPackageService, auditService, new CodeFormatter(), clock,
-                org.mockito.Mockito.mock(com.sportify.catalog.service.MemberAccountEligibility.class));
+                org.mockito.Mockito.mock(com.sportify.catalog.service.MemberAccountEligibility.class), notifications);
 
         receptionist = UserAccount.builder().id(7L).fullName("Rita Reception")
                 .role(Role.builder().code("RECEPTIONIST").name("Receptionist").build()).build();
@@ -351,6 +353,11 @@ class PaymentVerificationServiceImplTest {
                 .containsEntry("method", "BANK_TRANSFER")
                 .containsEntry("referenceCode", "FT2610140001")
                 .containsEntry("note", "Checked bank app");
+        // Kiem tra ghi thong bao PAYMENT_EXCEPTION cho ca RECEPTIONIST va MANAGER khi co sai lech so tien
+        verify(notifications).notifyRole(eq("RECEPTIONIST"), eq("Payment needs review PAY-1001"),
+                eq("An amount mismatch was recorded. The payment is still pending."), eq("RECEPTION_TASK"), eq("PAYMENT_EXCEPTION:1"));
+        verify(notifications).notifyRole(eq("MANAGER"), eq("Payment needs review PAY-1001"),
+                eq("An amount mismatch was recorded. The payment is still pending."), eq("PAYMENT_EXCEPTION"), eq("PAYMENT_EXCEPTION:1"));
         verifyNoInteractions(membershipCardService, sportPackageService, registrationRepository, memberCardRepository);
         verify(invoiceRepository, never()).save(any());
     }

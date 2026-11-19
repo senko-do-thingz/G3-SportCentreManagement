@@ -32,12 +32,26 @@ public class OperationalNotificationService {
     @Transactional public void changed(ClassSession session,List<Long> recipients,boolean cancelled) {
         String type=cancelled?"SESSION_CANCELLED":"SESSION_CHANGED";
         String event="SESSION:"+session.getId()+":"+session.getScheduleRevision()+":"+type;
-        for(long member:recipients) jdbc.update("""
+        for(long member:recipients) notifyUser(member,
+            cancelled?"Booked session cancelled":"Booked session schedule changed",
+            cancelled?"Your booked session was cancelled. Review your current bookings and restored package credits.":"Your booked session was updated. Review the current schedule before attending.",
+            type,event,session.getId(),session.getScheduleRevision());
+    }
+    // Ghi thong bao cho mot nguoi dung voi khoa (user_id, event_key) chong trung lap khi offline hoac retry
+    @Transactional public void notifyUser(long userId,String title,String content,String type,String eventKey,Long originSessionId,Long originRevision) {
+        String safeTitle=title!=null && title.length()>200?title.substring(0,200):title;
+        String safeContent=content!=null && content.length()>1000?content.substring(0,1000):content;
+        jdbc.update("""
             INSERT notification(user_id,title,content,type,created_at,event_key,origin_session_id,origin_revision)
             SELECT ?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM notification WITH(UPDLOCK,HOLDLOCK) WHERE user_id=? AND event_key=?)
-            """,member,cancelled?"Booked session cancelled":"Booked session schedule changed",
-            cancelled?"Your booked session was cancelled. Review your current bookings and restored package credits.":"Your booked session was updated. Review the current schedule before attending.",
-            type,LocalDateTime.now(clock),event,session.getId(),session.getScheduleRevision(),member,event);
+            """,userId,safeTitle,safeContent,type,LocalDateTime.now(clock),eventKey,originSessionId,originRevision,userId,eventKey);
+    }
+    // Ghi thong bao cho tat ca tai khoan dang ACTIVE thuoc mot role (vi du RECEPTIONIST hoac MANAGER) ngay khi su kien xay ra
+    @Transactional public void notifyRole(String roleCode,String title,String content,String type,String eventKey) {
+        var userIds=jdbc.queryForList("""
+            SELECT u.id FROM user_account u JOIN role r ON r.id=u.role_id WHERE r.code=? AND u.status='ACTIVE'
+            """,Long.class,roleCode);
+        for(long userId:userIds) notifyUser(userId,title,content,type,eventKey,null,null);
     }
     public Inbox inbox(long member) {
         if(expiryDays<0 || expiryDays>30) throw new IllegalStateException("Expiry notice window must be between 0 and 30 days");
@@ -67,9 +81,13 @@ public class OperationalNotificationService {
     }
     /** Manager/Coach header inbox: only the signed-in staff member's own notification rows, never another user's. */
     public List<Notice> own(long user) {
-        return jdbc.query("SELECT TOP (20) id,title,content,type,is_read,created_at,event_key,origin_revision FROM notification WHERE user_id=? ORDER BY created_at DESC,id DESC",
-            (rs,row)->new Notice(rs.getLong("id"),rs.getString("title"),rs.getString("content"),rs.getString("type"),rs.getBoolean("is_read"),
-                rs.getTimestamp("created_at").toLocalDateTime(),rs.getString("event_key"),rs.getObject("origin_revision",Long.class),null),user);
+        // Tra ve 100 thong bao moi nhat cua nhan vien hoac huan luyen vien kem thong tin lich day hien tai neu co
+        return jdbc.query("SELECT TOP (100) * FROM notification WHERE user_id=? ORDER BY created_at DESC,id DESC",
+            (rs,row)->{
+                Long session=rs.getObject("origin_session_id",Long.class);
+                return new Notice(rs.getLong("id"),rs.getString("title"),rs.getString("content"),rs.getString("type"),rs.getBoolean("is_read"),
+                    rs.getTimestamp("created_at").toLocalDateTime(),rs.getString("event_key"),rs.getObject("origin_revision",Long.class),session==null?null:schedule(session));
+            },user);
     }
     @Transactional public void read(long member,long id) {
         if(jdbc.update("UPDATE notification SET is_read=1 WHERE id=? AND user_id=?",id,member)!=1)
