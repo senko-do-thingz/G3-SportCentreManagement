@@ -514,7 +514,7 @@ class MyProfileIntegrationTest extends AbstractIntegrationTest {
                 .build());
 
         var initial = call(own(get("/api/v1/coach/profile"), coach), 200);
-        assertThat(initial.path("coachId").asLong()).isEqualTo(coach.getId());
+        assertThat(initial.path("userId").asLong()).isEqualTo(coach.getId());
         assertThat(initial.path("isPublic").asBoolean()).isTrue();
         assertThat(initial.path("certificationOptions").toString()).contains("BWF Coach Level 2");
 
@@ -542,7 +542,7 @@ class MyProfileIntegrationTest extends AbstractIntegrationTest {
         )), 200);
         assertThat(withCert.path("certifications").size()).isEqualTo(1);
         long certId = withCert.path("certifications").get(0).path("id").asLong();
-        assertThat(withCert.path("certifications").get(0).path("isVerified").asBoolean()).isFalse();
+        assertThat(withCert.path("certifications").get(0).path("verified").asBoolean()).isFalse();
 
         // Kiem tra ho so cong khai tren trang Member /api/v1/coaches/{id} phan anh thay doi
         var publicView = call(own(get("/api/v1/coaches/" + coach.getId()), member), 200);
