@@ -5,8 +5,8 @@ import { sporiApi, type ChatMessageItem, type ChatSession } from '../../api/spor
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { safeAssistantReturnTo } from './assistantNavigation'
-import { SporiAiBadge, SporiAvatar, SporiComposer, SporiCopyButton, SporiHandoff, SporiIcon, SporiSources, SporiText, SporiTyping } from './sporiChat'
-import { formatTime, useSporiChat, useSporiScroll } from './useSporiChat'
+import { SporiAiBadge, SporiAvatar, SporiComposer, SporiCopyButton, SporiDeleteConversationModal, SporiHandoff, SporiIcon, SporiSources, SporiText, SporiTyping } from './sporiChat'
+import { formatTime, isAbortError, stoppedTaskMessage, useSporiChat, useSporiScroll } from './useSporiChat'
 import './sporiChat.css'
 
 export function MemberAssistantLink({ onNavigate, className, label = 'Open center assistant' }: {
@@ -122,6 +122,10 @@ function CenterConsultationWorkspace() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [editingSessionId, setEditingSessionId] = useState<number | null>(null)
   const [editTitle, setEditTitle] = useState('')
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
+  const [deletingSession, setDeletingSession] = useState(false)
+  const sessionAbortRef = useRef<AbortController | null>(null)
+  const sessionQuestionRef = useRef('')
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -217,19 +221,54 @@ function CenterConsultationWorkspace() {
     }
   }, [])
 
-  const handleDelete = useCallback(async (sessionId: number, e: React.MouseEvent) => {
+  // Mo hop thoai xac nhan xoa thay cho window.confirm cua trinh duyet
+  const handleDelete = useCallback((sessionId: number, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!window.confirm('Are you sure you want to delete this conversation?')) return
+    setPendingDeleteId(sessionId)
+  }, [])
+
+  const confirmDelete = useCallback(async () => {
+    if (pendingDeleteId === null || deletingSession) return
+    const targetId = pendingDeleteId
+    setDeletingSession(true)
     try {
-      await sporiApi.deleteSession(sessionId)
-      setSessions(curr => curr.filter(s => s.id !== sessionId))
-      if (activeSessionId === sessionId) {
+      await sporiApi.deleteSession(targetId)
+      setSessions(curr => curr.filter(s => s.id !== targetId))
+      if (activeSessionId === targetId) {
         startNewChat()
       }
+      setPendingDeleteId(null)
     } catch (err) {
       console.error('Failed to delete session', err)
+    } finally {
+      setDeletingSession(false)
     }
-  }, [activeSessionId, startNewChat])
+  }, [activeSessionId, deletingSession, pendingDeleteId, startNewChat])
+
+  // Huy yeu cau dang tao cau tra loi o ca che do phien (session) va che do chat don
+  const handleStop = useCallback(() => {
+    const controller = sessionAbortRef.current
+    if (controller) {
+      const cancelledQuestion = sessionQuestionRef.current
+      sessionAbortRef.current = null
+      sessionQuestionRef.current = ''
+      controller.abort()
+      setSessionPending(false)
+      setActiveSessionMessages(prev => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          senderType: 'ASSISTANT',
+          content: stoppedTaskMessage(cancelledQuestion),
+          sentAt: new Date().toISOString()
+        }
+      ])
+      inputRef.current?.focus()
+      return
+    }
+    chat.stop()
+    inputRef.current?.focus()
+  }, [chat])
 
   const handleArchive = useCallback(async (sessionId: number, currentArchived: boolean, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -270,14 +309,19 @@ function CenterConsultationWorkspace() {
         sentAt: new Date().toISOString()
       }
       setActiveSessionMessages(prev => [...prev, tempUserMsg])
+      const controller = new AbortController()
+      sessionAbortRef.current = controller
+      sessionQuestionRef.current = text
       setSessionPending(true)
       try {
-        const res = await sporiApi.sendMessage(activeSessionId, text)
+        const res = await sporiApi.sendMessage(activeSessionId, text, controller.signal)
+        if (controller.signal.aborted || sessionAbortRef.current !== controller) return
         if (res && res.assistantMessage) {
           setActiveSessionMessages(prev => [...prev, res.assistantMessage])
           void fetchSessions()
         }
       } catch (err) {
+        if (controller.signal.aborted || isAbortError(err) || sessionAbortRef.current !== controller) return
         console.error('Failed to send message in session', err)
         setActiveSessionMessages(prev => [
           ...prev,
@@ -289,8 +333,12 @@ function CenterConsultationWorkspace() {
           }
         ])
       } finally {
-        setSessionPending(false)
-        inputRef.current?.focus()
+        if (sessionAbortRef.current === controller) {
+          sessionAbortRef.current = null
+          sessionQuestionRef.current = ''
+          setSessionPending(false)
+          inputRef.current?.focus()
+        }
       }
       return
     }
@@ -537,20 +585,28 @@ function CenterConsultationWorkspace() {
                   ? <div key={message.id} className="spori-row spori-row--user"><div className="spori-bubble"><SporiText text={message.text} /></div><time className="spori-time">{formatTime(message.at)}</time></div>
                   : message.role === 'error'
                     ? <div key={message.id} className="spori-row spori-row--bot"><SporiAvatar /><div className="spori-bubble is-error" role="alert"><SporiText text={message.text} /></div></div>
-                    : <AnswerBubble key={message.id} question={message.question} result={message.result} at={message.at} />)
+                    : message.role === 'stopped'
+                      ? <div key={message.id} className="spori-row spori-row--bot"><SporiAvatar /><div className="spori-bubble is-warning" role="status"><SporiText text={message.text} /></div></div>
+                      : <AnswerBubble key={message.id} question={message.question} result={message.result} at={message.at} />)
               )}
 
-              {pending && <SporiTyping label="Spori is typing…" />}
+              {pending && <SporiTyping label="Spori is typing..." />}
             </div>
 
             <div className="spori-page__composer">
-              <SporiComposer id="assistant-question" label="Your question" buttonLabel="Ask" placeholder="Message Spori…" value={question}
-                pending={pending} onChange={setQuestion} onSubmit={submit} inputRef={inputRef} />
+              <SporiComposer id="assistant-question" label="Your question" buttonLabel="Ask" placeholder="Message Spori..." value={question}
+                pending={pending} onChange={setQuestion} onSubmit={submit} onStop={handleStop} inputRef={inputRef} />
               <p className="spori-page__hint" aria-label="Privacy note">Answers come from Sportify data only. Personal details are never sent to AI.</p>
             </div>
           </>}
         </section>
       </div>
+      <SporiDeleteConversationModal
+        open={pendingDeleteId !== null}
+        deleting={deletingSession}
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={() => void confirmDelete()}
+      />
 
       {isMember && (
         <nav aria-label="Need help from a person?" className="spori-page__handoff">

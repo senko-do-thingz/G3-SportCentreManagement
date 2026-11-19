@@ -21,6 +21,8 @@ export function StaffLayout() {
   const workflowRoute = location.pathname === '/manager/schedule'
     || /^\/(coach|reception)\/training(?:\/|$)/.test(location.pathname)
     || /^\/reception\/payments\/[^/]+\/(qr-display|receipt)$/.test(location.pathname)
+  // An khung chat noi khi dang o trang tro ly toan man hinh cua tung vai tro
+  const onAssistantPage = /^\/(manager|coach|reception)\/assistant(?:\/|$)/.test(location.pathname)
 
   // RequireRole guarantees a staff role here; fall back to the manager menu for type safety only.
   const area = role && role !== 'MEMBER' ? STAFF_AREAS[role] : STAFF_AREAS.MANAGER
@@ -80,7 +82,7 @@ export function StaffLayout() {
         </main>
       </div>
       {/* Same Spori chat as Members; the server limits answers to this staff role's data. */}
-      <FloatingSporiChat />
+      {!onAssistantPage && <FloatingSporiChat />}
     </div>
   )
 }
