@@ -12,6 +12,14 @@ export interface InboxFeed { entries: InboxEntry[]; unread: number }
 
 // Anh xa duong dan dieu huong tu loai thong bao hoac event_key cho Member, Coach va Manager
 function noticeLink(role: Role, notice: OwnNotice): string | null {
+  if (role === 'MEMBER') {
+    if (notice.type === 'TRAINING_PLAN_ASSIGNED') {
+      return '/member/training/plans'
+    }
+    if (notice.type === 'TRAINING_FEEDBACK') {
+      return '/member/training/feedback'
+    }
+  }
   if (role === 'COACH') {
     if (notice.type === 'COACH_SESSION_ASSIGNED' || notice.type === 'COACH_SESSION_UNASSIGNED'
       || notice.type === 'SESSION_CHANGED' || notice.type === 'SESSION_CANCELLED') {

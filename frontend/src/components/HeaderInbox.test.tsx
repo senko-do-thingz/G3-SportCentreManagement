@@ -107,4 +107,57 @@ describe('Header inbox', () => {
     await waitFor(() => expect(calls.some(c => c.method === 'PUT' && c.path === '/staff/notifications/19/read')).toBe(true))
     expect(await screen.findByRole('heading', { name: 'Teaching Schedule' })).toBeInTheDocument()
   })
+
+  it('routes Member training plan and coach feedback notifications to their respective training pages', async () => {
+    const planNotice = {
+      id: 31,
+      title: 'New training plan assigned',
+      content: 'Your coach assigned a new training plan: "Footwork Focus". Open Training plans to review the exercises.',
+      type: 'TRAINING_PLAN_ASSIGNED',
+      read: false,
+      createdAt: '2026-11-19T09:00:00',
+    }
+    const feedbackNotice = {
+      id: 32,
+      title: 'New coach feedback received',
+      content: 'Your coach submitted feedback on your training plan "Footwork Focus". Open Coach feedback to review it.',
+      type: 'TRAINING_FEEDBACK',
+      read: false,
+      createdAt: '2026-11-19T09:05:00',
+    }
+    const readIds = new Set<number>()
+    const { calls } = setup('MEMBER', '/member/support', (path, method) => {
+      if (path === '/member/notifications/31/read' && method === 'PUT') {
+        readIds.add(31)
+        return new Response(null, { status: 204 })
+      }
+      if (path === '/member/notifications/32/read' && method === 'PUT') {
+        readIds.add(32)
+        return new Response(null, { status: 204 })
+      }
+      if (path === '/member/notifications') {
+        return json(200, {
+          notices: [
+            { ...planNotice, read: readIds.has(31) },
+            { ...feedbackNotice, read: readIds.has(32) },
+          ],
+          reminders: [],
+          expiryWindowDays: 7,
+        })
+      }
+      return null
+    })
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Inbox, 2 unread' }))
+    const panel = screen.getByRole('region', { name: 'Recent notifications' })
+    await user.click(within(panel).getByRole('button', { name: /New training plan assigned/ }))
+    await waitFor(() => expect(calls.some(c => c.method === 'PUT' && c.path === '/member/notifications/31/read')).toBe(true))
+    expect(await screen.findByRole('heading', { name: 'Training plans' })).toBeInTheDocument()
+
+    await user.click(await screen.findByRole('button', { name: 'Inbox, 1 unread' }))
+    const secondPanel = screen.getByRole('region', { name: 'Recent notifications' })
+    await user.click(within(secondPanel).getByRole('button', { name: /New coach feedback received/ }))
+    await waitFor(() => expect(calls.some(c => c.method === 'PUT' && c.path === '/member/notifications/32/read')).toBe(true))
+    expect(await screen.findByRole('heading', { name: 'Coach feedback' })).toBeInTheDocument()
+  })
 })
