@@ -82,12 +82,21 @@ function escapeCalendarText(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;')
 }
 
-export function bookingCalendarHref(booking: MemberBookingRecord): string | null {
-  const start = booking.startTime && calendarStamp(booking.sessionDate, booking.startTime)
-  const end = booking.endTime && calendarStamp(booking.sessionDate, booking.endTime)
+interface CalendarEventInput {
+  uid: string
+  sessionDate: string
+  startTime: string | null
+  endTime: string | null
+  title: string
+  location: string
+  description: string
+}
+
+// Tao duong dan data URI cho file .ics theo gio dia phuong trung tam (UTC+7) de tai xuong lich
+function buildCalendarHref(input: CalendarEventInput): string | null {
+  const start = input.startTime && calendarStamp(input.sessionDate, input.startTime)
+  const end = input.endTime && calendarStamp(input.sessionDate, input.endTime)
   if (!start || !end) return null
-  const title = booking.className || `${booking.sportName || 'Sport'} session`
-  const location = [booking.facilityName, booking.coachName].filter(Boolean).join(' - ')
   // Khai bao VTIMEZONE Asia/Ho_Chi_Minh (UTC+7) va TZID tren DTSTART/DTEND de Google Calendar giu dung gio 9AM
   const lines = [
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Sportify//Member Booking//EN', 'CALSCALE:GREGORIAN',
@@ -96,10 +105,39 @@ export function bookingCalendarHref(booking: MemberBookingRecord): string | null
     'BEGIN:STANDARD', 'TZOFFSETFROM:+0700', 'TZOFFSETTO:+0700', 'TZNAME:ICT', 'DTSTART:19700101T000000', 'END:STANDARD',
     'END:VTIMEZONE',
     'BEGIN:VEVENT',
-    `UID:booking-${booking.id}@sportify`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}`,
-    `DTSTART;TZID=${CENTER_TIME_ZONE}:${start}`, `DTEND;TZID=${CENTER_TIME_ZONE}:${end}`, `SUMMARY:${escapeCalendarText(title)}`,
-    ...(location ? [`LOCATION:${escapeCalendarText(location)}`] : []),
-    `DESCRIPTION:${escapeCalendarText(`Booking ${booking.bookingCode}; Session ID ${sessionIdText(booking.sessionCode)}`)}`, 'END:VEVENT', 'END:VCALENDAR', '',
+    `UID:${input.uid}@sportify`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}`,
+    `DTSTART;TZID=${CENTER_TIME_ZONE}:${start}`, `DTEND;TZID=${CENTER_TIME_ZONE}:${end}`, `SUMMARY:${escapeCalendarText(input.title)}`,
+    ...(input.location ? [`LOCATION:${escapeCalendarText(input.location)}`] : []),
+    `DESCRIPTION:${escapeCalendarText(input.description)}`, 'END:VEVENT', 'END:VCALENDAR', '',
   ]
   return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join('\r\n'))}`
+}
+
+export function bookingCalendarHref(booking: MemberBookingRecord): string | null {
+  const title = booking.className || `${booking.sportName || 'Sport'} session`
+  const location = [booking.facilityName, booking.coachName].filter(Boolean).join(' - ')
+  return buildCalendarHref({
+    uid: `booking-${booking.id}`,
+    sessionDate: booking.sessionDate,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    title,
+    location,
+    description: `Booking ${booking.bookingCode}; Session ID ${sessionIdText(booking.sessionCode)}`,
+  })
+}
+
+// Tai su dung cung logic tao file .ics cho trang chi tiet buoi tap khi Member da dat cho
+export function sessionCalendarHref(session: SessionDetail['session']): string | null {
+  const title = session.className || `${session.sportName || 'Sport'} session`
+  const location = [session.facilityName, session.coachName].filter(Boolean).join(' - ')
+  return buildCalendarHref({
+    uid: `session-${session.id}`,
+    sessionDate: session.sessionDate,
+    startTime: session.startTime,
+    endTime: session.endTime,
+    title,
+    location,
+    description: `Session ID ${sessionIdText(session.sessionId)}`,
+  })
 }

@@ -1,8 +1,10 @@
 import { useCallback, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { avatarSrc } from '../../api/avatarUrl'
 import { coachProfilesApi, type CoachCertificationOption, type CoachSelfProfile } from '../../api/coachProfilesApi'
 import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
 import { Badge, Button, CalendarDateField, Card, EmptyState, ErrorState, Input, Notice, PageHeader, PageLoader, Select, TextArea, useToast } from '../../components/ui'
+import { buttonClassName } from '../../components/ui/buttonClassName'
 import { useResource } from '../../hooks/useResource'
 import { formatCalendarDate } from '../../utils/dateDisplay'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
@@ -67,7 +69,8 @@ function CoachProfileContent({ initial }: { initial: CoachSelfProfile }) {
         <CoachPublicInfoCard profile={profile} onSaved={setProfile} />
         <CoachCertificationsCard profile={profile} onUpdated={setProfile} />
       </div>
-      <aside className="profile-layout__side" aria-label="Coach profile summary">
+      {/* Dong bo ten va bo cuc khung Public preview voi trang ho so Member */}
+      <aside className="profile-layout__side" aria-label="Public preview">
         <Card title="Public preview">
           <div className="profile-summary">
             <CoachAvatarPreview url={profile.avatarUrl ?? ''} name={profile.fullName} />
@@ -96,6 +99,9 @@ function CoachProfileContent({ initial }: { initial: CoachSelfProfile }) {
           <p className="notice notice--info profile-summary__note">
             Members see this profile when browsing classes and sessions so they can evaluate your coaching background.
           </p>
+          <Link className={buttonClassName('secondary', 'sm')} to="/coach/schedule">
+            View teaching schedule
+          </Link>
         </Card>
       </aside>
     </div>

@@ -127,10 +127,49 @@ class CoachSelfProfileServiceImplTest {
         assertEquals("Badminton", response.sports().getFirst().name());
         assertEquals(1, response.certifications().size());
         assertTrue(response.certifications().getFirst().verified());
-        // Danh sach lua chon chung chi duoc gop cac ban ghi trung lap
-        assertEquals(2, response.certificationOptions().size());
-        assertEquals("ASCA Level 2", response.certificationOptions().get(0).name());
-        assertEquals("BWF Level 1", response.certificationOptions().get(1).name());
+        // Danh sach lua chon chung chi gop danh muc chuan 6 mon voi cac ban ghi DB va loai bo trung lap
+        List<String> optionNames = response.certificationOptions().stream()
+                .map(CoachSelfProfileResponse.CertificationOption::name)
+                .toList();
+        assertTrue(optionNames.contains("ASCA Level 2"));
+        assertTrue(optionNames.contains("BWF Level 1"));
+        assertTrue(optionNames.contains("AFC C Coaching License"));
+        assertTrue(optionNames.contains("BWF Level 2 Coaching Certificate"));
+        assertTrue(optionNames.contains("FIBA Coaching Certificate"));
+        assertTrue(optionNames.contains("FIVB Level 1 Coaching Certificate"));
+        assertTrue(optionNames.contains("ASCA Swimming Coach Certification"));
+        assertTrue(optionNames.contains("ITF Level 1 Coaching Certificate"));
+        assertEquals(1, optionNames.stream().filter("BWF Level 1"::equals).count());
+    }
+
+    @Test
+    void getCertificationOptions_includesStandardCatalogForAllSixSportsAndDeduplicatesDbRows() {
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(coachProfile));
+        when(sportRepository.findAll()).thenReturn(List.of(
+                Sport.builder().id(1L).code("FOOTBALL").name("Football").isActive(true).build(),
+                Sport.builder().id(2L).code("BADMINTON").name("Badminton").isActive(true).build(),
+                Sport.builder().id(3L).code("BASKETBALL").name("Basketball").isActive(true).build(),
+                Sport.builder().id(4L).code("VOLLEYBALL").name("Volleyball").isActive(true).build(),
+                Sport.builder().id(5L).code("SWIMMING").name("Swimming").isActive(true).build(),
+                Sport.builder().id(6L).code("TENNIS").name("Tennis").isActive(true).build()
+        ));
+        CoachCertification duplicateStandard = CoachCertification.builder()
+                .id(20L).sportId(2L).name("BWF Level 2 Coaching Certificate").issuer("Badminton World Federation").isVerified(true).build();
+        when(certificationRepository.findAllOrdered()).thenReturn(List.of(duplicateStandard));
+
+        List<CoachSelfProfileResponse.CertificationOption> options = service.getCertificationOptions(coachAccount);
+
+        List<String> sportsCovered = options.stream()
+                .map(CoachSelfProfileResponse.CertificationOption::sportName)
+                .distinct()
+                .toList();
+        assertTrue(sportsCovered.containsAll(List.of("Football", "Badminton", "Basketball", "Volleyball", "Swimming", "Tennis")));
+        assertEquals(1, options.stream()
+                .filter(o -> "BWF Level 2 Coaching Certificate".equals(o.name()))
+                .count());
+        assertEquals(2L, options.stream()
+                .filter(o -> "BWF Level 2 Coaching Certificate".equals(o.name()))
+                .findFirst().orElseThrow().sportId());
     }
 
     @Test

@@ -117,6 +117,8 @@ function ProfileContent({ initial }: { initial: UserProfile }) {
   const [avatarModalOpen, setAvatarModalOpen] = useState(false)
   const avatarImageSrc = useAvatarSrc(saved.avatarUrl)
   const role = roleOf(saved)
+  const goalLabel = GOAL_OPTIONS.find((opt) => opt.value === saved.mainGoal)?.label ?? 'Not set'
+  const levelLabel = LEVEL_OPTIONS.find((opt) => opt.value === saved.currentLevel)?.label ?? 'Not set'
   return (
     <div className="profile-layout">
       <div className="profile-layout__main">
@@ -124,8 +126,9 @@ function ProfileContent({ initial }: { initial: UserProfile }) {
         <ChangePasswordCard />
         {role === 'MEMBER' && <DeleteAccountCard />}
       </div>
-      <aside className="profile-layout__side" aria-label="Profile summary">
-        <Card title="Profile summary">
+      {/* Dong bo ten va bo cuc khung Public preview giua trang ho so Member va Coach */}
+      <aside className="profile-layout__side" aria-label="Public preview">
+        <Card title="Public preview">
           <div className="profile-summary">
             <span className="avatar avatar--lg" aria-hidden="true">
               {avatarImageSrc ? (
@@ -149,6 +152,16 @@ function ProfileContent({ initial }: { initial: UserProfile }) {
             {saved.memberCode && <p className="profile-summary__code">Member code {saved.memberCode}</p>}
             <p className="profile-summary__email">{saved.email}</p>
           </div>
+          <dl className="summary-list">
+            <div>
+              <dt>Training goal</dt>
+              <dd>{goalLabel}</dd>
+            </div>
+            <div>
+              <dt>Experience level</dt>
+              <dd>{levelLabel}</dd>
+            </div>
+          </dl>
           <p className="notice notice--info profile-summary__note">
             Your goal and level help us suggest relevant classes. They do not register you for a sport.
           </p>

@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -40,6 +41,25 @@ import java.util.stream.Collectors;
 public class CoachSelfProfileServiceImpl implements CoachSelfProfileService {
 
     private static final String ENTITY_TYPE = "USER_ACCOUNT";
+
+    // Danh muc chung chi chuan cua trung tam theo 6 mon the thao (ghep cung cac chung chi da co trong DB)
+    private record StandardCertification(String sportCode, String sportName, String name, String issuer) { }
+
+    private static final List<StandardCertification> STANDARD_CERTIFICATIONS = List.of(
+            new StandardCertification("FOOTBALL", "Football", "AFC C Coaching License", "Asian Football Confederation"),
+            new StandardCertification("FOOTBALL", "Football", "VFF Football Coaching Certificate", "Vietnam Football Federation"),
+            new StandardCertification("BADMINTON", "Badminton", "BWF Level 1 Coaching Certificate", "Badminton World Federation"),
+            new StandardCertification("BADMINTON", "Badminton", "BWF Level 2 Coaching Certificate", "Badminton World Federation"),
+            new StandardCertification("BADMINTON", "Badminton", "National Badminton Coach Certificate", "Vietnam Badminton Federation"),
+            new StandardCertification("BASKETBALL", "Basketball", "FIBA Coaching Certificate", "International Basketball Federation"),
+            new StandardCertification("BASKETBALL", "Basketball", "National Basketball Coaching License", "Vietnam Basketball Federation"),
+            new StandardCertification("VOLLEYBALL", "Volleyball", "FIVB Level 1 Coaching Certificate", "International Volleyball Federation"),
+            new StandardCertification("VOLLEYBALL", "Volleyball", "National Volleyball Coaching Certificate", "Vietnam Volleyball Federation"),
+            new StandardCertification("SWIMMING", "Swimming", "ASCA Swimming Coach Certification", "American Swimming Coaches Association"),
+            new StandardCertification("SWIMMING", "Swimming", "Lifeguard & Water Safety Instructor", "Vietnam Aquatic Sports Association"),
+            new StandardCertification("TENNIS", "Tennis", "ITF Level 1 Coaching Certificate", "International Tennis Federation"),
+            new StandardCertification("TENNIS", "Tennis", "PTR Tennis Instructor Certification", "Professional Tennis Registry")
+    );
 
     private final CoachProfileRepository coachProfileRepository;
     private final CoachSportRepository coachSportRepository;
@@ -239,16 +259,41 @@ public class CoachSelfProfileServiceImpl implements CoachSelfProfileService {
                 .collect(Collectors.toMap(Sport::getId, Sport::getName, (a, b) -> a));
     }
 
-    // Tong hop danh sach chung chi tu cac ban ghi coach_certification hien co trong he thong
+    // Tong hop danh muc chung chi chuan cua trung tam ghep voi cac ban ghi coach_certification hien co trong DB
     private List<CoachSelfProfileResponse.CertificationOption> loadCertificationOptions(Map<Long, String> sportNames) {
+        Map<String, Long> sportIdByName = new LinkedHashMap<>();
+        for (Map.Entry<Long, String> entry : sportNames.entrySet()) {
+            if (entry.getValue() != null) {
+                sportIdByName.putIfAbsent(entry.getValue().trim().toLowerCase(Locale.ROOT), entry.getKey());
+            }
+        }
+
         Map<String, CoachSelfProfileResponse.CertificationOption> unique = new LinkedHashMap<>();
+        for (StandardCertification std : STANDARD_CERTIFICATIONS) {
+            Long sportId = sportIdByName.get(std.sportName().toLowerCase(Locale.ROOT));
+            if (sportId == null) {
+                sportId = sportIdByName.get(std.sportCode().toLowerCase(Locale.ROOT));
+            }
+            String resolvedSportName = sportId != null ? sportNames.get(sportId) : std.sportName();
+            String dedupKey = dedupKey(std.name(), std.issuer(), sportId);
+            String key = optionKey(std.name(), std.issuer(), sportId);
+            unique.putIfAbsent(dedupKey, new CoachSelfProfileResponse.CertificationOption(
+                    key,
+                    std.name(),
+                    std.issuer(),
+                    sportId,
+                    resolvedSportName
+            ));
+        }
+
         for (CoachCertification row : certificationRepository.findAllOrdered()) {
             String name = clean(row.getName());
             if (name == null) continue;
             String issuer = clean(row.getIssuer());
             Long sportId = row.getSportId();
+            String dedupKey = dedupKey(name, issuer, sportId);
             String key = optionKey(name, issuer, sportId);
-            unique.putIfAbsent(key, new CoachSelfProfileResponse.CertificationOption(
+            unique.putIfAbsent(dedupKey, new CoachSelfProfileResponse.CertificationOption(
                     key,
                     name,
                     issuer,
@@ -260,6 +305,12 @@ public class CoachSelfProfileServiceImpl implements CoachSelfProfileService {
                 .sorted(Comparator.comparing(CoachSelfProfileResponse.CertificationOption::name, String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(opt -> opt.issuer() == null ? "" : opt.issuer(), String.CASE_INSENSITIVE_ORDER))
                 .toList();
+    }
+
+    private static String dedupKey(String name, String issuer, Long sportId) {
+        return name.toLowerCase(Locale.ROOT)
+                + "|" + (issuer == null ? "" : issuer.toLowerCase(Locale.ROOT))
+                + "|" + (sportId == null ? "" : sportId);
     }
 
     private static String optionKey(String name, String issuer, Long sportId) {
