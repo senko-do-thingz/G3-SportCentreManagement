@@ -33,6 +33,8 @@ interface Options {
   myPayments?: (call: RecordedCall) => Response
   invoice?: Response
   onMethod?: (call: RecordedCall) => Response
+  payOsSync?: (call: RecordedCall) => Response
+  payOsCheckout?: (call: RecordedCall) => Response
 }
 
 function paymentsBackend(options: Options = {}) {
@@ -46,6 +48,12 @@ function paymentsBackend(options: Options = {}) {
       const answer = answers[Math.min(index, answers.length - 1)]
       index += 1
       return answer instanceof Response ? answer.clone() : json(200, answer)
+    }
+    if (call.path === '/payments/52/payos-checkout' && options.payOsCheckout) {
+      return options.payOsCheckout(call)
+    }
+    if (call.path === '/payments/52/payos-sync' && options.payOsSync) {
+      return options.payOsSync(call)
     }
     if (call.path === '/payments/52/vietqr-instructions') {
       const answer = answers[Math.max(0, Math.min(index - 1, answers.length - 1))]
@@ -457,7 +465,7 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     })
     expect(await within(panel).findByRole('alert')).toHaveTextContent('Could not check the status')
     expect(within(panel).getByRole('heading', { name: 'Awaiting confirmation' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Bank transfer' })).toBeInTheDocument()
+    expect(screen.getAllByText(/PAY-0052/).length).toBeGreaterThan(0)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS)
     })
@@ -478,7 +486,7 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     })
     expect(await within(panel).findByRole('alert')).toHaveTextContent('Access denied')
     expect(within(panel).getByText(/Automatic checks stopped/)).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Bank transfer' })).toBeInTheDocument()
+    expect(screen.getAllByText(/PAY-0052/).length).toBeGreaterThan(0)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 3)
     })
@@ -538,6 +546,84 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     })
     await user.click(within(panel).getByRole('button', { name: 'Refresh status' }))
     await waitFor(() => expect(paymentGets(calls)).toHaveLength(3))
+  })
+
+  it('a pending payment synced with settled true turns to paid after interval and polling stops', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let syncCount = 0
+    const { calls } = paymentsBackend({
+      payments: [
+        payment(),
+        payment(),
+        payment({ status: 'SUCCESS', bankTransferInstructions: null, invoiceId: 7, invoiceNumber: 'INV-0007', paymentTime: '2026-10-13T10:00:00' }),
+      ],
+      payOsSync: () => {
+        syncCount += 1
+        if (syncCount === 1) {
+          return json(200, { paymentId: 52, settled: false, providerStatus: 'PENDING', notice: 'PayOS has not confirmed this transfer yet.' })
+        }
+        return json(200, { paymentId: 52, settled: true, providerStatus: 'PAID', notice: 'PayOS confirmed and recorded this transfer.' })
+      },
+    })
+    renderApp('/member/payments/52/status')
+    const panel = await screen.findByRole('region', { name: 'Payment status' })
+    expect(within(panel).getByRole('heading', { name: 'Awaiting confirmation' })).toBeInTheDocument()
+
+    // Advance by interval: second sync returns settled true, which refreshes to SUCCESS.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS)
+    })
+    await waitFor(() => {
+      expect(within(panel).queryByRole('heading', { name: 'Payment confirmed' })).toBeInTheDocument()
+    })
+    expect(within(panel).getByText('Paid')).toBeInTheDocument()
+
+    // After settlement, advancing the interval sends no further checks.
+    const getsAfterSettled = paymentGets(calls).length
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 3)
+    })
+    expect(paymentGets(calls)).toHaveLength(getsAfterSettled)
+  })
+
+  it('settled false on periodic PayOS sync causes no extra refresh and no request loop', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { calls } = paymentsBackend({
+      payments: [payment()],
+      payOsSync: () => json(200, { paymentId: 52, settled: false, providerStatus: 'PENDING', notice: 'PayOS has not confirmed this transfer yet.' }),
+    })
+    renderApp('/member/payments/52/status')
+    const panel = await screen.findByRole('region', { name: 'Payment status' })
+    expect(within(panel).getByRole('heading', { name: 'Awaiting confirmation' })).toBeInTheDocument()
+
+    // Wait for the initial poll and its sync call to complete.
+    await waitFor(() => {
+      expect(calls.filter((c) => c.path === '/payments/52/payos-sync')).toHaveLength(1)
+    })
+    // Crucial: GET /payments/52 was called exactly once on initial load (no extra refresh loop).
+    expect(paymentGets(calls)).toHaveLength(1)
+
+    // Advance by one polling interval: only 1 new poll should fire.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS)
+    })
+    await waitFor(() => {
+      expect(paymentGets(calls)).toHaveLength(2)
+    })
+    await waitFor(() => {
+      expect(calls.filter((c) => c.path === '/payments/52/payos-sync')).toHaveLength(2)
+    })
+
+    // Advance by another polling interval: again exactly 1 new poll, no endless loop.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS)
+    })
+    await waitFor(() => {
+      expect(paymentGets(calls)).toHaveLength(3)
+    })
+    await waitFor(() => {
+      expect(calls.filter((c) => c.path === '/payments/52/payos-sync')).toHaveLength(3)
+    })
   })
 
   it('TC-FE11-021 a non-bank-transfer method without bank details shows the reference to give at reception', async () => {

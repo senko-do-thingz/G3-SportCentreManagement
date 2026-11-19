@@ -3,7 +3,7 @@ package com.sportify.payment.service;
 import com.sportify.payment.entity.Payment;
 
 /**
- * Lets a payment channel (Sportify demo QR today, the VietQR gateway once PR #325 is merged) refuse a cancellation
+ * Lets a payment channel (Sportify demo QR or PayOS checkout) refuse a cancellation
  * after its own checkout or settlement has started. Every method is called while the payment row is already locked
  * (payment-first lock order), inside the cancelling transaction.
  */

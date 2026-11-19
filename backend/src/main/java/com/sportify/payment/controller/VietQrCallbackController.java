@@ -33,7 +33,8 @@ public class VietQrCallbackController {
                                    TransactionResponseObject object) {}
 
     // Đầu mối cấp callback token cho đối tác: xác thực riêng với JWT đăng nhập của Member.
-    @PostMapping(value = "/api/token_generate", produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = {"/api/token_generate", "/vqr/api/token_generate"},
+            produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> issueCallbackToken(
             @RequestHeader(value = "Authorization", required = false) String authorization) {
         if (!properties.isEnabled()) {
@@ -49,7 +50,8 @@ public class VietQrCallbackController {
     }
 
     // Chỉ xử lý callback sau khi kiểm tra bearer token của gateway; QR được hiển thị chưa phải thanh toán thành công.
-    @PostMapping(value = "/bank/api/transaction-sync", consumes = MediaType.APPLICATION_JSON_VALUE,
+    @PostMapping(value = {"/bank/api/transaction-sync", "/vqr/bank/api/transaction-sync"},
+            consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CallbackResponse> transactionSync(
             @RequestHeader(value = "Authorization", required = false) String authorization,

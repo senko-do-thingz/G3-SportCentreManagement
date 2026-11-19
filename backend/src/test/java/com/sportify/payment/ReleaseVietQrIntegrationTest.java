@@ -43,7 +43,7 @@ class ReleaseVietQrIntegrationTest extends AbstractIntegrationTest {
         String path="/api/v1/payments/"+id+"/vietqr-instructions";
         mvc.perform(get(path).with(user(new CustomUserDetails(member)))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.payable").value(false)).andExpect(jsonPath("$.qrPayload").isEmpty())
-                .andExpect(jsonPath("$.notice").value(org.hamcrest.Matchers.containsString("DEMO NON-PAYABLE")));
+                .andExpect(jsonPath("$.notice").value(org.hamcrest.Matchers.containsString("Configure a verified receiving account")));
         mvc.perform(get(path).with(user(new CustomUserDetails(peer)))).andExpect(status().isNotFound());
         mvc.perform(get(path).with(user(new CustomUserDetails(coach)))).andExpect(status().isForbidden());
         mvc.perform(get(path)).andExpect(status().isUnauthorized());

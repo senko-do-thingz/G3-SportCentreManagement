@@ -29,7 +29,7 @@ public class VietQrTransferService {
             throw new BusinessRuleException("Only pending real bank-transfer payments support these instructions","TRANSFER_NOT_AVAILABLE");
         var bank=directory.supported(beneficiary.getBankBin());
         if(!beneficiary.isLiveInstructionsEnabled() || !beneficiary.isLiveBeneficiaryValid() || bank.isEmpty())
-            return new Instructions(id,payment.getCode(),false,"DEMO NON-PAYABLE. Configure a verified beneficiary and refresh the supported VietQR bank directory.",
+            return new Instructions(id,payment.getCode(),false,"VietQR transfer QR is unavailable. Configure a verified receiving account and refresh the supported VietQR bank directory.",
                     null,null,null,null,payment.getAmount(),"VND",null,null,true);
         String reference="SP"+id;
         String account=beneficiary.getAccountNumber().replace(" ","");

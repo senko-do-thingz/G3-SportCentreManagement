@@ -86,6 +86,21 @@ public class Payment {
     @Column(name = "vietqr_environment", length = 12)
     private String vietQrEnvironment;
 
+    @Column(name = "payos_payment_link_id", length = 64)
+    private String payOsPaymentLinkId;
+
+    @Column(name = "payos_order_code")
+    private Long payOsOrderCode;
+
+    @Column(name = "payos_checkout_url", length = 2048)
+    private String payOsCheckoutUrl;
+
+    @Column(name = "payos_qr_code", length = 1500)
+    private String payOsQrCode;
+
+    @Column(name = "payos_transaction_reference", length = 100)
+    private String payOsTransactionReference;
+
     @Version
     @Column(name = "version", nullable = false)
     private Integer version;
