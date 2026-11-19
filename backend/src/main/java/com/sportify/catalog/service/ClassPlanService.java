@@ -96,9 +96,9 @@ public class ClassPlanService {
             if(memberId!=null) {
                 notifications.notifyUser(
                         memberId,
-                        "TRAINING_PLAN_ASSIGNED",
                         "New class training plan assigned",
                         "Your coach assigned a new class training plan: \"" + planTitle + "\". Open Training plans to review the exercises.",
+                        "TRAINING_PLAN_ASSIGNED",
                         "CLASS_PLAN:" + id + ":ASSIGNED:" + memberId,
                         null,
                         null);

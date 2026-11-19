@@ -87,9 +87,9 @@ class TrainingNotificationTest {
         assertThat(created.id()).isEqualTo(42L);
         verify(notifications).notifyUser(
                 eq(20L),
-                eq("TRAINING_PLAN_ASSIGNED"),
                 eq("New training plan assigned"),
                 eq("Your coach assigned a new training plan: \"Footwork Focus\". Open Training plans to review the exercises."),
+                eq("TRAINING_PLAN_ASSIGNED"),
                 eq("TRAINING_PLAN:42:ASSIGNED"),
                 isNull(),
                 isNull());
@@ -132,9 +132,9 @@ class TrainingNotificationTest {
         assertThat(created.id()).isEqualTo(77L);
         verify(notifications).notifyUser(
                 eq(20L),
-                eq("TRAINING_FEEDBACK"),
                 eq("New coach feedback received"),
                 eq("Your coach submitted feedback on your training plan \"Footwork Focus\". Open Coach feedback to review it."),
+                eq("TRAINING_FEEDBACK"),
                 eq("TRAINING_FEEDBACK:77"),
                 isNull(),
                 isNull());
@@ -196,17 +196,17 @@ class TrainingNotificationTest {
         assertThat(detail.plan().id()).isEqualTo(88L);
         verify(notifications).notifyUser(
                 eq(20L),
-                eq("TRAINING_PLAN_ASSIGNED"),
                 eq("New class training plan assigned"),
                 eq("Your coach assigned a new class training plan: \"Match Strategy\". Open Training plans to review the exercises."),
+                eq("TRAINING_PLAN_ASSIGNED"),
                 eq("CLASS_PLAN:88:ASSIGNED:20"),
                 isNull(),
                 isNull());
         verify(notifications).notifyUser(
                 eq(21L),
-                eq("TRAINING_PLAN_ASSIGNED"),
                 eq("New class training plan assigned"),
                 eq("Your coach assigned a new class training plan: \"Match Strategy\". Open Training plans to review the exercises."),
+                eq("TRAINING_PLAN_ASSIGNED"),
                 eq("CLASS_PLAN:88:ASSIGNED:21"),
                 isNull(),
                 isNull());

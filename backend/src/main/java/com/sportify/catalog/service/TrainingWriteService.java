@@ -299,9 +299,9 @@ public class TrainingWriteService {
         // Gui thong bao vao Inbox cho Member khi Coach giao ke hoach tap luyen ca nhan
         notifications.notifyUser(
             request.memberId(),
-            "TRAINING_PLAN_ASSIGNED",
             "New training plan assigned",
             "Your coach assigned a new training plan: \"" + planTitle + "\". Open Training plans to review the exercises.",
+            "TRAINING_PLAN_ASSIGNED",
             "TRAINING_PLAN:" + id + ":ASSIGNED",
             null,
             null);
@@ -325,9 +325,9 @@ public class TrainingWriteService {
         // Gui thong bao vao Inbox cho Member khi Coach gui nhan xet cho ke hoach tap luyen
         notifications.notifyUser(
             plan.memberId(),
-            "TRAINING_FEEDBACK",
             "New coach feedback received",
             "Your coach submitted feedback on your training plan \"" + plan.title() + "\". Open Coach feedback to review it.",
+            "TRAINING_FEEDBACK",
             "TRAINING_FEEDBACK:" + id,
             null,
             null);
