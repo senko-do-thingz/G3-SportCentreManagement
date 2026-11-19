@@ -139,7 +139,13 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
                     .trainingType(request.trainingType()).status(status).bookedCount(0)
                     .createdAt(LocalDateTime.now(clock)).build()).toList();
             List<ClassSession> saved = sessionRepository.saveAllAndFlush(sessions);
-            saved.forEach(session -> audit(session, actor, AuditAction.SESSION_CREATED, snapshot(session)));
+            saved.forEach(session -> {
+                audit(session, actor, AuditAction.SESSION_CREATED, snapshot(session));
+                // Chi gui thong bao phan cong ca day cho Coach khi ca day o trang thai PUBLISHED
+                if (session.getStatus() == SessionStatus.PUBLISHED && session.getCoach() != null) {
+                    notifyCoachAssigned(session, session.getCoach().getId());
+                }
+            });
             return saved.stream().map(session -> toResponse(session, 0)).toList();
         });
     }
@@ -174,8 +180,10 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             }
             boolean timingChanged = dateChanged || !request.startTime().equals(session.getStartTime())
                     || !request.endTime().equals(session.getEndTime());
-            boolean audienceChange = timingChanged || !Objects.equals(request.coachId(),session.getCoach()==null?null:session.getCoach().getId())
-                    || !Objects.equals(request.facilityId(),session.getFacility()==null?null:session.getFacility().getId());
+            Long oldCoachId = session.getCoach() == null ? null : session.getCoach().getId();
+            Long newCoachId = request.coachId();
+            boolean facilityChanged = !Objects.equals(request.facilityId(), session.getFacility() == null ? null : session.getFacility().getId());
+            boolean audienceChange = timingChanged || !Objects.equals(newCoachId, oldCoachId) || facilityChanged;
             if (timingChanged && sessionRepository.countRecordedActivity(id) > 0) {
                 throw new BusinessRuleException("Sessions with attendance, allowed check-ins or saved results cannot be rescheduled.");
             }
@@ -223,6 +231,18 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             details.put("reason", request.rescheduleReason());
             audit(saved, actor, dateChanged ? AuditAction.SESSION_RESCHEDULED : AuditAction.SESSION_UPDATED, details);
             if (audienceChange) notifications.changed(saved,notifications.recipients(id),false);
+            // Gui thong bao cho Coach khi duoc phan cong moi, go phan cong hoac thay doi lich cua ca day PUBLISHED
+            if (saved.getStatus() == SessionStatus.PUBLISHED) {
+                if (newCoachId != null && !Objects.equals(oldCoachId, newCoachId)) {
+                    notifyCoachAssigned(saved, newCoachId);
+                }
+                if (oldCoachId != null && !Objects.equals(oldCoachId, newCoachId)) {
+                    notifyCoachUnassigned(saved, oldCoachId);
+                }
+                if (newCoachId != null && Objects.equals(oldCoachId, newCoachId) && (timingChanged || facilityChanged)) {
+                    notifyCoachChanged(saved, newCoachId);
+                }
+            }
             return toResponse(saved, booked);
         });
     }
@@ -248,6 +268,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
                         + " cancelling it would refund attended sessions", "SESSION_HAS_PARTICIPATION");
             }
             List<Long> recipients = notifications.recipients(id);
+            SessionStatus previousStatus = session.getStatus();
             var cancellation = cancellationRepository.cancelConfirmedBookings(id, actor.getId(), request.reason(), now);
             session.setStatus(SessionStatus.CANCELLED);
             session.setCancelReason(request.reason());
@@ -256,6 +277,10 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             session.setBookedCount(0);
             ClassSession saved = sessionRepository.saveAndFlush(session);
             notifications.changed(saved,recipients,true);
+            // Gui thong bao huy ca day cho Coach neu ca day da PUBLISHED va co Coach phu trach
+            if (previousStatus == SessionStatus.PUBLISHED && saved.getCoach() != null) {
+                notifyCoachCancelled(saved, saved.getCoach().getId());
+            }
             audit(saved, actor, AuditAction.SESSION_CANCELLED, Map.of("before", before,
                     "after", snapshot(saved), "reason", request.reason(), "bookingsCancelled", cancellation.cancelledCount(),
                     "registrations", cancellation.registrations().stream().map(row -> Map.of(
@@ -293,6 +318,10 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             session.setStatus(SessionStatus.PUBLISHED);
             ClassSession saved = sessionRepository.saveAndFlush(session);
             audit(saved, actor, AuditAction.SESSION_PUBLISHED, Map.of("before", before, "after", snapshot(saved)));
+            // Khi chuyen ca day tu DRAFT sang PUBLISHED, gui thong bao phan cong cho Coach
+            if (saved.getCoach() != null) {
+                notifyCoachAssigned(saved, saved.getCoach().getId());
+            }
             return toResponse(saved, bookingCounts(List.of(id)).getOrDefault(id, 0L));
         });
     }
@@ -545,6 +574,65 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
     private void audit(ClassSession session, UserAccount actor, String action, Map<String, Object> details) {
         auditService.record(AuditEvent.builder().actor(actor).action(action).entityType("CLASS_SESSION")
                 .entityId(session.getId()).summary(action + " session " + session.getId()).details(details).build());
+    }
+
+    // Dinh dang thong tin ca day trong noi dung thong bao cho Coach
+    private static String coachSessionDetails(ClassSession session) {
+        String className = session.getSportClass() != null ? session.getSportClass().getName()
+                : (session.getSport() != null ? session.getSport().getName() : "Class");
+        String facilityName = session.getFacility() != null ? " at " + session.getFacility().getName() : "";
+        return className + " (" + session.getSessionCode() + ") on " + session.getSessionDate()
+                + " from " + session.getStartTime() + " to " + session.getEndTime() + facilityName;
+    }
+
+    // Thong bao cho Coach khi duoc phan cong phu trach ca day
+    private void notifyCoachAssigned(ClassSession session, long coachId) {
+        String eventKey = "COACH_SESSION:" + session.getId() + ":" + session.getScheduleRevision() + ":ASSIGNED:" + coachId;
+        notifications.notifyUser(coachId,
+                "Assigned to session " + session.getSessionCode(),
+                "You have been assigned to teach " + coachSessionDetails(session) + ".",
+                "COACH_SESSION_ASSIGNED",
+                eventKey,
+                session.getId(),
+                session.getScheduleRevision());
+    }
+
+    // Thong bao cho Coach khi duoc go khoi ca day
+    private void notifyCoachUnassigned(ClassSession session, long coachId) {
+        String eventKey = "COACH_SESSION:" + session.getId() + ":" + session.getScheduleRevision() + ":UNASSIGNED:" + coachId;
+        notifications.notifyUser(coachId,
+                "Unassigned from session " + session.getSessionCode(),
+                "You are no longer assigned to teach " + coachSessionDetails(session) + ".",
+                "COACH_SESSION_UNASSIGNED",
+                eventKey,
+                session.getId(),
+                session.getScheduleRevision());
+    }
+
+    // Thong bao cho Coach khi ca day duoc doi lich hoac doi san tap
+    private void notifyCoachChanged(ClassSession session, long coachId) {
+        String eventKey = "COACH_SESSION:" + session.getId() + ":" + session.getScheduleRevision() + ":SESSION_CHANGED:" + coachId;
+        notifications.notifyUser(coachId,
+                "Assigned session schedule changed",
+                "Your assigned session was updated to " + coachSessionDetails(session) + ".",
+                "SESSION_CHANGED",
+                eventKey,
+                session.getId(),
+                session.getScheduleRevision());
+    }
+
+    // Thong bao cho Coach khi ca day bi huy
+    private void notifyCoachCancelled(ClassSession session, long coachId) {
+        String eventKey = "COACH_SESSION:" + session.getId() + ":" + session.getScheduleRevision() + ":SESSION_CANCELLED:" + coachId;
+        String reason = session.getCancelReason() != null && !session.getCancelReason().isBlank()
+                ? " Reason: " + session.getCancelReason().trim() + "." : "";
+        notifications.notifyUser(coachId,
+                "Assigned session cancelled",
+                "Your assigned session " + coachSessionDetails(session) + " was cancelled." + reason,
+                "SESSION_CANCELLED",
+                eventKey,
+                session.getId(),
+                session.getScheduleRevision());
     }
 
     private static Map<String, Object> snapshot(ClassSession session) {

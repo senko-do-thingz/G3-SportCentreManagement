@@ -59,6 +59,7 @@ class TokenRevocationAfterPasswordChangeIntegrationTest extends AbstractIntegrat
 
     @AfterEach void cleanup() {
         String own = "SELECT id FROM user_account WHERE email LIKE ?";
+        jdbc.update("DELETE FROM notification WHERE user_id IN (" + own + ")", marker + "%");
         jdbc.update("DELETE FROM activity_log WHERE actor_user_id IN (" + own + ") OR entity_id IN (" + own + ")", marker + "%", marker + "%");
         jdbc.update("DELETE FROM user_account WHERE email LIKE ?", marker + "%");
     }

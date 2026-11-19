@@ -99,6 +99,7 @@ class MemberScheduleIntegrationTest extends AbstractIntegrationTest {
         // Only this test instance's UUID-marked rows are deleted, in foreign-key order.
         String ownUsers = "SELECT id FROM user_account WHERE email LIKE ?";
         String ownSports = "SELECT id FROM sport WHERE code LIKE ?";
+        jdbc.update("DELETE FROM notification WHERE user_id IN (" + ownUsers + ")", marker + "%");
         jdbc.update("DELETE FROM activity_log WHERE actor_user_id IN (" + ownUsers + ")", marker + "%");
         jdbc.update("DELETE FROM booking WHERE session_id IN (SELECT id FROM class_session WHERE sport_id IN (" + ownSports + "))", marker + "%");
         jdbc.update("DELETE FROM class_session WHERE sport_id IN (" + ownSports + ")", marker + "%");

@@ -30,6 +30,7 @@ class ReleaseVietQrIntegrationTest extends AbstractIntegrationTest {
     }
     @AfterEach void cleanup() {
         for(long id:accounts) {
+            jdbc.update("DELETE FROM notification WHERE user_id=?",id);
             jdbc.update("DELETE FROM activity_log WHERE actor_user_id=?",id);
             jdbc.update("DELETE FROM payment WHERE member_id=?",id);
             jdbc.update("DELETE FROM member_profile WHERE user_id=?",id);

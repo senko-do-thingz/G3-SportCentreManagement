@@ -56,6 +56,7 @@ import { BookingConfirmedPage, BookingOptionsPage, BookingReviewPage } from '../
 import { BookingCancelledPage, BookingCancellationPage } from '../pages/member/MemberBookingsPages'
 import { ReceptionBookingConfirmedPage, ReceptionBookingsPage, ReceptionAssistedBookingPage } from '../pages/reception/ReceptionBookingsPage'
 import { CoachRosterPage, CoachTeachingSchedulePage } from '../pages/coach/CoachSchedulePages'
+import { CoachProfilePage } from '../pages/coach/CoachProfilePage'
 import { ManagerFinancialOverviewPage } from '../pages/manager/ManagerFinancialOverviewPage'
 import { ManagerTransactionsPage } from '../pages/manager/ManagerTransactionsPage'
 import { ManagerRevenueReportsPage } from '../pages/manager/ManagerRevenueReportsPage'
@@ -120,6 +121,7 @@ const SCREENS: Record<string, ReactNode> = {
   '/reception/refunds': <RefundRequestsPage />,
   '/coach': <CoachTeachingSchedulePage />,
   '/coach/roster': <CoachRosterPage />,
+  '/coach/profile': <CoachProfilePage />,
 }
 
 /**

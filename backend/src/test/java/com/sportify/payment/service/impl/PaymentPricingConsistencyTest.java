@@ -77,7 +77,8 @@ class PaymentPricingConsistencyTest {
                 resolver, bankProperties, formatter, clock, org.mockito.Mockito.mock(com.sportify.payment.service.impl.CashCaptureService.class));
         verificationService = new PaymentVerificationServiceImpl(paymentRepository, invoiceRepository, resolver,
                 paymentService, membershipCardService, sportPackageService, auditService, formatter, clock,
-                org.mockito.Mockito.mock(com.sportify.catalog.service.MemberAccountEligibility.class));
+                org.mockito.Mockito.mock(com.sportify.catalog.service.MemberAccountEligibility.class),
+                org.mockito.Mockito.mock(com.sportify.catalog.service.OperationalNotificationService.class));
 
         receptionist = UserAccount.builder().id(7L).fullName("Rita Reception")
                 .role(Role.builder().code("RECEPTIONIST").name("Receptionist").build()).build();

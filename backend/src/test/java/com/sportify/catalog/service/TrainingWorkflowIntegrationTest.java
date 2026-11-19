@@ -472,6 +472,14 @@ class TrainingWorkflowIntegrationTest {
         jdbc.update("UPDATE sport_package_registration SET status='CANCELLED' WHERE id=?",registration);
         assertThat(notifications.inbox(member).reminders()).noneMatch(r->r.key().equals("PACKAGE:"+registration));
         assertThat(count("SELECT COUNT(*) FROM notification WHERE user_id=? AND origin_session_id=?",member,session)).isEqualTo(3);
+        // Kiem tra Coach cung nhan duoc cac thong bao thay doi va huy ca day khi offline qua /api/v1/staff/notifications
+        var coachNotices=notifications.own(coach);
+        assertThat(coachNotices).extracting(OperationalNotificationService.Notice::type)
+            .contains("SESSION_CHANGED","SESSION_CANCELLED");
+        assertThat(notifications.own(otherCoach)).isEmpty();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/staff/notifications").with(as(coach)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$[0].type").value("SESSION_CANCELLED"));
     }
     @Test void RELEASE16_fourRoleAndAnonymousMatrixProtectsReleaseApis() throws Exception {
         long manager=account("MANAGER");
