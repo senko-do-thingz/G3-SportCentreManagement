@@ -33,6 +33,7 @@ public class ClassPlanService {
     private final AuditService audit;
     private final EntityManager em;
     private final ObjectMapper json;
+    private final OperationalNotificationService notifications;
     private static final String SELECT="""
         SELECT p.id,p.class_id,c.name class_name,p.coach_id,u.full_name coach_name,
             p.title,p.description,p.plan_scope,p.created_at
@@ -80,6 +81,29 @@ public class ClassPlanService {
         audit.record(AuditEvent.builder().actor(em.getReference(UserAccount.class,coach)).action("CLASS_PLAN_CREATED")
                 .entityType("SESSION_PLAN").entityId(id).summary("Class-wide training plan created")
                 .details(Map.of("classId",request.classId(),"scope","CLASS")).build());
+        // Gui thong bao vao Inbox cho tat ca Member dang hoat dong co booking CONFIRMED trong lop
+        String planTitle=request.title().trim();
+        List<Long> memberIds=jdbc.queryForList("""
+            SELECT DISTINCT b.member_id
+            FROM booking b
+            JOIN class_session s ON s.id=b.session_id
+            JOIN user_account u ON u.id=b.member_id
+            JOIN [role] r ON r.id=u.role_id
+            WHERE s.class_id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED'
+              AND u.status='ACTIVE' AND r.code='MEMBER'
+            """,Long.class,request.classId());
+        for(Long memberId:memberIds) {
+            if(memberId!=null) {
+                notifications.notifyUser(
+                        memberId,
+                        "New class training plan assigned",
+                        "Your coach assigned a new class training plan: \"" + planTitle + "\". Open Training plans to review the exercises.",
+                        "TRAINING_PLAN_ASSIGNED",
+                        "CLASS_PLAN:" + id + ":ASSIGNED:" + memberId,
+                        null,
+                        null);
+            }
+        }
         return detail(coach,id);
     }
     private String fingerprint(Request request) {

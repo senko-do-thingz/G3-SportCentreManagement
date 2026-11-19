@@ -32,6 +32,7 @@ public class TrainingWriteService {
     private final Clock clock;
     private final AuditService audit;
     private final jakarta.persistence.EntityManager entityManager;
+    private final OperationalNotificationService notifications;
 
     private static final String PLAN_SELECT = """
         SELECT p.id, p.title, p.description, p.class_id, c.name class_name, p.member_id,
@@ -288,12 +289,22 @@ public class TrainingWriteService {
         if (exists("SELECT COUNT(*) FROM session_plan WHERE booking_id=? AND member_id=? AND coach_id=? AND title=? AND is_template=0",
                 request.bookingId(), request.memberId(), coachId, request.title().trim()))
             throw new ConflictException("A plan with this title already exists for this booking; choose a distinct title for a new plan");
+        String planTitle = request.title().trim();
         long id = insert("INSERT INTO session_plan(class_id, member_id, booking_id, coach_id, title, description, is_template, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)",
-            request.classId(), request.memberId(), request.bookingId(), coachId, request.title().trim(), request.description(), now(), now());
+            request.classId(), request.memberId(), request.bookingId(), coachId, planTitle, request.description(), now(), now());
         int order = 0;
         for (var step : request.steps()) jdbc.update("INSERT INTO session_plan_step(plan_id, step_order, title, duration_minutes, instructions) VALUES (?, ?, ?, ?, ?)",
             id, ++order, step.title().trim(), step.durationMinutes(), step.instructions());
         audit(coachId, "TRAINING_PLAN_CREATED", "SESSION_PLAN", id, Map.of("memberId", request.memberId(), "bookingId", request.bookingId()));
+        // Gui thong bao vao Inbox cho Member khi Coach giao ke hoach tap luyen ca nhan
+        notifications.notifyUser(
+            request.memberId(),
+            "New training plan assigned",
+            "Your coach assigned a new training plan: \"" + planTitle + "\". Open Training plans to review the exercises.",
+            "TRAINING_PLAN_ASSIGNED",
+            "TRAINING_PLAN:" + id + ":ASSIGNED",
+            null,
+            null);
         return new Created(id);
     }
     public List<CoachPlan> coachPlans(long coachId) {
@@ -311,6 +322,15 @@ public class TrainingWriteService {
         long id = insert("INSERT INTO coach_feedback(plan_id, session_id, member_id, coach_id, rating, comments, strengths, areas_for_improvement, created_at) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)",
             planId, plan.memberId(), coachId, request.rating(), request.comments().trim(), request.strengths(), request.areasForImprovement(), now());
         audit(coachId, "TRAINING_FEEDBACK_CREATED", "COACH_FEEDBACK", id, Map.of("planId", planId, "memberId", plan.memberId()));
+        // Gui thong bao vao Inbox cho Member khi Coach gui nhan xet cho ke hoach tap luyen
+        notifications.notifyUser(
+            plan.memberId(),
+            "New coach feedback received",
+            "Your coach submitted feedback on your training plan \"" + plan.title() + "\". Open Coach feedback to review it.",
+            "TRAINING_FEEDBACK",
+            "TRAINING_FEEDBACK:" + id,
+            null,
+            null);
         return new Created(id);
     }
 

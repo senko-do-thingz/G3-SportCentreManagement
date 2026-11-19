@@ -1838,6 +1838,37 @@ class TrainingWorkflowIntegrationTest {
         assertThat(backfillAs(admin,backfillRequest()).id()).isPositive();
         assertThat(count("SELECT COUNT(*) FROM activity_log WHERE action='TRAINING_ATTENDANCE_BACKFILLED' AND actor_user_id=?",admin)).isEqualTo(1);
     }
+    @Test void memberInboxReceivesNotificationsForTrainingPlansAndFeedback() {
+        // Kiem tra thong bao Inbox khi Coach giao ke hoach ca nhan, gui nhan xet va tao ke hoach chung cua lop
+        long personalPlanId = writer.createPlan(coach, plan()).id();
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE user_id=? AND type='TRAINING_PLAN_ASSIGNED' AND event_key=?",
+                member, "TRAINING_PLAN:" + personalPlanId + ":ASSIGNED")).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE user_id=? AND type='TRAINING_PLAN_ASSIGNED'", peer)).isEqualTo(0);
+
+        long feedbackId = writer.feedback(coach, personalPlanId,
+                new TrainingWriteRequest.Feedback(5, "Strong footwork throughout the drill", "Consistency", "Recovery speed")).id();
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE user_id=? AND type='TRAINING_FEEDBACK' AND event_key=?",
+                member, "TRAINING_FEEDBACK:" + feedbackId)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE user_id=? AND type='TRAINING_FEEDBACK'", peer)).isEqualTo(0);
+
+        long peerBooking = insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')", code(), session, peer);
+        jdbc.update("UPDATE class_session SET booked_count=2 WHERE id=?", session);
+        var classPlanRequest = new ClassPlanService.Request(
+                classId, code(), "Shared conditioning block",
+                List.of(new TrainingWriteRequest.Step("Warm up", 10, "Jog and stretch")));
+        UUID operation = UUID.randomUUID();
+        long classPlanId = classPlans.create(coach, classPlanRequest, operation).plan().id();
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE user_id=? AND type='TRAINING_PLAN_ASSIGNED' AND event_key=?",
+                member, "CLASS_PLAN:" + classPlanId + ":ASSIGNED:" + member)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE user_id=? AND type='TRAINING_PLAN_ASSIGNED' AND event_key=?",
+                peer, "CLASS_PLAN:" + classPlanId + ":ASSIGNED:" + peer)).isEqualTo(1);
+
+        // Goi lai cung Idempotency-Key khong duoc tao trung thong bao
+        assertThat(classPlans.create(coach, classPlanRequest, operation).plan().id()).isEqualTo(classPlanId);
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE event_key=?", "CLASS_PLAN:" + classPlanId + ":ASSIGNED:" + member)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE event_key=?", "CLASS_PLAN:" + classPlanId + ":ASSIGNED:" + peer)).isEqualTo(1);
+        assertThat(peerBooking).isPositive();
+    }
     private void interleave(Callable<?> first,Callable<?> second,Class<? extends Throwable> failure) throws Exception {
         var held=new CountDownLatch(1);var release=new CountDownLatch(1);
         try(var pool=Executors.newFixedThreadPool(2)){

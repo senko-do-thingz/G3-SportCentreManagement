@@ -30,10 +30,11 @@ class TrainingWriteServiceDatePolicyTest {
     JdbcTemplate jdbc;
     AuditService audit;
     EntityManager entityManager;
+    OperationalNotificationService notifications;
     ResultSet row;
 
     @BeforeEach @SuppressWarnings("unchecked") void setup() throws Exception {
-        jdbc=mock(JdbcTemplate.class);audit=mock(AuditService.class);entityManager=mock(EntityManager.class);
+        jdbc=mock(JdbcTemplate.class);audit=mock(AuditService.class);entityManager=mock(EntityManager.class);notifications=mock(OperationalNotificationService.class);
         row=mock(ResultSet.class);
         when(row.getLong("session_id")).thenReturn(3L);
         when(row.getLong("member_id")).thenReturn(7L);
@@ -64,7 +65,7 @@ class TrainingWriteServiceDatePolicyTest {
             Arguments.of(path,"2026-11-03T17:00:01Z",false)));
     }
     private long mark(Path path,Instant time) throws Exception {
-        var service=new TrainingWriteService(jdbc,Clock.fixed(time,ZoneId.of("Asia/Ho_Chi_Minh")),audit,entityManager);
+        var service=new TrainingWriteService(jdbc,Clock.fixed(time,ZoneId.of("Asia/Ho_Chi_Minh")),audit,entityManager,notifications);
         if(path==Path.SELF_TRAINING){when(row.getString("training_type")).thenReturn("SELF_TRAINING");return service.selfAttendance(5L,11L,null).id();}
         var request=new TrainingWriteRequest.Attendance(11L,TrainingWriteRequest.AttendanceStatus.PRESENT,"Unit date boundary");
         return service.coachAttendance(5L,request).id();
