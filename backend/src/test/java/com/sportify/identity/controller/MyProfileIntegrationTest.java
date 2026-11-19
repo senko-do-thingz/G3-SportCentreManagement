@@ -539,7 +539,7 @@ class MyProfileIntegrationTest extends AbstractIntegrationTest {
                 "name", "BWF Coach Level 2",
                 "issuer", "Badminton World Federation",
                 "issuedOn", "2023-05-10"
-        )), 200);
+        )), 201);
         assertThat(withCert.path("certifications").size()).isEqualTo(1);
         long certId = withCert.path("certifications").get(0).path("id").asLong();
         assertThat(withCert.path("certifications").get(0).path("verified").asBoolean()).isFalse();
