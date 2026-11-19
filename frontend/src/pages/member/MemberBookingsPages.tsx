@@ -11,7 +11,7 @@ import { useAuth } from '../../auth/useAuth'
 import { BrowseError } from './BrowseError'
 import { MemberScheduleNav } from './MemberScheduleNav'
 import { useMemberResource } from './useMemberResource'
-import { bookingDate, bookingErrorMessage, bookingTime, cancellationDeadline, isLateCancellation } from './bookingPresentation'
+import { bookingCalendarHref, bookingDate, bookingErrorMessage, bookingTime, cancellationDeadline, isLateCancellation } from './bookingPresentation'
 import { MemberCommerceHeader, MemberCommerceHero } from './MemberCommerceComponents'
 
 function routeId(value: string | undefined): number | null {
@@ -135,6 +135,8 @@ export function MemberBookingsPage({ embedded = false }: { embedded?: boolean })
 function BookingHistoryCard({ booking, when }: { booking: MemberBookingRecord; when: BookingWhen }) {
   const self = booking.trainingType === 'SELF_TRAINING'
   const cancelHref = `/member/bookings/${booking.id}/cancel`
+  // Chi tao link tai file .ics cho cac booking sap toi da xac nhan
+  const calendarHref = when === 'UPCOMING' && booking.status === 'CONFIRMED' ? bookingCalendarHref(booking) : null
   return (
     <article className="booking-history-card">
       <div className="booking-history-card__heading">
@@ -188,6 +190,11 @@ function BookingHistoryCard({ booking, when }: { booking: MemberBookingRecord; w
         </dl>
       </details>
       <div className="browse-actions booking-actions">
+        {calendarHref && (
+          <a className={buttonClassName('secondary')} href={calendarHref} download={`${booking.bookingCode}.ics`}>
+            Add to calendar (.ics)
+          </a>
+        )}
         {when === 'UPCOMING' && booking.status === 'CONFIRMED' && (
           <Link className={buttonClassName('secondary')} to={cancelHref}>
             Cancel booking

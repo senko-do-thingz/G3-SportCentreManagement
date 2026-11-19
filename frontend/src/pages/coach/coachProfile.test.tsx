@@ -126,7 +126,7 @@ describe('Coach self-service profile page (/coach/profile)', () => {
     })
     const updatedNotices = await screen.findAllByText('Your coaching profile has been updated.')
     expect(updatedNotices.length).toBeGreaterThan(0)
-    const preview = screen.getByRole('complementary', { name: 'Coach profile summary' })
+    const preview = screen.getByRole('complementary', { name: 'Public preview' })
     expect(within(preview).getByText('8 years')).toBeInTheDocument()
 
     // Chon va them chung chi tu dropdown danh muc cua trung tam

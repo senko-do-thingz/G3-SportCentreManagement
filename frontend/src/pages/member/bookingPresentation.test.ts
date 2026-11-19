@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../api/errors'
 import type { MemberBookingRecord } from '../../api/memberBookingsApi'
 import type { SessionDetail } from '../../api/memberSessionsApi'
-import { bookingCalendarHref, bookingDate, bookingErrorMessage, bookingTime, cancellationDeadline, eligibleRegistrations } from './bookingPresentation'
+import { bookingCalendarHref, bookingDate, bookingErrorMessage, bookingTime, cancellationDeadline, eligibleRegistrations, sessionCalendarHref } from './bookingPresentation'
 
 const session: SessionDetail = {
   session: { id: 5, sportId: 3, sportName: 'Basketball', classId: 7, className: 'Foundations', trainingFormat: 'COACH_LED', level: 'BEGINNER', coachId: 8, coachName: 'Quan Coach', facilityId: 2, facilityName: 'Court A', sessionDate: '2026-11-05', startTime: '17:00:00', endTime: '18:00:00', capacity: 20, bookedCount: 3, freeSeats: 17, full: false, status: 'PUBLISHED' },
@@ -42,6 +42,14 @@ describe('FE-09 booking presentation helpers', () => {
     expect(contents).toContain('DTEND;TZID=Asia/Ho_Chi_Minh:20261105T180000')
     expect(contents).toContain('SUMMARY:Foundations\\, Level 1')
     expect(bookingCalendarHref({ ...booking, startTime: null })).toBeNull()
+
+    // Kiem tra sessionCalendarHref tao cung dinh dang ICS UTC+7 cho SessionDetailPage
+    const sessionHref = sessionCalendarHref(session.session)
+    expect(sessionHref).toContain('data:text/calendar')
+    const sessionIcs = decodeURIComponent(sessionHref!.split(',')[1])
+    expect(sessionIcs).toContain('TZID:Asia/Ho_Chi_Minh')
+    expect(sessionIcs).toContain('DTSTART;TZID=Asia/Ho_Chi_Minh:20261105T170000')
+    expect(sessionIcs).toContain('DTEND;TZID=Asia/Ho_Chi_Minh:20261105T180000')
   })
 
   it.each([

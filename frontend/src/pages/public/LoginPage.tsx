@@ -250,10 +250,10 @@ export function LoginPage() {
         </fieldset>
       </form>
 
+      {/* Gop thanh 1 lien ket duy nhat de ca cum tu dong bo mau va gach chan */}
       <p className="auth-tos-note">
         By logging in, you agree to our{' '}
-        <Link to="/terms">Terms of Service</Link> and{' '}
-        <Link to="/terms#privacy">Privacy Policy</Link>.
+        <Link to="/terms">Terms of Service and Privacy Policy</Link>.
       </p>
 
       <p className="auth-panel__footer">

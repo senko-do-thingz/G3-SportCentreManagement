@@ -142,7 +142,7 @@ describe('FE-02 My Profile (F1-08) - personal information', () => {
     expect(within(form).getByLabelText('Experience level')).toHaveValue('BEGINNER')
     expect(within(form).getByLabelText('Address')).toHaveValue('Ho Chi Minh City')
 
-    const summary = screen.getByRole('complementary', { name: 'Profile summary' })
+    const summary = screen.getByRole('complementary', { name: 'Public preview' })
     expect(within(summary).getByText('TN')).toBeInTheDocument()
     expect(within(summary).getByText('Member code MEM-0002')).toBeInTheDocument()
   })
@@ -184,7 +184,7 @@ describe('FE-02 My Profile (F1-08) - personal information', () => {
     expect(within(form).getByLabelText(/Full name/)).toHaveValue('Taylor Tran')
     // reloadUser() reads GET /users/me again, so the header shows the new name.
     await waitFor(() => expect(document.querySelector('.user-menu__name')).toHaveTextContent('Taylor Tran'))
-    expect(within(screen.getByRole('complementary', { name: 'Profile summary' })).getByText('Taylor Tran')).toBeInTheDocument()
+    expect(within(screen.getByRole('complementary', { name: 'Public preview' })).getByText('Taylor Tran')).toBeInTheDocument()
   })
 
   it('TC-FE02-043 client checks block an empty name, a bad phone and a future date of birth', async () => {

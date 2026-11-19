@@ -193,8 +193,13 @@ describe('FE-09 member booking screens', () => {
     renderApp('/member/bookings')
     expect(await screen.findByRole('heading', { name: 'Basketball Foundations' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Cancel booking' })).toHaveAttribute('href', '/member/bookings/21/cancel')
+    // Kiem tra nut tai file lich .ics hien thi cho booking sap toi da xac nhan
+    const calendarLink = screen.getByRole('link', { name: 'Add to calendar (.ics)' })
+    expect(calendarLink).toHaveAttribute('download', 'BK-1021.ics')
+    expect(calendarLink.getAttribute('href')).toContain('data:text/calendar')
     await user.click(screen.getByRole('tab', { name: 'Past' }))
     expect(await screen.findByText('Cancelled by Taylor Nguyen')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Add to calendar (.ics)' })).not.toBeInTheDocument()
     expect(backend.calls.some((call) => call.path === '/bookings/my?when=UPCOMING')).toBe(true)
     expect(backend.calls.some((call) => call.path === '/bookings/my?when=PAST')).toBe(true)
   })
