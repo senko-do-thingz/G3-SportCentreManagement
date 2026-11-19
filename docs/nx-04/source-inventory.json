@@ -571,6 +571,13 @@
       "creates": [],
       "drops": [],
       "sha256_lf": "85eff3526385d4f8d73d75da2037f65df8df13874927036a25f276e8f32f926b"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V71__seed_coach_certifications.sql",
+      "version": 71,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "4c966495e2d0a3059d6c5985fd9a2fb660f580303c262c940c0611ea570db810"
     }
   ],
   "create_occurrences": 82,
