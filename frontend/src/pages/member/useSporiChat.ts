@@ -8,14 +8,36 @@ export type SporiMessage =
   | { id: number; role: 'user'; text: string; at: Date }
   | { id: number; role: 'assistant'; question: string; result: Consultation; at: Date }
   | { id: number; role: 'error'; text: string; at: Date }
+  | { id: number; role: 'stopped'; text: string; at: Date }
 
 /** Earlier turns the server may use to understand follow-ups; the server trims and filters them again. */
 const HISTORY_TURNS = 8
+
+// Kiem tra cau hoi co phai tieng Viet hay khong de chon thong bao dung tac vu phu hop
+const VI_WORD_PATTERN = /\b(toi|cua|khong|ko|bao nhieu|the nao|minh|duoc|nhung|gi|nao|vay|nhe|xin|lam sao|o dau|khi nao|chao|cam on|tao|lop|buoi|lich|goi tap|hoi vien|le tan)\b/i
+
+export function isVietnameseText(text: string): boolean {
+  const normalized = text.normalize('NFC')
+  const stripped = normalized.replace(/[\u0111\u0110]/g, 'd').normalize('NFD').replace(/\p{M}+/gu, '')
+  return normalized.toLowerCase() !== stripped.toLowerCase() || VI_WORD_PATTERN.test(stripped)
+}
+
+export function stoppedTaskMessage(question: string): string {
+  return isVietnameseText(question) ? 'B\u1EA1n \u0111\u00E3 d\u1EEBng t\u00E1c v\u1EE5 n\u00E0y.' : 'You stopped this task.'
+}
+
+export function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === 'AbortError'
+    : error instanceof Error && error.name === 'AbortError'
+}
 
 export function useSporiChat(fallbackError: string) {
   const [messages, setMessages] = useState<SporiMessage[]>([])
   const [pending, setPending] = useState(false)
   const nextId = useRef(1)
+  const abortRef = useRef<AbortController | null>(null)
+  const activeQuestionRef = useRef('')
 
   async function send(question: string) {
     const text = question.trim()
@@ -24,19 +46,48 @@ export function useSporiChat(fallbackError: string) {
       ? [{ role: 'user', text: message.text }]
       : message.role === 'assistant' ? [{ role: 'assistant', text: message.result.answer }] : []).slice(-HISTORY_TURNS)
     setMessages(current => [...current, { id: nextId.current++, role: 'user', text, at: new Date() }])
+    const controller = new AbortController()
+    abortRef.current = controller
+    activeQuestionRef.current = text
     setPending(true)
     try {
-      const result = await sporiApi.chat(text, history)
+      const result = await sporiApi.chat(text, history, controller.signal)
+      if (controller.signal.aborted || abortRef.current !== controller) return
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', question: text, result, at: new Date() }])
     } catch (error) {
+      if (controller.signal.aborted || isAbortError(error) || abortRef.current !== controller) return
       const message = error instanceof Error && error.message ? error.message : fallbackError
       setMessages(current => [...current, { id: nextId.current++, role: 'error', text: message, at: new Date() }])
     } finally {
-      setPending(false)
+      if (abortRef.current === controller) {
+        abortRef.current = null
+        activeQuestionRef.current = ''
+        setPending(false)
+      }
     }
   }
 
-  return { messages, pending, send, reset: () => setMessages([]) }
+  // Dung yeu cau dang cho va ghi nhan thong bao huy vao khung chat
+  function stop() {
+    const controller = abortRef.current
+    if (!controller) return
+    const cancelledQuestion = activeQuestionRef.current
+    abortRef.current = null
+    activeQuestionRef.current = ''
+    controller.abort()
+    setPending(false)
+    setMessages(current => [...current, { id: nextId.current++, role: 'stopped', text: stoppedTaskMessage(cancelledQuestion), at: new Date() }])
+  }
+
+  function reset() {
+    abortRef.current?.abort()
+    abortRef.current = null
+    activeQuestionRef.current = ''
+    setPending(false)
+    setMessages([])
+  }
+
+  return { messages, pending, send, stop, reset }
 }
 
 /**

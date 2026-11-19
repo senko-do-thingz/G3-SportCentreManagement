@@ -2,6 +2,8 @@ import { Fragment, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { type Consultation } from '../../api/trainingGuidanceApi'
 import { SporiRobotMark } from './SporiRobotMark'
+import { Button } from '../../components/ui/Button'
+import { Modal } from '../../components/ui/Modal'
 import { Spinner } from '../../components/ui/Spinner'
 
 /** Message pieces shared by the floating Spori widget and the full assistant page. */
@@ -71,10 +73,10 @@ export function SporiTyping({ label }: { label: string }) {
   )
 }
 
-/** Text area that sends on Enter and adds a line on Shift+Enter, with a round send button. */
-export function SporiComposer({ id, label, buttonLabel, placeholder, value, pending, onChange, onSubmit, inputRef }: {
+/** Text area that sends on Enter and adds a line on Shift+Enter, with a round send/stop button. */
+export function SporiComposer({ id, label, buttonLabel, placeholder, value, pending, onChange, onSubmit, onStop, inputRef }: {
   id: string; label: string; buttonLabel: string; placeholder: string; value: string; pending: boolean
-  onChange: (value: string) => void; onSubmit: () => void; inputRef?: React.RefObject<HTMLTextAreaElement | null>
+  onChange: (value: string) => void; onSubmit: () => void; onStop?: () => void; inputRef?: React.RefObject<HTMLTextAreaElement | null>
 }) {
   function keyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -87,17 +89,65 @@ export function SporiComposer({ id, label, buttonLabel, placeholder, value, pend
       <label className="member-concept__sr-only" htmlFor={id}>{label}</label>
       <textarea ref={inputRef} id={id} name="question" rows={1} maxLength={500} placeholder={placeholder} value={value}
         disabled={pending} onKeyDown={keyDown} onChange={event => onChange(event.target.value)} />
-      <button
-        type="submit"
-        className="spori-composer__submit"
-        style={{ borderRadius: '50%', width: 40, height: 40, minWidth: 40, minHeight: 40, aspectRatio: '1 / 1', padding: 0 }}
-        aria-label={buttonLabel}
-        title={buttonLabel}
-        disabled={!value.trim() || pending}
-      >
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6l.1 6.5L15 12 3.5 13.9z" fill="currentColor" /></svg>
-      </button>
+      {/* Khi Spori dang tra loi, hien nut Stop de nguoi dung co the huy yeu cau ngay */}
+      {pending && onStop ? (
+        <button
+          type="button"
+          className="spori-composer__submit spori-composer__stop"
+          style={{ borderRadius: '50%', width: 40, height: 40, minWidth: 40, minHeight: 40, aspectRatio: '1 / 1', padding: 0 }}
+          aria-label="Stop generating"
+          title="Stop generating"
+          onClick={onStop}
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" /></svg>
+        </button>
+      ) : (
+        <button
+          type="submit"
+          className="spori-composer__submit"
+          style={{ borderRadius: '50%', width: 40, height: 40, minWidth: 40, minHeight: 40, aspectRatio: '1 / 1', padding: 0 }}
+          aria-label={buttonLabel}
+          title={buttonLabel}
+          disabled={!value.trim() || pending}
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6l.1 6.5L15 12 3.5 13.9z" fill="currentColor" /></svg>
+        </button>
+      )}
     </form>
+  )
+}
+
+// Hop thoai xac nhan xoa cuoc tro chuyen dung chung giua FloatingSporiChat va MemberAssistantPage
+export function SporiDeleteConversationModal({
+  open,
+  deleting,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean
+  deleting: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <Modal
+      open={open}
+      onClose={() => { if (!deleting) onCancel() }}
+      title="Delete conversation"
+      size="sm"
+      footer={
+        <>
+          <Button type="button" variant="secondary" disabled={deleting} onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="button" variant="danger" loading={deleting} onClick={onConfirm}>
+            Delete
+          </Button>
+        </>
+      }
+    >
+      <p>Are you sure you want to delete this conversation? This action cannot be undone.</p>
+    </Modal>
   )
 }
 

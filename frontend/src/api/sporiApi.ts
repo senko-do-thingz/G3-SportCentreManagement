@@ -36,17 +36,17 @@ export interface ChatSessionMessageResponse {
 
 /** Spori AI assistant API: both backward-compatible consultation and modern session management */
 export const sporiApi = {
-  // Legacy single-turn consultation
-  chat: (question: string, history: ChatTurn[] = []) =>
-    api.post<Consultation>('/assistant/chat', history.length ? { question, history } : { question }),
+  // Ho tro truyen AbortSignal de nguoi dung co the dung tac vu tao cau tra loi ngay lap tuc
+  chat: (question: string, history: ChatTurn[] = [], signal?: AbortSignal) =>
+    api.post<Consultation>('/assistant/chat', history.length ? { question, history } : { question }, { signal }),
 
   // Multi-session management
   listSessions: (archived?: boolean) => {
     const query = archived !== undefined ? { archived } : undefined
     return api.get<ChatSession[]>('/spori-ai/sessions', { query })
   },
-  createSession: (title?: string) =>
-    api.post<ChatSession>('/spori-ai/sessions', title ? { title } : {}),
+  createSession: (title?: string, signal?: AbortSignal) =>
+    api.post<ChatSession>('/spori-ai/sessions', title ? { title } : {}, { signal }),
   getSession: (id: number) =>
     api.get<ChatSessionDetail>(`/spori-ai/sessions/${id}`),
   renameSession: (id: number, title: string) =>
@@ -55,7 +55,7 @@ export const sporiApi = {
     api.put<ChatSession>(`/spori-ai/sessions/${id}/archive`, { archived }),
   deleteSession: (id: number) =>
     api.delete<void>(`/spori-ai/sessions/${id}`),
-  sendMessage: (sessionId: number, message: string) =>
-    api.post<ChatSessionMessageResponse>(`/spori-ai/sessions/${sessionId}/messages`, { message }),
+  sendMessage: (sessionId: number, message: string, signal?: AbortSignal) =>
+    api.post<ChatSessionMessageResponse>(`/spori-ai/sessions/${sessionId}/messages`, { message }, { signal }),
 }
 

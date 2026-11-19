@@ -170,14 +170,14 @@ public class SportifyKnowledgeBase {
                 "Staff Account Creation",
                 "T\u1EA1o t\u00E0i kho\u1EA3n nh\u00E2n vi\u00EAn (HLV / L\u1EC5 t\u00E2n)",
                 Map.of(
-                        "MANAGER", "As Manager, navigate to Manager Workspace > Users (/manager). Click the 'Add account' button to open the staff creation form. Enter the staff member's full name, email address, phone number, select the role (Coach or Receptionist), provide a temporary password, and for Coaches, select at least one qualified sport. Click Submit to create the active staff account.",
-                        "RECEPTIONIST", "Creating staff accounts (Receptionist and Coach) is an administrative operation restricted to Managers only. Receptionists do not have permission to create staff accounts. Please contact your Manager for staff account requests.",
-                        "COACH", "Staff account creation is an administrative operation restricted to Managers only. Coaches do not have permission to create accounts.",
+                        "MANAGER", "As Manager, follow these steps to create a new Coach or Receptionist account (Spori only guides and does not create accounts for you):\n1. Open [User Management](/manager).\n2. Click 'Add account' to open the staff creation form.\n3. Enter the staff member's full name, email address, phone number, and a temporary password.\n4. Select the role (Coach or Receptionist). For a Coach, select at least one sport they are qualified to teach.\n5. Click Submit to create and activate the account.",
+                        "RECEPTIONIST", "Creating staff accounts (Receptionist and Coach) is an administrative operation restricted to Managers only at /manager. Receptionists do not have permission to create staff accounts. Please contact your Manager for staff account requests.",
+                        "COACH", "Staff account creation is an administrative operation restricted to Managers only at /manager. Coaches do not have permission to create accounts.",
                         "MEMBER", "Staff account creation (Receptionist and Coach) is strictly an administrative action restricted to Managers only. Members do not have permission to access staff management.",
-                        "DEFAULT", "Creating staff accounts (Receptionist and Coach) is a Manager-only administrative action performed at Manager Workspace > Users (/manager)."
+                        "DEFAULT", "Creating staff accounts (Receptionist and Coach) is a Manager-only administrative action performed at [User Management](/manager)."
                 ),
                 Map.of(
-                        "MANAGER", "V\u1EDBi vai tr\u00F2 Manager, v\u00E0o Manager Workspace > Users (/manager). B\u1EA5m n\u00FAt 'Add account' \u0111\u1EC3 m\u1EDF form t\u1EA1o nh\u00E2n vi\u00EAn. Nh\u1EADp h\u1ECD t\u00EAn, email, s\u1ED1 \u0111i\u1EC7n tho\u1EA1i, ch\u1ECDn vai tr\u00F2 (Coach ho\u1EB7c Receptionist), nh\u1EADp m\u1EADt kh\u1EA9u t\u1EA1m, v\u00E0 v\u1EDBi Coach h\u00E3y ch\u1ECDn \u00EDt nh\u1EA5t m\u1ED9t m\u00F4n th\u1EC3 thao chuy\u00EAn m\u00F4n. B\u1EA5m Submit \u0111\u1EC3 ho\u00E0n t\u1EA5t.",
+                        "MANAGER", "V\u1EDBi vai tr\u00F2 Manager, h\u00E3y l\u00E0m theo c\u00E1c b\u01B0\u1EDBc sau \u0111\u1EC3 t\u1EA1o t\u00E0i kho\u1EA3n Coach ho\u1EB7c L\u1EC5 t\u00E2n (Spori ch\u1EC9 h\u01B0\u1EDBng d\u1EABn v\u00E0 kh\u00F4ng t\u1EF1 t\u1EA1o t\u00E0i kho\u1EA3n thay b\u1EA1n):\n1. M\u1EDF [User Management](/manager).\n2. B\u1EA5m n\u00FAt 'Add account' \u0111\u1EC3 m\u1EDF bi\u1EC3u m\u1EABu t\u1EA1o nh\u00E2n vi\u00EAn.\n3. Nh\u1EADp h\u1ECD t\u00EAn, email, s\u1ED1 \u0111i\u1EC7n tho\u1EA1i v\u00E0 m\u1EADt kh\u1EA9u t\u1EA1m.\n4. Ch\u1ECDn vai tr\u00F2 (Coach ho\u1EB7c Receptionist). V\u1EDBi Coach, ch\u1ECDn \u00EDt nh\u1EA5t m\u1ED9t m\u00F4n th\u1EC3 thao chuy\u00EAn m\u00F4n.\n5. B\u1EA5m Submit \u0111\u1EC3 ho\u00E0n t\u1EA5t.",
                         "RECEPTIONIST", "T\u1EA1o t\u00E0i kho\u1EA3n nh\u00E2n vi\u00EAn (L\u1EC5 t\u00E2n v\u00E0 Coach) thu\u1ED9c quy\u1EC1n qu\u1EA3n tr\u1ECB c\u1EE7a Manager. L\u1EC5 t\u00E2n kh\u00F4ng c\u00F3 quy\u1EC1n th\u1EF1c hi\u1EC7n. Vui l\u00F2ng li\u00EAn h\u1EC7 Manager.",
                         "COACH", "Vi\u1EC7c t\u1EA1o t\u00E0i kho\u1EA3n nh\u00E2n vi\u00EAn thu\u1ED9c th\u1EA9m quy\u1EC1n c\u1EE7a Manager t\u1EA1i /manager. Coach kh\u00F4ng c\u00F3 quy\u1EC1n t\u1EA1o t\u00E0i kho\u1EA3n.",
                         "MEMBER", "T\u1EA1o t\u00E0i kho\u1EA3n nh\u00E2n vi\u00EAn l\u00E0 t\u00E1c v\u1EE5 qu\u1EA3n tr\u1ECB ch\u1EC9 d\u00E0nh cho Manager. H\u1ED9i vi\u00EAn kh\u00F4ng c\u00F3 quy\u1EC1n th\u1EF1c hi\u1EC7n.",
@@ -589,6 +589,37 @@ public class SportifyKnowledgeBase {
                 "/reception/support",
                 "/coach/training/questions",
                 "/member/support"
+        ));
+
+        // 16. COACH PROFILE & CERTIFICATIONS
+        topics.add(new TopicGuidance(
+                "COACH_PROFILE",
+                List.of("coach profile", "customize my profile", "update my profile", "my certifications",
+                        "add certification", "coach certification", "update bio", "update headline",
+                        "h\u1ED3 s\u01A1 coach", "h\u1ED3 s\u01A1 hu\u1EA5n luy\u1EC7n vi\u00EAn", "ch\u1EE9ng ch\u1EC9 coach", "th\u00EAm ch\u1EE9ng ch\u1EC9"),
+                List.of("coach profile", "customize my profile", "my certifications", "add certification",
+                        "coach certification", "ho so coach", "ho so huan luyen vien", "chung chi coach", "them chung chi"),
+                "Coach Profile & Certifications",
+                "H\u1ED3 s\u01A1 v\u00E0 ch\u1EE9ng ch\u1EC9 Hu\u1EA5n luy\u1EC7n vi\u00EAn",
+                Map.of(
+                        "COACH", "As Coach, follow these steps to update your public coaching profile (Spori only guides and does not edit profiles for you):\n1. Open [My Profile](/coach/profile).\n2. Update your headline, years of coaching, specialties, biography, or upload a photo, then click 'Save profile'.\n3. Under 'Certifications & qualifications', choose a certification from the center catalog dropdown and click 'Add certification'.",
+                        "MANAGER", "Managers can review and manage coach accounts and public visibility in [User Management](/manager). Coaches can also customize their own bio and certifications at /coach/profile.",
+                        "RECEPTIONIST", "Coach profiles are managed by Managers at /manager and customized by Coaches at /coach/profile.",
+                        "MEMBER", "You can view a Coach's public profile and certifications by clicking 'View coach profile' on any coach-led session in [Schedules & Classes](/member/schedules). To update your own member profile, open [My Profile](/member/profile).",
+                        "DEFAULT", "Coaches customize their public profile and certifications at [My Profile](/coach/profile)."
+                ),
+                Map.of(
+                        "COACH", "V\u1EDBi vai tr\u00F2 Coach, l\u00E0m theo c\u00E1c b\u01B0\u1EDBc sau \u0111\u1EC3 c\u1EADp nh\u1EADt h\u1ED3 s\u01A1 c\u00F4ng khai (Spori ch\u1EC9 h\u01B0\u1EDBng d\u1EABn v\u00E0 kh\u00F4ng t\u1EF1 ch\u1EC9nh s\u1EEDa h\u1ED3 s\u01A1 thay b\u1EA1n):\n1. M\u1EDF [My Profile](/coach/profile).\n2. Ch\u1EC9nh s\u1EEDa headline, s\u1ED1 n\u0103m kinh nghi\u1EC7m, chuy\u00EAn m\u00F4n, ti\u1EC3u s\u1EED ho\u1EB7c t\u1EA3i \u1EA3nh r\u1ED3i b\u1EA5m 'Save profile'.\n3. Trong m\u1EE5c 'Certifications & qualifications', ch\u1ECDn ch\u1EE9ng ch\u1EC9 t\u1EEB danh m\u1EE5c trung t\u00E2m v\u00E0 b\u1EA5m 'Add certification'.",
+                        "MANAGER", "Manager qu\u1EA3n l\u00FD t\u00E0i kho\u1EA3n v\u00E0 hi\u1EC3n th\u1ECB h\u1ED3 s\u01A1 Coach t\u1EA1i [User Management](/manager). Coach c\u0169ng t\u1EF1 c\u1EADp nh\u1EADt h\u1ED3 s\u01A1 t\u1EA1i /coach/profile.",
+                        "RECEPTIONIST", "H\u1ED3 s\u01A1 Coach do Manager qu\u1EA3n l\u00FD t\u1EA1i /manager v\u00E0 Coach t\u1EF1 t\u00F9y ch\u1EC9nh t\u1EA1i /coach/profile.",
+                        "MEMBER", "B\u1EA1n c\u00F3 th\u1EC3 xem h\u1ED3 s\u01A1 Coach khi m\u1EDF chi ti\u1EBFt bu\u1ED5i h\u1ECDc t\u1EA1i [Schedules & Classes](/member/schedules), ho\u1EB7c c\u1EADp nh\u1EADt h\u1ED3 s\u01A1 c\u00E1 nh\u00E2n t\u1EA1i [My Profile](/member/profile).",
+                        "DEFAULT", "Coach t\u1EF1 c\u1EADp nh\u1EADt h\u1ED3 s\u01A1 c\u00F4ng khai v\u00E0 ch\u1EE9ng ch\u1EC9 t\u1EA1i [My Profile](/coach/profile)."
+                ),
+                "COACH_PROFILE",
+                "/manager",
+                "/reception",
+                "/coach/profile",
+                "/member/profile"
         ));
 
         for (TopicGuidance t : topics) {

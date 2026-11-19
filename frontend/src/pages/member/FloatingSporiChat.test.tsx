@@ -136,7 +136,9 @@ describe('FloatingSporiChat', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: /Ask Spori AI/i }))
-    expect(screen.queryByRole('link', { name: 'Open full assistant' })).not.toBeInTheDocument()
+    const managerExpandLink = screen.getByRole('link', { name: 'Open full assistant' })
+    expect(managerExpandLink).toBeInTheDocument()
+    expect(managerExpandLink.getAttribute('href')).toContain('/manager/assistant')
 
     unmount()
 
@@ -158,5 +160,74 @@ describe('FloatingSporiChat', () => {
     const expandLink = screen.getByRole('link', { name: 'Open full assistant' })
     expect(expandLink).toBeInTheDocument()
     expect(expandLink.getAttribute('href')).toContain('/member/assistant')
+  })
+
+  it('stops an in-flight reply when clicking Stop generating and shows the stopped notice', async () => {
+    let aborted = false
+    const createSessionSpy = vi.spyOn(sporiApi, 'createSession').mockRejectedValueOnce(new Error('No sessions'))
+    const chatSpy = vi.spyOn(sporiApi, 'chat').mockImplementationOnce((_q, _h, signal) => new Promise((_resolve, reject) => {
+      signal?.addEventListener('abort', () => {
+        aborted = true
+        reject(new DOMException('Aborted', 'AbortError'))
+      })
+    }))
+
+    render(
+      <MemoryRouter>
+        <FloatingSporiChat isDesktop={true} />
+      </MemoryRouter>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Ask Spori AI/i }))
+    const textarea = screen.getByRole('textbox', { name: /Ask Spori a question/i })
+    fireEvent.change(textarea, { target: { value: 'How can I create a new Coach Account?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    const stopBtn = await screen.findByRole('button', { name: 'Stop generating' })
+    fireEvent.click(stopBtn)
+
+    expect(aborted).toBe(true)
+    expect(await screen.findByText('You stopped this task.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Stop generating' })).not.toBeInTheDocument()
+
+    createSessionSpy.mockRestore()
+    chatSpy.mockRestore()
+  })
+
+  it('uses an in-app confirmation modal instead of window.confirm when deleting a conversation', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
+    const listSpy = vi.spyOn(sporiApi, 'listSessions').mockResolvedValue([
+      { id: 55, title: 'Coach guide chat', archived: false, messageCount: 2, createdAt: '2026-11-19T10:00:00', updatedAt: '2026-11-19T10:05:00' },
+    ])
+    const deleteSpy = vi.spyOn(sporiApi, 'deleteSession').mockResolvedValue(undefined)
+
+    render(
+      <MemoryRouter>
+        <FloatingSporiChat isDesktop={true} />
+      </MemoryRouter>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Ask Spori AI/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Conversation history' }))
+    expect(await screen.findByText('Coach guide chat')).toBeInTheDocument()
+
+    // Bam xoa mo Modal thay vi window.confirm; bam Cancel giu nguyen hoi thoai
+    fireEvent.click(screen.getByRole('button', { name: 'Delete chat' }))
+    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(await screen.findByRole('heading', { name: 'Delete conversation' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(deleteSpy).not.toHaveBeenCalled()
+    expect(screen.getByText('Coach guide chat')).toBeInTheDocument()
+
+    // Mo lai va bam Delete de xoa
+    fireEvent.click(screen.getByRole('button', { name: 'Delete chat' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    await waitFor(() => {
+      expect(deleteSpy).toHaveBeenCalledWith(55)
+    })
+
+    confirmSpy.mockRestore()
+    listSpy.mockRestore()
+    deleteSpy.mockRestore()
   })
 })

@@ -27,7 +27,9 @@ describe('Spori in staff workspaces', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Ask Spori AI' }))
     const dialog = screen.getByRole('dialog', { name: 'Spori AI' })
-    expect(within(dialog).queryByRole('link', { name: 'Open full assistant' })).not.toBeInTheDocument()
+    // Ca 4 vai tro deu co nut mo tro ly toan man hinh tro dung ve khu vuc cua minh
+    const expandLink = within(dialog).getByRole('link', { name: 'Open full assistant' })
+    expect(expandLink).toHaveAttribute('href', '/manager/assistant?returnTo=%2Fmanager')
     expect(within(dialog).getByRole('button', { name: 'Give me an overview of the center today' })).toBeInTheDocument()
     await user.type(within(dialog).getByRole('textbox', { name: 'Ask Spori a question' }), 'How do refunds work?')
     await user.click(within(dialog).getByRole('button', { name: 'Send' }))
@@ -54,5 +56,18 @@ describe('Spori in staff workspaces', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Send' }))
 
     expect(await within(dialog).findByText('Handled by: Coaching team')).toBeInTheDocument()
+    expect(within(dialog).getByRole('link', { name: 'Open full assistant' }))
+      .toHaveAttribute('href', '/coach/assistant?returnTo=%2Fcoach')
+  })
+
+  it('hides the floating Spori launcher when already on a staff full assistant page', async () => {
+    staffBackend(MANAGER, {
+      mode: 'KNOWLEDGE_BASED', status: 'ANSWERED', answer: 'Hello!', historyStored: false,
+      sources: [], language: 'en', handoff: null,
+    })
+    renderApp('/manager/assistant')
+
+    expect(await screen.findByRole('heading', { name: 'Center assistant' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ask Spori AI' })).not.toBeInTheDocument()
   })
 })

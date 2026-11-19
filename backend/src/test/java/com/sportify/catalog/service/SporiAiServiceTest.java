@@ -110,6 +110,15 @@ class SporiAiServiceTest {
         List<?> userParts = (List<?>) content.get("parts");
         Map<?, ?> firstUserPart = (Map<?, ?>) userParts.get(0);
         assertThat(firstUserPart.get("text")).isEqualTo("[User Role: MEMBER] How do I book a court?");
+
+        // Kiem tra system instruction tuan thu quy tac tieng Anh mac dinh, chi huong dan (Guide-Only) va duong dan that cua 4 vai tro
+        assertThat(SporiAiService.SYSTEM_INSTRUCTION)
+                .contains("ENGLISH-FIRST")
+                .contains("READ-ONLY GUIDE")
+                .contains("/manager")
+                .contains("/coach/profile")
+                .contains("/reception/inbox")
+                .contains("/member/bookings");
     }
 
     @Test

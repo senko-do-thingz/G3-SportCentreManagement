@@ -313,10 +313,11 @@ public class CenterConsultationService {
         return response(vi,RULES_MODE,"NO_ANSWER",answer,List.of()).withHandoff("RECEPTIONIST");
     }
 
-    /** Member app links mean nothing in staff workspaces, so staff sources keep their text but no link. */
+    // Giu lai duong dan workspace hop le cho nhan vien, chi bo duong dan danh rieng cho Member
     private static Consultation forRole(Consultation draft,boolean staff) {
         if(!staff)return draft;
-        var sources=draft.sources().stream().map(s->new ConsultationSource(s.kind(),s.id(),s.title(),s.detail(),"")).toList();
+        var sources=draft.sources().stream().map(s->new ConsultationSource(s.kind(),s.id(),s.title(),s.detail(),
+                s.path()!=null && (s.path().equals("/member") || s.path().startsWith("/member/"))?"":s.path())).toList();
         return new Consultation(draft.mode(),draft.status(),draft.answer(),false,sources,draft.language(),draft.handoff());
     }
 
@@ -516,6 +517,13 @@ public class CenterConsultationService {
         if(contains(raw,"create class","create a class","create new class","add a class","add class",
             "set up a class","make a class","manage classes","t\u1EA1o l\u1EDBp","th\u00EAm l\u1EDBp","qu\u1EA3n l\u00FD l\u1EDBp")
             || contains(plain,"tao lop","them lop","quan ly lop"))return "CLASS_MANAGEMENT";
+        // Uu tien tra loi huong dan quy trinh theo vai tro (Guide-Only) truoc khi roi vao tra cuu lich/goi tap chung
+        var kbEarly = SportifyKnowledgeBase.findTopic(raw, plain);
+        if(kbEarly.isPresent() && !kbEarly.get().topicCode().equals("CLASS_MANAGEMENT")
+                && !kbEarly.get().topicCode().equals("SUPPORT_REQUESTS")
+                && !kbEarly.get().topicCode().equals("COACH_SCHEDULE")) {
+            return "KB_" + kbEarly.get().topicCode();
+        }
         if(faq(raw,plain)!=null)return "FAQ";
         if(contains(raw,"homework","coach feedback","my feedback","my training","my progress","my results","my result",
             "b\u00E0i t\u1EADp v\u1EC1 nh\u00E0","nh\u1EADn x\u00E9t","ph\u1EA3n h\u1ED3i c\u1EE7a","k\u1EBFt qu\u1EA3 t\u1EADp","ti\u1EBFn \u0111\u1ED9")

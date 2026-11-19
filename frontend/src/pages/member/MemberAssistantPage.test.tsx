@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
+import { sporiApi } from '../../api/sporiApi'
 import { tokenStorage } from '../../api/tokenStorage'
 import { installFakeFetch, json, MEMBER } from '../../test/fakeBackend'
 import { renderApp } from '../../test/renderApp'
@@ -209,11 +210,15 @@ it('lists past sessions, allows selecting, renaming, and deleting', async () => 
   await userEvent.type(editInput, 'Yoga schedule{Enter}')
   expect(calls.some(c => c.path.includes('/spori-ai/sessions/101/title') && (c.body as { title?: string })?.title === 'Yoga schedule')).toBe(true)
 
-  // Delete session
-  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  // Xoa hoi thoai bang Modal trong ung dung thay vi window.confirm
+  const confirmSpy = vi.spyOn(window, 'confirm')
   const deleteBtn = screen.getByRole('button', { name: 'Delete chat' })
   await userEvent.click(deleteBtn)
+  expect(confirmSpy).not.toHaveBeenCalled()
+  expect(await screen.findByRole('heading', { name: 'Delete conversation' })).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
   expect(calls.some(c => c.path === '/spori-ai/sessions/101' && c.method === 'DELETE')).toBe(true)
+  confirmSpy.mockRestore()
 })
 
 it('prevents spamming new chat sessions when current chat is empty', async () => {
@@ -266,4 +271,28 @@ it('prevents spamming new chat sessions when current chat is empty', async () =>
   // Now that we are in the newly created empty session (id 202, 0 messages), clicking new conversation again should NOT call POST
   await userEvent.click(newConvBtn)
   expect(calls.filter(c => c.path === '/spori-ai/sessions' && c.method === 'POST')).toHaveLength(1)
+})
+
+it('aborts an in-flight request when clicking Stop generating and shows the stopped notice', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  let aborted = false
+  installFakeFetch((call) => call.path === '/users/me' ? json(200, MEMBER) : json(200, []))
+  const chatSpy = vi.spyOn(sporiApi, 'chat').mockImplementationOnce((_q, _h, signal) => new Promise((_resolve, reject) => {
+    signal?.addEventListener('abort', () => {
+      aborted = true
+      reject(new DOMException('Aborted', 'AbortError'))
+    })
+  }))
+
+  renderApp('/member/assistant')
+  const box = await screen.findByRole('textbox', { name: /Your question/ })
+  await userEvent.type(box, 'Hello Spori{Enter}')
+
+  const stopBtn = await screen.findByRole('button', { name: 'Stop generating' })
+  await userEvent.click(stopBtn)
+
+  expect(aborted).toBe(true)
+  expect(await screen.findByText('You stopped this task.')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Stop generating' })).not.toBeInTheDocument()
+  chatSpy.mockRestore()
 })
