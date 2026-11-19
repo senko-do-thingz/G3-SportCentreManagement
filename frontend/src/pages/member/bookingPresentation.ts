@@ -1,5 +1,6 @@
 import { formatDateTime } from '../../utils/format'
 import { formatCalendarDate, formatClockTime } from '../../utils/date'
+import { CENTER_TIME_ZONE } from '../../utils/dateDisplay'
 import { isCalendarDate } from '../../api/responseValidation'
 import { sessionIdText } from '../../api/sessionIdentity'
 import { ApiError } from '../../api/errors'
@@ -69,12 +70,12 @@ export function bookingErrorMessage(error: unknown): string {
   }
 }
 
+// Dinh dang thoi gian su kien theo gio dia phuong trung tam (UTC+7) de file ICS khai bao VTIMEZONE Asia/Ho_Chi_Minh
 function calendarStamp(date: string, time: string): string | null {
   if (!isCalendarDate(date) || !/^([01]\d|2[0-3]):[0-5]\d/.test(time)) return null
-  const [year, month, day] = date.split('-').map(Number)
-  const [hour, minute] = time.split(':').map(Number)
-  const value = new Date(Date.UTC(year, month - 1, day, hour - 7, minute))
-  return value.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+  const [year, month, day] = date.split('-')
+  const [hour, minute] = time.split(':')
+  return `${year}${month}${day}T${hour}${minute}00`
 }
 
 function escapeCalendarText(value: string): string {
@@ -87,10 +88,16 @@ export function bookingCalendarHref(booking: MemberBookingRecord): string | null
   if (!start || !end) return null
   const title = booking.className || `${booking.sportName || 'Sport'} session`
   const location = [booking.facilityName, booking.coachName].filter(Boolean).join(' - ')
+  // Khai bao VTIMEZONE Asia/Ho_Chi_Minh (UTC+7) va TZID tren DTSTART/DTEND de Google Calendar giu dung gio 9AM
   const lines = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Sportify//Member Booking//EN', 'BEGIN:VEVENT',
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Sportify//Member Booking//EN', 'CALSCALE:GREGORIAN',
+    `X-WR-TIMEZONE:${CENTER_TIME_ZONE}`,
+    'BEGIN:VTIMEZONE', `TZID:${CENTER_TIME_ZONE}`,
+    'BEGIN:STANDARD', 'TZOFFSETFROM:+0700', 'TZOFFSETTO:+0700', 'TZNAME:ICT', 'DTSTART:19700101T000000', 'END:STANDARD',
+    'END:VTIMEZONE',
+    'BEGIN:VEVENT',
     `UID:booking-${booking.id}@sportify`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}`,
-    `DTSTART:${start}`, `DTEND:${end}`, `SUMMARY:${escapeCalendarText(title)}`,
+    `DTSTART;TZID=${CENTER_TIME_ZONE}:${start}`, `DTEND;TZID=${CENTER_TIME_ZONE}:${end}`, `SUMMARY:${escapeCalendarText(title)}`,
     ...(location ? [`LOCATION:${escapeCalendarText(location)}`] : []),
     `DESCRIPTION:${escapeCalendarText(`Booking ${booking.bookingCode}; Session ID ${sessionIdText(booking.sessionCode)}`)}`, 'END:VEVENT', 'END:VCALENDAR', '',
   ]

@@ -204,7 +204,6 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
           )}
         </Card>
         <OrderSummary payment={data} singleVisit={singleVisit} onStale={reload} />
-        <CancelPayment payment={data} onChanged={reload} />
       </div>
       </div>
     </PaymentWorkspace>
@@ -399,6 +398,8 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
       <Link className={buttonClassName('ghost', 'md', true, 'no-print')} to={MEMBER_PATHS.membership}>
         My membership and packages
       </Link>
+      {/* Dat nut Cancel Payment mau do nam duoi nut My membership and packages ben trong Order summary */}
+      <CancelPayment payment={payment} onChanged={onStale} size="md" fullWidth />
     </Card>
   )
 }
