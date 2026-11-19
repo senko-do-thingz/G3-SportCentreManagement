@@ -170,6 +170,21 @@ class SporiChatTest {
         var coachStaffQuestion = service(null).chat(13L, "COACH", "how can I create a new receptionist or coach", List.of());
         assertThat(coachStaffQuestion.status()).isEqualTo("ANSWERED");
         assertThat(coachStaffQuestion.answer()).contains("Manager");
+
+        // Kiem tra chao hoi tieng Anh mac dinh tra loi tieng Anh, tieng Viet tra loi tieng Viet
+        var englishHello = service(null).chat(11L, "MANAGER", "hello", List.of());
+        assertThat(englishHello.language()).isEqualTo("en");
+        assertThat(englishHello.answer()).contains("Hello!");
+
+        var vietnameseHello = service(null).chat(11L, "MANAGER", "xin chao", List.of());
+        assertThat(vietnameseHello.language()).isEqualTo("vi");
+
+        // Kiem tra Coach hoi ve ho so ca nhan nhan huong dan tung buoc va link /coach/profile
+        var coachProfileGuide = service(null).chat(13L, "COACH", "How can I customize my coach profile?", List.of());
+        assertThat(coachProfileGuide.status()).isEqualTo("ANSWERED");
+        assertThat(coachProfileGuide.language()).isEqualTo("en");
+        assertThat(coachProfileGuide.answer()).contains("/coach/profile");
+        assertThat(coachProfileGuide.sources()).anySatisfy(s -> assertThat(s.path()).isEqualTo("/coach/profile"));
     }
 
     @Test

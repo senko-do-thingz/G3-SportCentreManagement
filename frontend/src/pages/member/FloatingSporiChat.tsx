@@ -3,8 +3,8 @@ import { Link, useLocation } from 'react-router-dom'
 import { AuthContext } from '../../auth/authContext'
 import { sporiApi, type ChatMessageItem, type ChatSession } from '../../api/sporiApi'
 import { SporiRobotMark } from './SporiRobotMark'
-import { SporiAiBadge, SporiAvatar, SporiComposer, SporiCopyButton, SporiHandoff, SporiIcon, SporiSources, SporiText, SporiTyping, type SporiIconName } from './sporiChat'
-import { formatTime, useSporiChat, useSporiScroll, type SporiMessage } from './useSporiChat'
+import { SporiAiBadge, SporiAvatar, SporiComposer, SporiCopyButton, SporiDeleteConversationModal, SporiHandoff, SporiIcon, SporiSources, SporiText, SporiTyping, type SporiIconName } from './sporiChat'
+import { formatTime, isAbortError, stoppedTaskMessage, useSporiChat, useSporiScroll, type SporiMessage } from './useSporiChat'
 import './sporiChat.css'
 
 type SporiRole = 'MEMBER' | 'MANAGER' | 'RECEPTIONIST' | 'COACH'
@@ -76,6 +76,10 @@ export function FloatingSporiChat({ isDesktop = true }: { isDesktop?: boolean })
   const [showHistory, setShowHistory] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
+  const [deletingSession, setDeletingSession] = useState(false)
+  const sessionAbortRef = useRef<AbortController | null>(null)
+  const sessionQuestionRef = useRef('')
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -110,6 +114,7 @@ export function FloatingSporiChat({ isDesktop = true }: { isDesktop?: boolean })
     dialog.current?.querySelector<HTMLButtonElement>('.spori-panel__close')?.focus()
     const handleKeyboard = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (pendingDeleteId !== null) return
         event.preventDefault()
         setOpen(false)
         launcher.current?.focus()
@@ -128,7 +133,7 @@ export function FloatingSporiChat({ isDesktop = true }: { isDesktop?: boolean })
       document.body.style.overflow = previousOverflow
       document.removeEventListener('keydown', handleKeyboard)
     }
-  }, [open])
+  }, [open, pendingDeleteId])
 
   const isSessionMode = activeSessionId !== null
   const totalCount = isSessionMode ? activeSessionMessages.length : chat.messages.length
@@ -208,19 +213,54 @@ export function FloatingSporiChat({ isDesktop = true }: { isDesktop?: boolean })
     }
   }, [activeSessionId, fetchSessions, handleNewChat, showArchived])
 
-  const handleDeleteSession = useCallback(async (sessionId: number, e: React.MouseEvent) => {
+  // Mo hop thoai xac nhan xoa thay cho window.confirm cua trinh duyet
+  const handleDeleteSession = useCallback((sessionId: number, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!window.confirm('Delete this conversation?')) return
+    setPendingDeleteId(sessionId)
+  }, [])
+
+  const confirmDeleteSession = useCallback(async () => {
+    if (pendingDeleteId === null || deletingSession) return
+    const targetId = pendingDeleteId
+    setDeletingSession(true)
     try {
-      await sporiApi.deleteSession(sessionId)
-      setSessions((curr) => curr.filter((s) => s.id !== sessionId))
-      if (activeSessionId === sessionId) {
+      await sporiApi.deleteSession(targetId)
+      setSessions((curr) => curr.filter((s) => s.id !== targetId))
+      if (activeSessionId === targetId) {
         handleNewChat()
       }
+      setPendingDeleteId(null)
     } catch (err) {
       console.error('Failed to delete session', err)
+    } finally {
+      setDeletingSession(false)
     }
-  }, [activeSessionId, handleNewChat])
+  }, [activeSessionId, deletingSession, handleNewChat, pendingDeleteId])
+
+  // Huy yeu cau dang tao cau tra loi o ca che do phien (session) va che do chat don
+  const handleStop = useCallback(() => {
+    const controller = sessionAbortRef.current
+    if (controller) {
+      const cancelledQuestion = sessionQuestionRef.current
+      sessionAbortRef.current = null
+      sessionQuestionRef.current = ''
+      controller.abort()
+      setSessionPending(false)
+      setActiveSessionMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          senderType: 'ASSISTANT',
+          content: stoppedTaskMessage(cancelledQuestion),
+          sentAt: new Date().toISOString(),
+        },
+      ])
+      input.current?.focus()
+      return
+    }
+    chat.stop()
+    input.current?.focus()
+  }, [chat])
 
   async function send() {
     const question = draft.trim()
@@ -235,26 +275,39 @@ export function FloatingSporiChat({ isDesktop = true }: { isDesktop?: boolean })
         sentAt: new Date().toISOString(),
       }
       setActiveSessionMessages((prev) => [...prev, tempUserMsg])
+      const controller = new AbortController()
+      sessionAbortRef.current = controller
+      sessionQuestionRef.current = question
       setSessionPending(true)
       try {
-        const res = await sporiApi.sendMessage(activeSessionId, question)
+        const res = await sporiApi.sendMessage(activeSessionId, question, controller.signal)
+        if (controller.signal.aborted || sessionAbortRef.current !== controller) return
         if (res && res.assistantMessage) {
           setActiveSessionMessages((prev) => [...prev, res.assistantMessage])
           void fetchSessions()
         }
-      } catch {
+      } catch (err) {
+        if (controller.signal.aborted || isAbortError(err) || sessionAbortRef.current !== controller) return
         // Fallback to chat.send if sendMessage fails (e.g. mock test environment)
         void chat.send(question)
       } finally {
-        setSessionPending(false)
-        input.current?.focus()
+        if (sessionAbortRef.current === controller) {
+          sessionAbortRef.current = null
+          sessionQuestionRef.current = ''
+          setSessionPending(false)
+          input.current?.focus()
+        }
       }
       return
     }
 
     // When starting from fresh chat: attempt session creation
+    const controller = new AbortController()
+    sessionAbortRef.current = controller
+    sessionQuestionRef.current = question
     try {
-      const created = await sporiApi.createSession()
+      const created = await sporiApi.createSession(undefined, controller.signal)
+      if (controller.signal.aborted || sessionAbortRef.current !== controller) return
       if (created && created.id) {
         setActiveSessionId(created.id)
         const tempUserMsg: ChatMessageItem = {
@@ -265,20 +318,28 @@ export function FloatingSporiChat({ isDesktop = true }: { isDesktop?: boolean })
         }
         setActiveSessionMessages([tempUserMsg])
         setSessionPending(true)
-        const res = await sporiApi.sendMessage(created.id, question)
+        const res = await sporiApi.sendMessage(created.id, question, controller.signal)
+        if (controller.signal.aborted || sessionAbortRef.current !== controller) return
         if (res && res.assistantMessage) {
           setActiveSessionMessages((prev) => [...prev, res.assistantMessage])
           void fetchSessions()
         }
+        sessionAbortRef.current = null
+        sessionQuestionRef.current = ''
         setSessionPending(false)
         input.current?.focus()
         return
       }
-    } catch {
+    } catch (err) {
+      if (controller.signal.aborted || isAbortError(err) || sessionAbortRef.current !== controller) return
       // In mock/test environments where createSession is not mocked,
       // fallback smoothly to chat.send(question)
     } finally {
-      setSessionPending(false)
+      if (sessionAbortRef.current === controller) {
+        sessionAbortRef.current = null
+        sessionQuestionRef.current = ''
+        setSessionPending(false)
+      }
     }
 
     void chat.send(question).then(() => input.current?.focus())
@@ -357,13 +418,12 @@ export function FloatingSporiChat({ isDesktop = true }: { isDesktop?: boolean })
                 </svg>
               )}
             </button>
-            {member && (
-              <Link className="spori-icon-button" to={assistantHref} onClick={close} aria-label="Open full assistant" title="Open full assistant">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5" />
-                </svg>
-              </Link>
-            )}
+            {/* Hien thi nut mo tro ly toan man hinh cho ca 4 vai tro */}
+            <Link className="spori-icon-button" to={assistantHref} onClick={close} aria-label="Open full assistant" title="Open full assistant">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5" />
+              </svg>
+            </Link>
             <button type="button" className="spori-icon-button spori-panel__close" aria-label="Close Spori AI" title="Close" onClick={close}>
               <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
             </button>
@@ -511,16 +571,23 @@ export function FloatingSporiChat({ isDesktop = true }: { isDesktop?: boolean })
               id="spori-question"
               label="Ask Spori a question"
               buttonLabel="Send"
-              placeholder="Type a message…"
+              placeholder="Type a message..."
               value={draft}
               pending={isPending}
               onChange={setDraft}
               onSubmit={() => void send()}
+              onStop={handleStop}
               inputRef={input}
             />
           )}
-        <p className="spori-panel__foot">Answers use Sportify data · Spori can make mistakes</p>
+        <p className="spori-panel__foot">Answers use Sportify data - Spori can make mistakes</p>
       </section>
+      <SporiDeleteConversationModal
+        open={pendingDeleteId !== null}
+        deleting={deletingSession}
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={() => void confirmDeleteSession()}
+      />
     </>}
   </>
 }
@@ -536,6 +603,12 @@ function FloatingMessage({ message, member, onNavigate }: { message: SporiMessag
     <div className="spori-row spori-row--bot">
       <SporiAvatar />
       <div className="spori-bubble is-error" role="alert"><SporiText text={message.text} /></div>
+    </div>
+  )
+  if (message.role === 'stopped') return (
+    <div className="spori-row spori-row--bot">
+      <SporiAvatar />
+      <div className="spori-bubble is-warning" role="status"><SporiText text={message.text} /></div>
     </div>
   )
   const { result, question } = message
