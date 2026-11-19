@@ -38,8 +38,8 @@ public final class UnifyPreflight {
                 .outOfOrder(false).baselineOnMigrate(false).ignoreMigrationPatterns(new String[0]).load();
         // validate and info only: never migrate, baseline, repair or clean.
         require(flyway.validateWithResult().validationSuccessful, "FLYWAY_HISTORY_MISMATCH");
-        // Main uses V67 for demo birth dates; PayOS migrations continue after it in V68-V70.
-        String releaseVersion = "70";
+        // Phien ban migration moi nhat sau khi bo sung V71 seed chung chi chuan cho Coach.
+        String releaseVersion = "71";
         require(flyway.info().current() != null && releaseVersion.equals(flyway.info().current().getVersion().toString())
                 && flyway.info().pending().length == 0, "V" + releaseVersion + "_REQUIRED");
         require(zero(jdbc, "SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0 AND schema_id<>SCHEMA_ID('dbo')"), "UNDECLARED_SCHEMA");
